@@ -1,0 +1,22 @@
+# Git / local state
+.git
+.gitignore
+.env
+*.log
+.DS_Store
+
+# Dependencies and build output are recreated inside the image
+node_modules
+*/node_modules
+web/dist
+coverage
+
+# Local SQLite files should not be baked into an image
+server/data/*.db
+server/data/*.db-*
+
+# Tool caches
+.cache
+.npm
+.vite
+.pytest_cache

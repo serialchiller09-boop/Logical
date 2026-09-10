@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^5.2.1"
   },
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.12.0"
   },
   "description": "Express + node:sqlite API serving the gas plant ladder-logic pocket reference dataset"
 }
