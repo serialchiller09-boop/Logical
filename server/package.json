@@ -1,0 +1,22 @@
+{
+  "name": "@logical/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/index.js",
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning src/seed/run.js",
+    "seed:force": "node --disable-warning=ExperimentalWarning src/seed/run.js --force",
+    "seed:reset": "node --disable-warning=ExperimentalWarning src/seed/run.js --reset"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "description": "Express + node:sqlite API serving the gas plant ladder-logic pocket reference dataset"
+}
