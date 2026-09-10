@@ -2,7 +2,10 @@
   "name": "logical-gasplant-pocket-reference",
   "version": "1.0.0",
   "private": true,
-  "description": "Pocket reference for ladder logic, instrumentation, valves and gas plant process \u2014 full-stack (Express + SQLite API, Vite + React UI)",
+  "description": "Pocket reference for ladder logic, instrumentation, valves and gas plant process — full-stack (Express + SQLite API, Vite + React UI)",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "workspaces": [
     "server",
     "web"
@@ -17,10 +20,11 @@
     "seed:force": "node --disable-warning=ExperimentalWarning server/src/seed/run.js --force",
     "seed:reset": "node --disable-warning=ExperimentalWarning server/src/seed/run.js --reset",
     "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.mjs",
-    "check:render": "node --disable-warning=ExperimentalWarning scripts/render-check.mjs"
+    "check:render": "node --disable-warning=ExperimentalWarning scripts/render-check.mjs",
+    "verify": "npm run build && npm test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
-    "esbuild": null
+    "esbuild": "^0.28.2"
   }
 }

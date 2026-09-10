@@ -1,0 +1,14 @@
+# Railway and other Nixpacks hosts can use this directly.
+# Logical needs Node 22.12+ because it uses node:sqlite.
+
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run verify"]
+
+[start]
+cmd = "npm start"

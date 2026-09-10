@@ -17,7 +17,7 @@ npm run dev         # API on :8787, Vite on :5173 (proxies /api)
 npm run build && npm start     # Express serves web/dist and the API on :8787
 ```
 
-Requires **Node ≥ 22.5** (the database is `node:sqlite`, built into Node — no native build step).
+Requires **Node ≥ 22.12** (the database is `node:sqlite`, built into Node — no native build step).
 
 ## The one rule that shapes everything
 
@@ -105,10 +105,22 @@ docs/ADMIN.md                the admin token, what an edit does, how reseeding p
 | `npm run seed:force` | re-apply reference content from source; rows you edited or created are kept |
 | `npm run seed:reset` | delete the database and rebuild it (this does clear bookmarks/notes — export first) |
 | `npm test` | 33 tests: ladder semantics, geometry integrity, I/O completeness, and the content policy below (provenance, badges, disclaimers) |
+| `npm run verify` | production build plus the test suite; useful as a hosting build check |
 | `npm run check:render` | render all 734 entries (cards, detail bodies, rung diagrams and simulators) into strings and fail on any throw - needs the API up; uses the esbuild that ships with vite |
 
 Environment: `PORT`, `HOST`, `LOGICAL_DB`, `LOGICAL_DATA_DIR`, `ADMIN_TOKEN` (see `docs/ADMIN.md`), and
 `API_ORIGIN` for the Vite proxy when the API lives elsewhere.
+
+## Deployment
+
+Logical is deployed as one Node web service: run `npm run build`, then `npm start`. Express serves both the
+API and the built React app from the same port. It is **not** a GitHub Pages-only app unless you convert it to
+a static/read-only build.
+
+Production needs Node `>=22.12.0`, a private `ADMIN_TOKEN`, and a persistent disk for `LOGICAL_DATA_DIR` if you
+want bookmarks, notes, and Plant data edits to survive redeploys. This repo includes ready-to-use deployment
+files for Render (`render.yaml`), Railway/Nixpacks (`railway.json`, `nixpacks.toml`), and Docker/Fly.io
+(`Dockerfile`, `fly.toml`). See [`docs/DEPLOY.md`](docs/DEPLOY.md) for step-by-step hosting instructions.
 
 ## API
 
