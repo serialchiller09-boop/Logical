@@ -19,6 +19,13 @@ npm run build && npm start     # Express serves web/dist and the API on :8787
 
 Requires **Node ≥ 22.12** (the database is `node:sqlite`, built into Node — no native build step).
 
+## Deploying the full app
+
+Logical should be hosted as a Node web service, not GitHub Pages, because the UI depends on the Express API and
+SQLite-backed state/admin features. This repo includes `render.yaml`, `railway.json`, `nixpacks.toml`,
+`fly.toml`, and a `Dockerfile` for full-app hosting. See [`docs/DEPLOY.md`](docs/DEPLOY.md) for plain-English
+step-by-step deployment instructions.
+
 ## The one rule that shapes everything
 
 **No invented facts, and no invented numbers.** The reference part of this app is safe to read at 2 a.m.

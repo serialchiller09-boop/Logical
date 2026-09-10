@@ -2,7 +2,9 @@ services:
   - type: web
     name: logical
     runtime: node
-    buildCommand: npm ci && npm run verify
+    plan: starter
+    numInstances: 1
+    buildCommand: npm ci --include=dev && npm run verify
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:

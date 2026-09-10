@@ -6,7 +6,7 @@ server creates and uses a SQLite database on disk.
 That means the production service needs three things:
 
 1. **Node 22.12 or newer** — the app uses `node:sqlite`.
-2. **A build step** — `npm ci && npm run build` creates `web/dist`.
+2. **A build step** — `npm ci --include=dev && npm run build` creates `web/dist`.
 3. **Persistent disk storage** if you want bookmarks, notes, and Plant data edits to survive redeploys.
 
 The server listens on `PORT` and `HOST`; defaults are `8787` and `0.0.0.0`.
@@ -26,7 +26,8 @@ directory.
 
 ## Fast path: Render
 
-This repo includes `render.yaml`, so Render can create the web service from the repository.
+This repo includes `render.yaml`, so Render can create the web service from the repository. The Blueprint uses
+one instance and a small persistent disk so the SQLite database survives deploys.
 
 Step by step:
 
@@ -37,7 +38,7 @@ Step by step:
 4. Connect the `serialchiller09-boop/Logical` repo.
 5. Use these settings:
    - Runtime: **Node**
-   - Build command: `npm ci && npm run verify`
+   - Build command: `npm ci --include=dev && npm run verify`
    - Start command: `npm start`
    - Health check path: `/api/health`
 6. Add environment variables:
@@ -139,7 +140,7 @@ built-in HTTPS router.
 Run this locally or in CI:
 
 ```bash
-npm ci
+npm ci --include=dev
 npm run verify
 ```
 
