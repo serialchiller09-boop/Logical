@@ -26,6 +26,7 @@ export default function Home() {
           <span className="pill"><b className="num">{sections.length}</b> sections</span>
           <span className="pill"><b className="num">{stats?.rungCount ?? 16}</b> runnable rungs</span>
           <span className="pill">search <kbd>⌘K</kbd></span>
+          <Link className="pill pill-accent" to="/notebook">new · substation project notebook →</Link>
           <span className="pill" style={{ color: 'var(--warn)' }}>no setpoints, ever — by design</span>
         </div>
       </section>

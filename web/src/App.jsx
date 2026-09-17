@@ -3,16 +3,17 @@ import { AppProvider, groupSections, useApp } from './lib/store.jsx';
 import { SearchPalette } from './components/SearchPalette.jsx';
 
 const TOOL_LINKS = [
+  { to: '/notebook', label: 'Substation notebook', icon: 'SS' },
   { to: '/tools', label: 'Tools & simulator', icon: '⌗' },
   { to: '/saved', label: 'My list', icon: '★' },
   { to: '/admin', label: 'Plant data', icon: '✎' }
 ];
 
-function Sidebar({ onNavigate }) {
+function Sidebar({ onNavigate, open = false }) {
   const { sections, bookmarks } = useApp();
   const groups = groupSections(sections);
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="brand">
         <span className="brand-mark" aria-hidden>
           <svg viewBox="0 0 100 60" width="42" height="25">
@@ -71,7 +72,7 @@ function Topbar() {
   const loc = useLocation();
   const seg = loc.pathname.split('/').filter(Boolean);
   const crumbs = [{ to: '/', label: 'reference' }];
-  const LABELS = { s: 'section', e: 'entry', tools: 'tools & simulator', saved: 'my list', admin: 'plant data', search: 'search' };
+  const LABELS = { s: 'section', e: 'entry', notebook: 'substation notebook', tools: 'tools & simulator', saved: 'my list', admin: 'plant data', search: 'search' };
   if (seg[0] && seg[0] !== '') crumbs.push({ to: `/${seg[0]}${seg[1] ? '' : ''}`, label: LABELS[seg[0]] || seg[0] });
   if (seg[1]) crumbs.push({ to: null, label: decodeURIComponent(seg[1]).replace(/^.*:/, '') });
 
@@ -99,8 +100,8 @@ function Shell() {
   const loc = useLocation();
   return (
     <div className="shell">
-      <div className={`scrim ${drawer ? 'show' : ''}`} onClick={() => setDrawer(false)} />
-      <Sidebar onNavigate={() => setDrawer(false)} />
+      <div className={`scrim-nav ${drawer ? 'show' : ''}`} onClick={() => setDrawer(false)} />
+      <Sidebar open={drawer} onNavigate={() => setDrawer(false)} />
       <div className="main">
         <Topbar />
         <div className="canvas" key={loc.pathname}>
