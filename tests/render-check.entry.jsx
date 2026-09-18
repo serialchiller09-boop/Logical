@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { EntryCard, StatusLegend } from '../web/src/components/Bits.jsx';
 import { Fields, RelatedLinks, ORDER_KEYS } from '../web/src/components/Fields.jsx';
 import { RungStatic, RungSimulator, subRungs, describeRung } from '../web/src/components/RungDiagram.jsx';
+import { AppProvider } from '../web/src/lib/store.jsx';
+import ProjectNotebook from '../web/src/pages/ProjectNotebook.jsx';
 
 const BASE = process.env.API_ORIGIN || 'http://127.0.0.1:8787';
 main().catch((e) => { console.error('FATAL', e); process.exit(1); });
@@ -52,6 +54,10 @@ for (const s of sections) {
   }
 }
 renderToString(React.createElement(StatusLegend));
+renderToString(
+  React.createElement(MemoryRouter, null,
+    React.createElement(AppProvider, null, React.createElement(ProjectNotebook)))
+);
 
 console.log(`rendered ${rendered} entries (${rungCount} rungs, ${simCount} simulators) with ${crashes.length} failures`);
 if (crashes.length) console.log(crashes.slice(0, 20).join('\n'));

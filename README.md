@@ -3,8 +3,8 @@
 A pocket reference and working tool for **reading and writing ladder logic around gas plant equipment** —
 ISA-5.1 tags, valves and actuators, transmitters and analysers, IEC 61131-3 data types, ladder elements,
 function blocks, PID/loop structure, gas process stages, equipment, safety and interlock vocabulary, units,
-and a standards index. Plus a rung simulator you can actually step, bookmarks, notes, and an editor for
-plant-specific answers.
+and a standards index. Plus a rung simulator you can actually step, bookmarks, notes, an editor for
+plant-specific answers, and a printable **substation PLC project notebook** for taking a software emulator through an isolated physical trainer.
 
 734 entries across 14 sections. Everything is one codebase: an Express + SQLite API whose content is
 version-controlled data modules, and a React front end that renders them.
@@ -75,6 +75,24 @@ manuals — not from this app.
 | Units & formulas | 39 | Definitional conversions and relations, with reference conditions called out |
 | Standards index | 38 | What each named document actually governs and why it appears here (scope, never content) |
 
+## Substation project notebook
+
+Open **Substation notebook** in the Workspace navigation (route `/notebook`). It is a self-contained, printable build
+workbook for a Studio 5000 or RSLogix 500 simulator with a Wonderware / AVEVA InTouch HMI. It includes:
+
+- an explicitly assumed source/main bus/transformer/two-cap-bank one-line to replace with the approved drawing;
+- a 12-phase, 60-check build plan whose progress and editable cover sheet stay in browser storage;
+- an exact assignment for 15 maintained inputs, 15 momentary inputs, two analog pots, six green LEDs, and two amber LEDs;
+- Studio 5000 and RSLogix 500 example address columns plus CSV export;
+- breaker/relay/transformer ownership, close permissives, first-out/86, timers, counters, ONS/OSR, and analog-quality patterns;
+- independent K1/K2 capacitor-bank state tables, with the mechanical Kirk system and approved safe-work process kept authoritative;
+- a seven-screen HMI plan, communication-loss checks, 14-case FAT, handoff register, print/PDF formatting, and source links.
+
+The notebook deliberately provides no relay pickups, voltage bands, CT ratios, discharge delay, breaker travel time, or
+other design value. Those fields point back to the one-line, elementary drawings, relay/cap-bank manuals, key-exchange
+drawing, cause-and-effect matrix, and adopted electrical safety procedure. The proposed physical interface is an isolated
+low-voltage trainer only; it is not a path for connecting a general-purpose PLC to live protection or instrument-transformer circuits.
+
 ## Layout
 
 ```
@@ -111,7 +129,7 @@ docs/ADMIN.md                the admin token, what an edit does, how reseeding p
 | `npm run seed` | create `server/data/logical.db` from the data modules (no-op if already seeded) |
 | `npm run seed:force` | re-apply reference content from source; rows you edited or created are kept |
 | `npm run seed:reset` | delete the database and rebuild it (this does clear bookmarks/notes — export first) |
-| `npm test` | 33 tests: ladder semantics, geometry integrity, I/O completeness, and the content policy below (provenance, badges, disclaimers) |
+| `npm test` | 36 tests: ladder semantics, geometry integrity, I/O completeness, notebook trainer allocations/safety boundaries, and the content policy below (provenance, badges, disclaimers) |
 | `npm run verify` | production build plus the test suite; useful as a hosting build check |
 | `npm run check:render` | render all 734 entries (cards, detail bodies, rung diagrams and simulators) into strings and fail on any throw - needs the API up; uses the esbuild that ships with vite |
 
