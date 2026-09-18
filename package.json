@@ -21,6 +21,7 @@
     "seed:reset": "node --disable-warning=ExperimentalWarning server/src/seed/run.js --reset",
     "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.mjs",
     "check:render": "node --disable-warning=ExperimentalWarning scripts/render-check.mjs",
+    "notebook:docs": "node scripts/generate-substation-notebook.mjs",
     "verify": "npm run build && npm test"
   },
   "devDependencies": {

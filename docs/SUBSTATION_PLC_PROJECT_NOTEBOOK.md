@@ -1,45 +1,72 @@
 # Substation PLC Simulator & Trainer — Project Notebook
 
-**Project ID:** SUB-TRAIN-01  
-**Targets:** Studio 5000 or RSLogix 500 · Wonderware / AVEVA InTouch · isolated low-voltage trainer
+**Project ID:** SUB-TRAIN-01
 
-> **TRAINING MODEL — NOT PROTECTION OR A SWITCHING PROCEDURE**  
+**Controller basis:** CompactLogix L18ER (full catalog/firmware pending confirmation)
+
+**Targets:** Studio 5000 · Wonderware / AVEVA InTouch · isolated low-voltage trainer
+
+> **TRAINING MODEL — NOT PROTECTION OR A SWITCHING PROCEDURE**
+>
 > Keep this project software-only or on an isolated low-voltage trainer. A standard PLC must not replace a protective relay, hardwired trip, mechanical Kirk interlock, approved discharge/grounding method, or absence-of-voltage test. Never open an energized CT secondary and never connect the trainer directly to substation CT/VT circuits.
 
 ## Project cover sheet
 
 | Field | Project value |
 |---|---|
-| Project | Substation PLC simulator & trainer |
-| Approved one-line / revision | **ADD ACTUAL DRAWING NUMBER AND REVISION** |
-| Controller / firmware | ______________________________ |
-| Programming target | Studio 5000 / RSLogix 500 (circle active target) |
+| Drawing | Uploaded Duke Energy Texas 138/4.16 kV one-line screenshot |
+| Original drawing number / revision | **ADD FROM NATIVE PDF** |
+| Controller / firmware | CompactLogix L18ER — confirm full catalog and firmware |
+| Studio 5000 revision | ______________________________ |
 | Emulator and version | ______________________________ |
 | Wonderware / AVEVA version | ______________________________ |
 | Trainer voltage, commons and isolation | **VERIFY BEFORE WIRING** |
-| Prepared by / date | ______________________________ |
-| Reviewer / date | ______________________________ |
+| Prepared / reviewed | ______________________________ |
 
-## 1. Design basis
+## 1. Drawing review and design basis
 
-The actual station one-line was not included with the repository. The baseline below is an explicit assumption to replace before using anything beyond software emulation.
+The uploaded screenshot establishes the architecture and branch count but is not sharp enough for reliable device-tag, rating or protection-setting transcription. Normalized simulator names are used below until the original PDF and elementary drawings are added.
 
-| Assumed tag | Device | Modeled role |
+| Area | What is visible | Reading status | Required confirmation |
+| --- | --- | --- | --- |
+| Drawing identity | Duke Energy Texas project-substation one-line; title identifies a 138/4.16 kV station. | Readable | Record the original drawing number and revision from the native PDF/title block. |
+| Incoming transformation | A 138 kV source enters through high-side switching/protection and a main step-down transformer to the 4.16 kV system. | Topology visible | Transcribe transformer, disconnect, breaker, CT and relay device tags from the original drawing. |
+| 4.16 kV bus and feeders | The medium-voltage bus supplies labeled feeder branches (including Feeder A, B and C) plus clouded additions. | Topology visible | Confirm every feeder name, breaker number, bus section and tie arrangement from the PDF. |
+| Motor/load feeders | Multiple protected load/motor branches and SEL relay bubbles are shown on the bus. | Visible; labels soft | Do not create PLC tags from the screenshot—use the relay/elementary drawings. |
+| Capacitor banks | Four repeated three-phase shunt-capacitor branches appear in the lower addition cloud. | Count visible | Confirm bank designations, ratings, breaker numbers, CTs, discharge devices and key schedule. |
+| Protection/communications | CTs, protective-relay functions and communications connections are depicted. | Architecture visible | Protection remains relay-owned; obtain settings, cause/effect and communications point lists separately. |
+
+### CompactLogix L18ER fit check
+
+| Item | Current basis | Project effect |
 | --- | --- | --- |
-| SRC-101 | Training source | Supplies the incoming side of the model; availability is simulated. |
-| CB-101 | Main breaker | Connects the source to BUS-101. Model includes 52a/52b state, close/open requests and trip ownership. |
-| BUS-101 | Main bus | Derived energized state; no live medium-voltage equipment is connected to the trainer. |
-| T-101 | Power transformer | Feeder load with simulated protection health/trip contacts and alarm indications. |
-| CB-201 | Transformer feeder breaker | Connects BUS-101 to T-101 in the training one-line. |
-| CB-301 / CAP-1 | Capacitor bank 1 breaker | Switched bank with operation count, anti-repeat logic and K1 transfer-key state. |
-| CB-302 / CAP-2 | Capacitor bank 2 breaker | Second switched bank with independent permissives and K2 transfer-key state. |
-| 86-L | Master lockout relay model | Latches protective trips and blocks closes until the trip cause is clear and reset is accepted. |
+| Controller family | CompactLogix 5370 L1 — user specified L18ER | Use the L1 embedded I/O plus local 1734 POINT I/O; confirm the complete nameplate catalog before creating the ACD. |
+| Likely full catalog | 1769-L18ER-BB1B — CONFIRM | Rockwell literature lists 16 embedded DC inputs and 16 embedded DC outputs for this family; the selected catalog also determines onboard analog capability. |
+| Maintained switches | 15 embedded digital inputs + 1 spare | Fits one 16-point bank after voltage, sourcing/sinking and common wiring are confirmed. |
+| Momentary switches | 15 additional digital inputs + 1 spare | Requires compatible local POINT I/O expansion; select the module only after the trainer electrical interface is known. |
+| LED outputs | 8 of 16 embedded digital outputs | Leaves 8 spares; verify sourcing behavior, output current and whether interposing devices are required. |
+| Potentiometers | 2 analog input channels | Use isolated onboard/expansion analog channels compatible with the measured trainer signal; do not assume a bare pot can connect directly. |
+| Studio 5000 revision | MATCH CONTROLLER FIRMWARE | Record firmware and compatible Logix Designer revision before creating or flashing the project. |
+| Emulation strategy | Confirm installed emulator support; keep internal plant model | The ACD target and emulator must be compatible. If not, validate logic on a supported virtual target and separately prove the L18ER hardware mapping. |
+
+### Normalized trainer topology
+
+| Simulator tag | Drawing equipment | Modeled role |
+| --- | --- | --- |
+| UTILITY_138KV | 138 kV source | Drawing-observed incoming source; availability is simulated on the isolated trainer. |
+| SW_HV / CB_HV | High-side switching and protection | Monitored as a simplified healthy/available state until the elementary drawings provide exact device points. |
+| XFMR_MAIN | 138/4.16 kV main transformer | Drawing-observed step-down transformer with relay-owned protection and PLC supervision only. |
+| CB_MAIN | 4.16 kV main breaker | Normalized trainer breaker with 52a/52b state, close/open requests, trip ownership and operation count. |
+| BUS_4KV | 4.16 kV bus | Derived energized/quality state; no live medium-voltage equipment is connected to the trainer. |
+| FDR_A… / MOTOR_LOADS | Feeder and motor branches | Shown on the HMI as monitored load branches; exact tags remain a drawing-transcription task. |
+| CB_CAP1…CB_CAP4 | Four shunt-capacitor bank breakers | Independent switched-bank instances with operation count, discharge sequence and K1–K4 trapped-key state. |
+| 86_LOCKOUT | Master lockout model | Latches imported protective trips and blocks closes until causes are clear and reset is accepted. |
 
 ### Control boundary
 
 - **PLC may own:** training requests, permissive display, simulator states, indications, counters, alarms and HMI handshakes.
-- **PLC may monitor:** relay trips/health, breaker auxiliary contacts, key position, disconnect/access position and hardwired trip status.
-- **PLC does not replace:** protective relay pickup, hardwired 86/trip circuits, trapped-key mechanics, grounding, absence-of-voltage test or safe-work procedure.
+- **PLC may monitor:** relay trips/health, breaker auxiliaries, key position and hardwired trip status.
+- **PLC does not replace:** protective relay pickup, hardwired 86/trip circuits, trapped-key mechanics, grounding, absence-of-voltage testing or safe-work procedure.
 
 ## 2. Step-by-step build plan
 
@@ -47,9 +74,9 @@ The actual station one-line was not included with the repository. The baseline b
 
 **Outcome:** A signed-off scope with every unknown visible.
 
-- [ ] Attach the actual one-line, elementary diagrams, relay list, breaker control schematics, cap-bank manual and Kirk key exchange drawing.
-- [ ] Replace the assumed tags SRC-101, CB-101, CB-201, CB-301, CB-302, T-101 and 86-L with drawing tags.
-- [ ] Record controller catalog number, firmware, programming software revision, emulator and Wonderware/AVEVA version.
+- [ ] Attach the original PDF of the uploaded 138/4.16 kV one-line, plus elementary diagrams, relay list, cap-bank manual and Kirk key exchange drawing.
+- [ ] Transcribe exact source, transformer, bus, feeder, motor, four cap-bank breaker and 86/relay tags; do not read soft characters from the screenshot.
+- [ ] Record the CompactLogix L18ER full catalog number, firmware, Studio 5000 revision, emulator strategy and Wonderware/AVEVA version.
 - [ ] Declare the boundary: software only, isolated low-voltage trainer, or observation of real equipment. Do not mix modes.
 - [ ] Write an “out of scope” list: protection settings, synchronization, arc-flash calculations and live switching are not implemented here.
 
@@ -61,7 +88,7 @@ The actual station one-line was not included with the repository. The baseline b
 
 - [ ] For every breaker, list 52a, 52b, local/remote, spring/energy charged, trip-circuit healthy, close coil and trip coil points actually available.
 - [ ] For every relay, list healthy, alarm and trip contacts independently; identify hardwired trip paths the PLC only monitors.
-- [ ] For T-101, list only indications present on the drawings (for example winding temperature, pressure/gas, sudden pressure or lockout) without inventing contacts.
+- [ ] For XFMR_MAIN, list only indications present on the transformer/relay drawings (for example winding temperature, pressure/gas, sudden pressure or lockout) without inventing contacts.
 - [ ] For each cap bank, document key trapped/released positions, disconnect/ground switch/access-door sequence and discharge requirement from approved documents.
 - [ ] Create OPEN, CLOSED, MOVING, BAD STATUS and BAD QUALITY truth tables. Do not treat missing data as OPEN.
 
@@ -127,17 +154,17 @@ The actual station one-line was not included with the repository. The baseline b
 
 **Evidence to retain:** Permissive matrix, rung printout and breaker FAT cases.
 
-### 08. Build both cap-bank Kirk sequences
+### 08. Build all four cap-bank Kirk sequences
 
 **Outcome:** Independent, testable supplemental indications around a real mechanical boundary.
 
-- [ ] Create separate K1 and K2 state tags, release requests, discharge timers, no-current indications and alarms.
-- [ ] Require proven open, current below the approved threshold and the approved discharge wait before indicating release permitted.
-- [ ] Block close whenever the key is not at the breaker, disconnect/access is open, sequence is active or input quality is bad.
-- [ ] Require key return and access/disconnect restoration before the bank can return to READY.
-- [ ] Walk every state and failure: timer reset, current returns, key changes early, access opens, relay trips and power cycles.
+- [ ] Create separate K1–K4 state tags, HMI release requests, discharge timers, selected-bank no-current proof and alarms.
+- [ ] Require proven open, current below the approved threshold and the approved discharge wait before indicating release permitted for the selected bank.
+- [ ] Block close whenever that bank key is not at its breaker, access is open, sequence is active or any required quality is bad.
+- [ ] Require key return and access/disconnect restoration before the selected bank can return to READY.
+- [ ] Walk every state and failure on all four instances: timer reset, current returns, wrong bank selected, key changes early, relay trips and power cycles.
 
-**Evidence to retain:** Approved key-exchange truth table and independent CAP-1/CAP-2 sequence FAT.
+**Evidence to retain:** Approved key-exchange truth table and independent CAP-1 through CAP-4 sequence FAT.
 
 ### 09. Add timers, counters, one-shots and alarms
 
@@ -189,7 +216,7 @@ The actual station one-line was not included with the repository. The baseline b
 
 ## 3. Physical trainer I/O
 
-**Capacity used:** 15 maintained inputs, 15 momentary inputs, 2 analog inputs, 6 green LED outputs and 2 amber LED outputs. Reserve the sixteenth channel in each digital input group. Addresses below are rack examples only; match the exact selected modules and processor.
+**Capacity used:** 15 maintained inputs, 15 momentary inputs, 2 analog inputs, 6 green LED outputs and 2 amber LED outputs. The L18ER family fit and generated module paths must be confirmed before wiring.
 
 ### 15 maintained toggles
 
@@ -198,63 +225,63 @@ The actual station one-line was not included with the repository. The baseline b
 | M01 | DI_SafetyChainHealthy | Local:1:I.Data.0 | I:1/0 | Safety chain healthy simulation | ON |  |  | Status input only. A real emergency stop remains hardwired and safety-rated. |
 | M02 | DI_ControlPowerHealthy | Local:1:I.Data.1 | I:1/1 | Control power healthy | ON |  |  | Drops every close permissive. |
 | M03 | DI_RemoteMode | Local:1:I.Data.2 | I:1/2 | Local / remote selector | OFF |  |  | ON selects HMI/trainer remote control. |
-| M04 | DI_SourceAvailable | Local:1:I.Data.3 | I:1/3 | Training source available | ON |  |  | Simulation of source voltage relay status. |
-| M05 | DI_XfmrProtectionHealthy | Local:1:I.Data.4 | I:1/4 | Transformer protection healthy | ON |  |  | Composite training contact; real relay contacts remain independent. |
-| M06 | DI_FeederRelayHealthy | Local:1:I.Data.5 | I:1/5 | 50/51 relay healthy | ON |  |  | Device-health indication, not a substitute for its trip output. |
-| M07 | DI_VoltageRelayHealthy | Local:1:I.Data.6 | I:1/6 | 27/59 relay healthy | ON |  |  | Training healthy contact for under/over-voltage relay. |
-| M08 | DI_CB101_52a | Local:1:I.Data.7 | I:1/7 | CB-101 closed indication | OFF |  |  | Trainer uses one toggle. Real gear should bring independent 52a and 52b contacts. |
-| M09 | DI_CB201_52a | Local:1:I.Data.8 | I:1/8 | CB-201 closed indication | OFF |  |  | 52b is derived only in training mode. |
-| M10 | DI_CB301_52a | Local:1:I.Data.9 | I:1/9 | CB-301 / CAP-1 closed | OFF |  |  | Drives CAP-1 status and operation edge count. |
-| M11 | DI_CB302_52a | Local:1:I.Data.10 | I:1/10 | CB-302 / CAP-2 closed | OFF |  |  | Drives CAP-2 status and operation edge count. |
-| M12 | DI_K1AtBreaker | Local:1:I.Data.11 | I:1/11 | K1 inserted/trapped at breaker | ON |  |  | Simulation of a key-position switch; the physical key system remains mechanical. |
-| M13 | DI_K2AtBreaker | Local:1:I.Data.12 | I:1/12 | K2 inserted/trapped at breaker | ON |  |  | Required for CAP-2 close permissive. |
-| M14 | DI_CAP1DisconnectOpen | Local:1:I.Data.13 | I:1/13 | CAP-1 disconnect/access open | OFF |  |  | ON blocks close. Confirm the actual lock sequence and switch truth table. |
-| M15 | DI_CAP2DisconnectOpen | Local:1:I.Data.14 | I:1/14 | CAP-2 disconnect/access open | OFF |  |  | ON blocks close. This is indication, not personnel protection. |
+| M04 | DI_SourceAvailable | Local:1:I.Data.3 | I:1/3 | 138 kV source available | ON |  |  | Simulation of incoming-source and high-side availability—not a live voltage indication. |
+| M05 | DI_XfmrProtectionHealthy | Local:1:I.Data.4 | I:1/4 | Main transformer protection healthy | ON |  |  | Composite trainer contact; actual relay alarm/trip contacts remain separate. |
+| M06 | DI_MVRelayHealthy | Local:1:I.Data.5 | I:1/5 | 4.16 kV protection healthy | ON |  |  | Composite trainer health input for the drawing-observed protective-relay layer. |
+| M07 | DI_CBMain_52a | Local:1:I.Data.6 | I:1/6 | 4.16 kV main breaker closed | OFF |  |  | Trainer has one contact per breaker; 52b may be derived only in training mode. |
+| M08 | DI_CBCap1_52a | Local:1:I.Data.7 | I:1/7 | CAP-1 breaker closed | OFF |  |  | Drives CAP-1 state and proven-operation count. |
+| M09 | DI_CBCap2_52a | Local:1:I.Data.8 | I:1/8 | CAP-2 breaker closed | OFF |  |  | Drives CAP-2 state and proven-operation count. |
+| M10 | DI_CBCap3_52a | Local:1:I.Data.9 | I:1/9 | CAP-3 breaker closed | OFF |  |  | Drives CAP-3 state and proven-operation count. |
+| M11 | DI_CBCap4_52a | Local:1:I.Data.10 | I:1/10 | CAP-4 breaker closed | OFF |  |  | Drives CAP-4 state and proven-operation count. |
+| M12 | DI_K1AtBreaker | Local:1:I.Data.11 | I:1/11 | K1 inserted/trapped at CAP-1 breaker | ON |  |  | Simulation of key-position indication; the physical key system remains mechanical. |
+| M13 | DI_K2AtBreaker | Local:1:I.Data.12 | I:1/12 | K2 inserted/trapped at CAP-2 breaker | ON |  |  | Independent CAP-2 close proof. |
+| M14 | DI_K3AtBreaker | Local:1:I.Data.13 | I:1/13 | K3 inserted/trapped at CAP-3 breaker | ON |  |  | Independent CAP-3 close proof. |
+| M15 | DI_K4AtBreaker | Local:1:I.Data.14 | I:1/14 | K4 inserted/trapped at CAP-4 breaker | ON |  |  | Independent CAP-4 close proof. |
 
 ### 15 momentary controls
 
 | Point | PLC tag / symbol | Studio 5000 example | RSLogix 500 example | Trainer label | Normal | Action | Engineering tag | Design note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| P01 | DI_PB_CB101_Close | Local:2:I.Data.0 | I:2/0 | CB-101 CLOSE |  | Request |  |  |
-| P02 | DI_PB_CB101_Open | Local:2:I.Data.1 | I:2/1 | CB-101 OPEN |  | Request |  |  |
-| P03 | DI_PB_CB201_Close | Local:2:I.Data.2 | I:2/2 | CB-201 CLOSE |  | Request |  |  |
-| P04 | DI_PB_CB201_Open | Local:2:I.Data.3 | I:2/3 | CB-201 OPEN |  | Request |  |  |
-| P05 | DI_PB_CB301_Close | Local:2:I.Data.4 | I:2/4 | CAP-1 CLOSE |  | Request |  |  |
-| P06 | DI_PB_CB301_Open | Local:2:I.Data.5 | I:2/5 | CAP-1 OPEN |  | Request |  |  |
-| P07 | DI_PB_CB302_Close | Local:2:I.Data.6 | I:2/6 | CAP-2 CLOSE |  | Request |  |  |
-| P08 | DI_PB_CB302_Open | Local:2:I.Data.7 | I:2/7 | CAP-2 OPEN |  | Request |  |  |
-| P09 | DI_PB_MasterTrip | Local:2:I.Data.8 | I:2/8 | MASTER TRIP |  | Trip input |  |  |
-| P10 | DI_PB_86Reset | Local:2:I.Data.9 | I:2/9 | 86 RESET |  | Reset request |  |  |
-| P11 | DI_PB_AlarmAck | Local:2:I.Data.10 | I:2/10 | ALARM ACKNOWLEDGE |  | Acknowledge |  |  |
-| P12 | DI_PB_CountReset | Local:2:I.Data.11 | I:2/11 | COUNTER RESET |  | Maintenance request |  |  |
-| P13 | DI_PB_K1ReleaseRequest | Local:2:I.Data.12 | I:2/12 | K1 RELEASE REQUEST |  | Sequence request |  |  |
-| P14 | DI_PB_K2ReleaseRequest | Local:2:I.Data.13 | I:2/13 | K2 RELEASE REQUEST |  | Sequence request |  |  |
+| P01 | DI_PB_CBMain_Close | Local:2:I.Data.0 | I:2/0 | 4.16 kV MAIN CLOSE |  | Request |  |  |
+| P02 | DI_PB_CBMain_Open | Local:2:I.Data.1 | I:2/1 | 4.16 kV MAIN OPEN |  | Request |  |  |
+| P03 | DI_PB_Cap1_Close | Local:2:I.Data.2 | I:2/2 | CAP-1 CLOSE |  | Request |  |  |
+| P04 | DI_PB_Cap1_Open | Local:2:I.Data.3 | I:2/3 | CAP-1 OPEN |  | Request |  |  |
+| P05 | DI_PB_Cap2_Close | Local:2:I.Data.4 | I:2/4 | CAP-2 CLOSE |  | Request |  |  |
+| P06 | DI_PB_Cap2_Open | Local:2:I.Data.5 | I:2/5 | CAP-2 OPEN |  | Request |  |  |
+| P07 | DI_PB_Cap3_Close | Local:2:I.Data.6 | I:2/6 | CAP-3 CLOSE |  | Request |  |  |
+| P08 | DI_PB_Cap3_Open | Local:2:I.Data.7 | I:2/7 | CAP-3 OPEN |  | Request |  |  |
+| P09 | DI_PB_Cap4_Close | Local:2:I.Data.8 | I:2/8 | CAP-4 CLOSE |  | Request |  |  |
+| P10 | DI_PB_Cap4_Open | Local:2:I.Data.9 | I:2/9 | CAP-4 OPEN |  | Request |  |  |
+| P11 | DI_PB_MasterTrip | Local:2:I.Data.10 | I:2/10 | MASTER TRIP |  | Trip input |  |  |
+| P12 | DI_PB_86Reset | Local:2:I.Data.11 | I:2/11 | 86 RESET |  | Reset request |  |  |
+| P13 | DI_PB_AlarmAck | Local:2:I.Data.12 | I:2/12 | ALARM ACKNOWLEDGE |  | Acknowledge |  |  |
+| P14 | DI_PB_CountReset | Local:2:I.Data.13 | I:2/13 | COUNTER RESET |  | Maintenance request |  |  |
 | P15 | DI_PB_LampTest | Local:2:I.Data.14 | I:2/14 | LAMP TEST |  | Test |  |  |
 
 ### 2 analog potentiometers
 
 | Point | PLC tag / symbol | Studio 5000 example | RSLogix 500 example | Trainer label | Normal | Action | Engineering tag | Design note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AI01 | AI_FeederCurrentRaw | Local:3:I.Ch0Data | I:3.0 | Potentiometer 1 — isolated CT/current simulator |  |  | AI_FeederCurrent_A | Scale raw minimum/maximum to the trainer range. Never connect a trainer analog input directly to an energized CT secondary. |
-| AI02 | AI_BusVoltageRaw | Local:3:I.Ch1Data | I:3.1 | Potentiometer 2 — isolated VT/bus-voltage simulator |  |  | AI_BusVoltage_Pct | Use percent-of-nominal in the emulator until the approved VT ratio is known. |
+| AI01 | AI_SelectedCapCurrentRaw | Local:3:I.Ch0Data | I:3.0 | Potentiometer 1 — selected-bank isolated CT/current simulator |  |  | AI_SelectedCapCurrent_Pct | HMI selects CAP-1…4 for one-at-a-time checkout. Never connect a trainer input to an energized CT secondary. |
+| AI02 | AI_BusVoltageRaw | Local:3:I.Ch1Data | I:3.1 | Potentiometer 2 — isolated 4.16 kV bus VT simulator |  |  | AI_BusVoltage_Pct | Use percent-of-nominal until the approved VT ratio and module calibration are transcribed. |
 
 ### 6 green LEDs
 
 | Point | PLC tag / symbol | Studio 5000 example | RSLogix 500 example | Trainer label | Normal | Action | Engineering tag | Design note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | G01 | DO_LED_ControlHealthy | Local:4:O.Data.0 | O:4/0 | CONTROL HEALTHY |  |  |  |  |
-| G02 | DO_LED_BusEnergized | Local:4:O.Data.1 | O:4/1 | BUS ENERGIZED |  |  |  |  |
-| G03 | DO_LED_CB101Closed | Local:4:O.Data.2 | O:4/2 | CB-101 CLOSED |  |  |  |  |
-| G04 | DO_LED_CB201Closed | Local:4:O.Data.3 | O:4/3 | CB-201 CLOSED |  |  |  |  |
-| G05 | DO_LED_CAP1Closed | Local:4:O.Data.4 | O:4/4 | CAP-1 CLOSED |  |  |  |  |
-| G06 | DO_LED_CAP2Closed | Local:4:O.Data.5 | O:4/5 | CAP-2 CLOSED |  |  |  |  |
+| G02 | DO_LED_BusEnergized | Local:4:O.Data.1 | O:4/1 | 4.16 kV BUS ENERGIZED |  |  |  |  |
+| G03 | DO_LED_Cap1Closed | Local:4:O.Data.2 | O:4/2 | CAP-1 CLOSED |  |  |  |  |
+| G04 | DO_LED_Cap2Closed | Local:4:O.Data.3 | O:4/3 | CAP-2 CLOSED |  |  |  |  |
+| G05 | DO_LED_Cap3Closed | Local:4:O.Data.4 | O:4/4 | CAP-3 CLOSED |  |  |  |  |
+| G06 | DO_LED_Cap4Closed | Local:4:O.Data.5 | O:4/5 | CAP-4 CLOSED |  |  |  |  |
 
 ### 2 amber LEDs
 
 | Point | PLC tag / symbol | Studio 5000 example | RSLogix 500 example | Trainer label | Normal | Action | Engineering tag | Design note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | A01 | DO_LED_TripLockout | Local:4:O.Data.6 | O:4/6 | TRIP / 86 LOCKOUT |  |  |  |  |
-| A02 | DO_LED_KeyRelease | Local:4:O.Data.7 | O:4/7 | KEY RELEASE PERMITTED |  |  |  |  |
+| A02 | DO_LED_KeyRelease | Local:4:O.Data.7 | O:4/7 | SELECTED KEY RELEASE PERMITTED |  |  |  |  |
 
 ### Internal / HMI tag starter set
 
@@ -263,20 +290,17 @@ The actual station one-line was not included with the repository. The baseline b
 | SYS_SimMode | BOOL | Configuration | Selects internal breaker plant model. Must be false before trainer outputs are enabled. |
 | SYS_FirstScan | BOOL | Controller | First-scan initialization; map to S:FS in Logix 5000 or S:1/15 in many SLC projects after verifying processor behavior. |
 | SYS_IOHealthy | BOOL | Diagnostics | Combined module/communications health. A failed input module blocks closes. |
-| BUS101_Energized | BOOL | State model | Derived from source available, main breaker state and voltage proof. |
-| CB101_52b_Training | BOOL | State model | Training-only complement of 52a. Do not use as an independent proof in real switchgear. |
-| P_CB101_Close | BOOL | Permissives | All reviewed conditions required to accept a main-breaker close request. |
-| P_CB201_Close | BOOL | Permissives | Main bus energized, transformer protection healthy, breaker open and no lockout. |
-| P_CAP1_Close | BOOL | Permissives | Bus/relay healthy, key at breaker, disconnect closed, breaker open, no 86 and no inhibit timer. |
-| P_CAP2_Close | BOOL | Permissives | Independent CAP-2 equivalent; never share an ONS storage bit with CAP-1. |
-| TRIP_Any | BOOL | Trips | OR of protective-relay trips, transformer trip, master trip and simulation trip requests. |
+| SIM_SelectedCapBank | DINT / N7 | Configuration | Selects CAP-1…4 for the single physical CT/current potentiometer; only the selected bank may use that proof. |
+| BUS4KV_Energized | BOOL | State model | Derived from source available, main breaker state, VT simulation and input quality. |
+| CBMain_52b_Training | BOOL | State model | Training-only complement of 52a. Do not use as an independent proof in real switchgear. |
+| P_CBMain_Close | BOOL | Permissives | All reviewed conditions required to accept a 4.16 kV main-breaker close request. |
+| P_CAP[1..4]_Close | BOOL[4] / B3 range | Permissives | Four independent results: bus and relay healthy, matching key at breaker, breaker open, no 86 and no inhibit. |
+| TRIP_Any | BOOL | Trips | OR of imported SEL/protective-relay trips, transformer trip, master trip and simulation trip requests. |
 | TRIP_FirstOutCode | DINT / N7 | Trips | Captures the first active cause; subsequent trips do not overwrite it until a controlled reset. |
 | L_86Lockout | BOOL | Trips | Latched lockout model. Reset only when all causes are clear and reset permissive is true. |
-| T_CAP1_Discharge | TIMER / T4 | Cap bank | Nameplate/engineering-approved discharge wait preset; page deliberately supplies no preset. |
-| T_CAP2_Discharge | TIMER / T4 | Cap bank | Independent timer and independent state for bank 2. |
-| C_CB101_Operations | COUNTER / C5 | Maintenance | Counts rising edges of proven closed feedback, not button presses. |
-| C_CAP1_Operations | COUNTER / C5 | Maintenance | Counts CAP-1 52a off-to-on transitions. |
-| C_CAP2_Operations | COUNTER / C5 | Maintenance | Counts CAP-2 52a off-to-on transitions. |
+| T_CAP[1..4]_Discharge | TIMER[4] / T4 range | Cap bank | Four independent discharge-wait instances; presets come from the bank documents and key schedule. |
+| C_CBMain_Operations | COUNTER / C5 | Maintenance | Counts rising edges of proven main-breaker closed feedback, not button presses. |
+| C_CAP[1..4]_Operations | COUNTER[4] / C5 range | Maintenance | Four independent counters driven by each capacitor breaker 52a rising edge. |
 
 ## 4. Controller structure and ladder patterns
 
@@ -290,7 +314,7 @@ The actual station one-line was not included with the repository. The baseline b
 | 30 | ProtectionTrips | Processes relay contacts, first-out capture and 86 lockout before close logic runs. | Trips always win the scan. |
 | 40 | Permissives | Calculates one named permissive and one named reason bit for each close condition. | HMI can explain every blocked close. |
 | 50 | BreakerControl | Arbitrates trainer and HMI requests, generates bounded command pulses and proves travel. | Commands are separate from status. |
-| 60 | CapBankKirk | Runs both bank state machines, discharge timers and key-release indication. | No PLC bit is presented as a mechanical key guarantee. |
+| 60 | CapBankKirk | Runs four independent bank state machines, discharge timers and selected-key release indication. | No PLC bit is presented as a mechanical key guarantee. |
 | 70 | Transformer | Combines alarm indications while preserving independent trip causes. | Transformer protection is visible without moving it into the PLC. |
 | 80 | CountersAlarms | Counts proven operations, applies one-shots, latches alarms and handles acknowledgement/reset. | Maintenance totals and first-out record. |
 | 90 | OutputMap | Maps internal commands and indications to physical outputs; lamp test affects lamps only. | One writer for each physical output. |
@@ -300,26 +324,27 @@ The actual station one-line was not included with the repository. The baseline b
 
 | Device | Close requires | Trip / block | PLC boundary |
 | --- | --- | --- | --- |
-| CB-101 | Safety chain healthy; control power healthy; remote/local authority valid; source available; protection and I/O healthy; 86 reset; breaker proven open | Master/protective trip, 86 lockout, contradictory 52a/52b, module fault | Control and indication only; protection trip remains hardwired/relay-owned where required. |
-| CB-201 | CB-101 closed; BUS-101 voltage proven; transformer protection healthy; feeder relay healthy; 86 reset; breaker open | Transformer/feeder trip, bus dead, 86 lockout, bad status | Accept close request and supervise travel. |
-| CB-301 / CAP-1 | Bus energized and voltage in approved band; relay healthy; K1 at breaker; CAP-1 disconnect/access not open; discharge/reclose inhibit complete; breaker open | Key removed, access/disconnect open, relay trip, bus dead, 86, bad status | Supplemental interlock, sequence and indication. Mechanical Kirk system is authoritative. |
-| CB-302 / CAP-2 | Same classes of proof as CAP-1 using independent tags, timer, ONS storage and key K2 | Same classes of trip/block using CAP-2 device inputs | Independent sequence; no shared state that can release the wrong key. |
-| 86-L reset | All active trip causes clear; breakers in reviewed state; reset request edge; reset authority valid | Any active or untrustworthy trip input | A reset never creates a close command. |
+| CB_MAIN | Safety chain and control power healthy; remote/local authority valid; 138 kV source/high-side available; transformer protection and I/O healthy; 86 reset; 4.16 kV breaker proven open | Imported transformer/bus/protective trip, master trip, 86 lockout, contradictory 52a/52b or module fault | Training control and indication only; drawing-observed protection remains relay/hardwire-owned. |
+| CB_CAP1 / K1 | 4.16 kV bus energized and voltage in approved band; relay healthy; K1 at breaker; access state secured; bank breaker open; no 86 or reclose inhibit | K1 removed, access open, bank relay trip, bus dead, 86 or bad quality/status | Supplemental interlock and sequence. Mechanical Kirk system is authoritative. |
+| CB_CAP2 / K2 | Same classes of proof as CAP-1 using independent CAP-2 tags, timer, ONS storage, counter and K2 | Same classes of trip/block using CAP-2 inputs | Independent instance; no state shared with another key. |
+| CB_CAP3 / K3 | Same classes of proof as CAP-1 using independent CAP-3 tags, timer, ONS storage, counter and K3 | Same classes of trip/block using CAP-3 inputs | Independent instance; no state shared with another key. |
+| CB_CAP4 / K4 | Same classes of proof as CAP-1 using independent CAP-4 tags, timer, ONS storage, counter and K4 | Same classes of trip/block using CAP-4 inputs | Independent instance; no state shared with another key. |
+| 86_LOCKOUT reset | All active trip causes clear; breakers in reviewed state; reset request edge; reset authority valid | Any active or untrustworthy trip input | A reset never creates a close command. |
 
 ### Illustrative ladder patterns
 
-> Tags are invented. All presets, thresholds, voltage bands and travel times are placeholders that must come from reviewed project documents. Verify instruction behavior for the exact processor and firmware.
+> Tags are normalized/invented. All presets, thresholds, voltage bands and travel times are placeholders that must come from reviewed project documents.
 
 #### Main-breaker close acceptance
 
 A request is an event; a permissive is a continuously evaluated condition; an output is a bounded action. Keep all three separate.
 
 ```text
-XIC(DI_PB_CB101_Close) ONS(OSR_CB101_CloseReq) OTL(REQ_CB101_Close);
-XIC(REQ_CB101_Close) XIC(P_CB101_Close) XIO(T_CB101_ClosePulse.DN) OTE(CMD_CB101_Close);
-XIC(REQ_CB101_Close) XIC(P_CB101_Close) TON(T_CB101_ClosePulse, PRE_CLOSE_PULSE_PLACEHOLDER);
-XIC(T_CB101_ClosePulse.DN) OTU(REQ_CB101_Close);
-XIC(REQ_CB101_Close) XIO(P_CB101_Close) OTL(ALM_CB101_CloseRejected) OTU(REQ_CB101_Close);
+XIC(DI_PB_CBMain_Close) ONS(OSR_CBMain_CloseReq) OTL(REQ_CBMain_Close);
+XIC(REQ_CBMain_Close) XIC(P_CBMain_Close) XIO(T_CBMain_ClosePulse.DN) OTE(CMD_CBMain_Close);
+XIC(REQ_CBMain_Close) XIC(P_CBMain_Close) TON(T_CBMain_ClosePulse, PRE_CLOSE_PULSE_PLACEHOLDER);
+XIC(T_CBMain_ClosePulse.DN) OTU(REQ_CBMain_Close);
+XIC(REQ_CBMain_Close) XIO(P_CBMain_Close) OTL(ALM_CBMain_CloseRejected) OTU(REQ_CBMain_Close);
 ```
 
 **RSLogix 500 translation:** Use OSR with a dedicated B3 storage bit, T4:x for the pulse timer and B3 bits for REQ/CMD. Verify the chosen processor instruction syntax.
@@ -330,8 +355,8 @@ Trip logic executes before close logic and drops commands in the same scan. Rese
 
 ```text
 XIC(TRIP_Any) OTL(L_86Lockout);
-XIC(TRIP_Any) OTU(REQ_CB101_Close) OTU(REQ_CB201_Close);
-XIC(TRIP_Any) OTU(REQ_CAP1_Close) OTU(REQ_CAP2_Close);
+XIC(TRIP_Any) OTU(REQ_CBMain_Close);
+XIC(TRIP_Any) OTU(REQ_CAP1_Close) OTU(REQ_CAP2_Close) OTU(REQ_CAP3_Close) OTU(REQ_CAP4_Close);
 XIC(DI_PB_86Reset) ONS(OSR_86Reset) XIC(P_86Reset) OTU(L_86Lockout);
 ```
 
@@ -355,10 +380,12 @@ XIO(DI_K1AtBreaker) OR XIC(DI_CAP1DisconnectOpen) OTE(BLK_CAP1_KeyAccess);
 A button press can be rejected and a close coil can fail. Count the state transition that proves the mechanism moved.
 
 ```text
-XIC(CB101_52a) ONS(OSR_CB101_ClosedEdge) CTU(C_CB101_Operations);
+XIC(CBMain_52a) ONS(OSR_CBMain_ClosedEdge) CTU(C_CBMain_Operations);
 XIC(CAP1_52a) ONS(OSR_CAP1_ClosedEdge) CTU(C_CAP1_Operations);
 XIC(CAP2_52a) ONS(OSR_CAP2_ClosedEdge) CTU(C_CAP2_Operations);
-XIC(MaintResetAuthorized) XIC(DI_PB_CountReset) ONS(OSR_CountReset) RES(C_CB101_Operations);
+XIC(CAP3_52a) ONS(OSR_CAP3_ClosedEdge) CTU(C_CAP3_Operations);
+XIC(CAP4_52a) ONS(OSR_CAP4_ClosedEdge) CTU(C_CAP4_Operations);
+XIC(MaintResetAuthorized) XIC(DI_PB_CountReset) ONS(OSR_CountReset) RES(C_CBMain_Operations);
 ```
 
 **RSLogix 500 translation:** Use separate OSR storage bits and C5 counters. Save totals externally before download/reset if maintenance depends on them.
@@ -368,9 +395,9 @@ XIC(MaintResetAuthorized) XIC(DI_PB_CountReset) ONS(OSR_CountReset) RES(C_CB101_
 Separate raw counts, engineering value and quality. A bad channel must not quietly become a valid zero.
 
 ```text
-CPT(AI_FeederCurrent_Pct, (AI_FeederCurrentRaw - RAW_MIN) * 100.0 / (RAW_MAX - RAW_MIN));
-LIM(RAW_VALID_LOW, AI_FeederCurrentRaw, RAW_VALID_HIGH) OTE(AI_FeederCurrent_QualityGood);
-XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRESHOLD_APPROVED) OTE(CAP_NoCurrentIndication);
+CPT(AI_SelectedCapCurrent_Pct, (AI_SelectedCapCurrentRaw - RAW_MIN) * 100.0 / (RAW_MAX - RAW_MIN));
+LIM(RAW_VALID_LOW, AI_SelectedCapCurrentRaw, RAW_VALID_HIGH) OTE(AI_SelectedCapCurrent_QualityGood);
+XIC(AI_SelectedCapCurrent_QualityGood) LES(AI_SelectedCapCurrent_Pct, CAP_NO_CURRENT_THRESHOLD_APPROVED) OTE(SelectedCAP_NoCurrentIndication);
 ```
 
 **RSLogix 500 translation:** Use SCP where supported or compute with F8 values and explicit divide-by-zero protection. Raw limits and thresholds come from module configuration and approved design data.
@@ -400,9 +427,9 @@ XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRES
 | Structured equipment | UDT/AOI after base logic is tested | Repeated documented file ranges/subroutines | Reusable symbol/faceplate with instance tag references |
 | First scan | S:FS | Processor status first-scan bit; verify processor manual | Not an HMI function |
 
-## 5. Kirk key system for the capacitor banks
+## 5. K1–K4 Kirk key system
 
-**Use the words KEY RELEASE PERMITTED, never “safe,” “de-energized,” or “safe to touch.”** A CT low-current indication is not an absence-of-voltage test. K1 and K2 require independent tags, timers, one-shot storage, counters and state.
+**Use KEY RELEASE PERMITTED, never “safe,” “de-energized,” or “safe to touch.”** A CT low-current indication is not an absence-of-voltage test. Each drawing-observed bank requires independent tags, timer, one-shot storage, counter and state.
 
 | State | Breaker proof | CT/current indication | Key location | Release indication | Close result |
 | --- | --- | --- | --- | --- | --- |
@@ -416,22 +443,11 @@ XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRES
 ### Sequence
 
 1. **Open:** open the selected bank breaker; trip/open always overrides close.
-2. **Prove:** require independent 52a/52b agreement, good quality and no-current indication.
-3. **Wait:** run that bank's discharge timer using the approved manufacturer/engineering preset.
+2. **Prove:** require 52a/52b agreement, good quality and selected-bank no-current indication.
+3. **Wait:** run only that bank's timer using the approved manufacturer/engineering preset.
 4. **Release:** indicate release permitted; the mechanical lock controls actual key removal.
-5. **Access:** key-at-breaker drops and/or disconnect/access opens, immediately blocking electrical close.
-6. **Return:** secure access, restore the disconnect as designed, return/trap the key, cancel the request and recalculate every permissive.
-
-### Kirk-system failure checks
-
-- [ ] No-current input failed low does not become a personnel-safety proof.
-- [ ] A breaker auxiliary contact is not treated as proof of isolation.
-- [ ] Timer completion is not treated as proof of capacitor discharge.
-- [ ] An HMI animation is not treated as proof of key location.
-- [ ] K1 state cannot release or block K2 accidentally.
-- [ ] Loss of any proof resets the selected bank's timer.
-- [ ] A power cycle cannot skip into RELEASE PERMITTED.
-- [ ] Key/access change blocks close immediately.
+5. **Access:** key-at-breaker drops and/or access opens, immediately blocking close.
+6. **Return:** secure access, return/trap the key, cancel the request and recalculate permissives.
 
 ## 6. Wonderware / AVEVA HMI
 
@@ -439,7 +455,7 @@ XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRES
 
 | Screen | Includes | Operator action | Acceptance |
 | --- | --- | --- | --- |
-| 01 — One-line overview | Source, four breakers, bus, transformer, both cap banks, 86 and analog meters | Open faceplates; no direct output writes | Every color has a text/state label; bad quality is gray/hatched, not “open”. |
+| 01 — Drawing overview | 138 kV source/high-side, main transformer, 4.16 kV main, feeders/motors, four cap banks, 86 and analog meters | Open faceplates; no direct output writes | Every color has a text/state label; untranscribed drawing tags remain visibly flagged. |
 | 02 — Breaker faceplate | 52a/52b, close/open request, permissive summary, command pulse, fail-to-open/close, local/remote | Two-step select then execute for training | Close rejected reason is visible and requests self-clear in PLC. |
 | 03 — Cap bank / Kirk sequence | Key location, breaker proof, CT no-current indication, discharge timer state, disconnect/access indication | Request release or cancel; follow mechanical procedure | Banner says PLC indication is supplemental and never “safe to touch”. |
 | 04 — Alarms & first-out | Active, unacknowledged, first-out code, timestamp from HMI historian, 86 state | Acknowledge; reset only from dedicated control | Acknowledge does not clear the trip or 86. |
@@ -465,13 +481,13 @@ XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRES
 | ID | Test | Method | Expected result |
 | --- | --- | --- | --- |
 | FAT-01 | Power-up / first scan | Restart controller in each mode | No spontaneous close; transient requests clear; intentional retentive data behaves as documented. |
-| FAT-02 | Main close success | Make all CB-101 permissives, pulse close and prove status | One request, bounded command, one operation count, CLOSED indication. |
+| FAT-02 | Main close success | Make all CB_MAIN permissives, pulse close and prove status | One request, bounded command, one operation count, CLOSED indication. |
 | FAT-03 | Each close block | Drop one permissive at a time | No output; exact block reason; rejected request self-clears. |
 | FAT-04 | Trip during close | Assert master/protective trip during command | Command drops, 86 latches, trip is first-out, closes remain blocked. |
 | FAT-05 | Aux contact disagreement | Simulate impossible 52a/52b combinations | BAD STATUS; neither OPEN nor CLOSED claimed; close blocked. |
 | FAT-06 | CAP discharge interruption | Begin K1 release then restore current/proof loss | Timer resets and release-permitted drops immediately. |
-| FAT-07 | Wrong key location | Remove K1 or open CAP-1 access then request close | CAP-1 close blocked; CAP-2 remains independent. |
-| FAT-08 | Bank independence | Operate both banks and inject one bank fault | No shared timer/ONS/counter state; only intended common bus/86 effects cross over. |
+| FAT-07 | Wrong key location | Remove each K1–K4 in turn, then request its bank close | Only the matching bank close is blocked; all other bank state remains independent. |
+| FAT-08 | Four-bank independence | Operate all bank instances and inject one bank fault | No shared timer/ONS/counter state; only intended common bus/86 effects cross over. |
 | FAT-09 | HMI communications loss | Disconnect driver while command is pressed | No stuck request/output; quality goes bad; operator is notified. |
 | FAT-10 | Analog bad quality | Drive raw value outside configured valid range / fault module | Bad quality, no-current proof invalid, key release blocked. |
 | FAT-11 | Counter integrity | Press close repeatedly without feedback, then complete one close | Rejected/failed presses do not count; one proven rising edge counts once. |
@@ -481,29 +497,35 @@ XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRES
 
 ### Handoff package
 
-- [ ] Controller ACD/RSS source, upload/compare, firmware/catalog and module profiles
-- [ ] HMI backup, tag export, communications configuration, alarm export and role record
-- [ ] One-line, elementary diagrams, I/O map, permissive matrix and cause/effect matrix
-- [ ] FAT results, analog calibration, point-to-point sheets and force/bypass-zero record
-- [ ] Clean-machine restore steps, required installers/licenses and known-good backup location
-- [ ] Revision, approvers, open items, trainer-only boundary and next review date
+- [ ] ACD source, upload/compare, firmware/catalog and module profiles
+- [ ] HMI backup, tag export, communications configuration, alarm export and roles
+- [ ] Original one-line/elementaries, I/O map, permissive matrix and cause/effect matrix
+- [ ] FAT, analog calibration, point-to-point sheets and force/bypass-zero record
+- [ ] Restore steps, installers/licenses and known-good backup location
 
-## 8. Project-specific documents required
+## 8. Studio 5000 package
 
-- [ ] Approved substation one-line and revision
+- [Studio 5000 package overview](studio5000/README.md)
+- [Routine-by-routine L18ER specification](studio5000/SUB_TRAIN_01_ROUTINE_SPEC.md)
+- [115-row tag design register](studio5000/SUB_TRAIN_01_TAG_REGISTER.csv)
+
+## Project-specific documents still required
+
+- [ ] Original one-line PDF and revision
 - [ ] Breaker elementary/control schematics
-- [ ] Relay manual, settings file and cause/effect matrix
+- [ ] Relay point list, settings file and cause/effect matrix
 - [ ] Transformer protection schematic
-- [ ] Capacitor-bank nameplate/manual and discharge requirement
-- [ ] Kirk key exchange drawing and key schedule
-- [ ] PLC/module installation and instruction manuals
-- [ ] Trainer wiring and electrical specifications
+- [ ] Four capacitor-bank manuals and discharge requirements
+- [ ] K1–K4 key-exchange drawing and key schedule
+- [ ] L18ER/POINT I/O and trainer electrical specifications
 - [ ] Wonderware / AVEVA application and OI-driver manuals
 - [ ] Electrical safe-work, switching, LOTO and MOC procedures
 
 ## Reference starting points
 
 - [Rockwell Automation Literature Library](https://literature.rockwellautomation.com/) — Controller, module and instruction manuals—select the exact catalog, firmware and publication revision.
+- [CompactLogix 5370 L1 product profile (1769-PP012)](https://literature.rockwellautomation.com/idc/groups/literature/documents/pp/1769-pp012_-en-e.pdf) — L18ER family embedded I/O, memory, expansion and communications starting point; verify the current revision and full catalog.
+- [CompactLogix controller specifications (1769-TD005)](https://literature.rockwellautomation.com/idc/groups/literature/documents/td/1769-td005_-en-p.pdf) — Controller and embedded-I/O technical data; use the publication revision applicable to the installed unit.
 - [Studio 5000 Logix Designer product page](https://www.rockwellautomation.com/en-us/products/software/factorytalk/designsuite/studio-5000.html) — Project environment and compatibility starting point.
 - [AVEVA InTouch HMI](https://www.aveva.com/en/products/intouch-hmi/) — HMI/communications documentation starting point; product naming varies by installed generation.
 - [Kirk Key Interlock resources](https://www.kirkkey.com/resources/) — Obtain the actual key-interlock scheme, operation/maintenance instructions and project drawing.
@@ -515,7 +537,7 @@ XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRES
 
 | Role | Name / signature | Date |
 |---|---|---|
-| Prepared by |  |  |
-| Controls review |  |  |
-| Electrical / protection review |  |  |
-| Training release |  |  |
+| Prepared by | | |
+| Controls review | | |
+| Electrical / protection review | | |
+| Training release | | |
