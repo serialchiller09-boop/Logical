@@ -4,6 +4,8 @@ import {
   ALL_IO_ROWS,
   ASSUMED_TOPOLOGY,
   BUILD_PHASES,
+  CONTROLLER_BASIS,
+  DRAWING_OBSERVATIONS,
   FAT_TESTS,
   HMI_SCREENS,
   INTERNAL_TAGS,
@@ -36,8 +38,8 @@ const CHAPTERS = [
 const DEFAULT_FIELDS = {
   projectName: 'Substation PLC simulator & trainer',
   drawing: 'ADD ACTUAL ONE-LINE NUMBER / REVISION',
-  controller: 'Choose exact controller catalog and firmware',
-  toolchain: 'Studio 5000 or RSLogix 500 — choose the active target',
+  controller: 'CompactLogix L18ER — confirm 1769-L18ER-BB1B and firmware',
+  toolchain: 'Studio 5000 Logix Designer — record exact revision',
   hmi: 'Wonderware / AVEVA InTouch version to be recorded',
   trainerPower: 'VERIFY voltage, commons, source/sink and isolation',
   preparedBy: '',
@@ -74,73 +76,86 @@ function downloadIoCsv() {
 
 function OneLineDiagram() {
   return (
-    <div className="oneline-wrap" role="img" aria-label="Assumed training one-line: source through main breaker to bus, transformer feeder and two capacitor banks">
-      <svg className="oneline" viewBox="0 0 980 410">
-        <title>Assumed training one-line — replace with the supplied approved drawing</title>
-        <desc>Training source SRC-101 feeds CB-101 and BUS-101. The bus feeds CB-201 and transformer T-101, plus independent capacitor-bank breakers CB-301 and CB-302.</desc>
+    <div className="oneline-wrap" role="img" aria-label="Drawing-informed training one-line: 138 kilovolt source, high-side switching, main transformer, 4.16 kilovolt main and bus, monitored feeders and motors, and four capacitor banks">
+      <svg className="oneline" viewBox="0 0 1020 430">
+        <title>Drawing-informed 138/4.16 kV training subset</title>
+        <desc>The uploaded Duke Energy one-line is normalized into a trainer model with incoming high-side status, one main transformer, one 4.16 kV main breaker, feeder and motor monitoring, and four independent capacitor-bank breakers with K1 through K4.</desc>
         <defs>
           <filter id="glow"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
         </defs>
+
         <g className="ol-wire">
-          <line x1="80" y1="58" x2="80" y2="108" />
-          <line x1="80" y1="148" x2="80" y2="205" />
-          <line x1="80" y1="205" x2="900" y2="205" className="ol-bus" />
-          <line x1="340" y1="205" x2="340" y2="263" />
-          <line x1="340" y1="303" x2="340" y2="326" />
-          <line x1="625" y1="205" x2="625" y2="263" />
-          <line x1="625" y1="303" x2="625" y2="354" />
-          <line x1="820" y1="205" x2="820" y2="263" />
-          <line x1="820" y1="303" x2="820" y2="354" />
+          <line x1="54" y1="92" x2="116" y2="92" />
+          <line x1="164" y1="92" x2="214" y2="92" />
+          <line x1="277" y1="92" x2="336" y2="92" />
+          <line x1="384" y1="92" x2="970" y2="92" className="ol-bus" />
+          <line x1="466" y1="92" x2="466" y2="190" />
+          <line x1="565" y1="92" x2="565" y2="190" />
+          <line x1="655" y1="92" x2="655" y2="271" />
+          <line x1="755" y1="92" x2="755" y2="271" />
+          <line x1="855" y1="92" x2="855" y2="271" />
+          <line x1="955" y1="92" x2="955" y2="271" />
+          <line x1="655" y1="313" x2="655" y2="355" />
+          <line x1="755" y1="313" x2="755" y2="355" />
+          <line x1="855" y1="313" x2="855" y2="355" />
+          <line x1="955" y1="313" x2="955" y2="355" />
         </g>
+
         <g className="ol-source">
-          <circle cx="80" cy="42" r="16" />
-          <path d="M68 42c5-9 9 9 14 0s9 9 14 0" />
-          <text x="110" y="39">SRC-101</text><text x="110" y="56" className="ol-sub">SIMULATED SOURCE</text>
-        </g>
-        <g className="ol-breaker" transform="translate(80 128)">
-          <rect x="-25" y="-20" width="50" height="40" rx="5" />
-          <line x1="-13" y1="10" x2="13" y2="-10" />
-          <text x="42" y="-3">CB-101</text><text x="42" y="14" className="ol-sub">MAIN · 52a/52b</text>
-        </g>
-        <text x="94" y="190" className="ol-ct">CT</text>
-        <text x="80" y="190" className="ol-ct-ring">◯</text>
-        <text x="80" y="230" textAnchor="middle">BUS-101</text>
-
-        <g className="ol-breaker" transform="translate(340 283)">
-          <rect x="-25" y="-20" width="50" height="40" rx="5" />
-          <line x1="-13" y1="10" x2="13" y2="-10" />
-          <text x="42" y="-3">CB-201</text><text x="42" y="14" className="ol-sub">XFMR FEEDER</text>
-        </g>
-        <g className="ol-xfmr" transform="translate(340 349)">
-          <circle cx="0" cy="-10" r="20" /><circle cx="0" cy="12" r="20" />
-          <text x="42" y="-4">T-101</text><text x="42" y="13" className="ol-sub">PROTECTION MONITORED</text>
+          <circle cx="38" cy="92" r="16" />
+          <path d="M26 92c5-9 9 9 14 0s9 9 14 0" />
+          <text x="20" y="55">138 kV SOURCE</text><text x="20" y="70" className="ol-sub">DRAWING OBSERVED</text>
         </g>
 
-        <g className="ol-breaker" transform="translate(625 283)">
-          <rect x="-25" y="-20" width="50" height="40" rx="5" />
-          <line x1="-13" y1="10" x2="13" y2="-10" />
-          <text x="42" y="-3">CB-301</text><text x="42" y="14" className="ol-sub">K1 KEY</text>
+        <g className="ol-breaker" transform="translate(140 92) rotate(90)">
+          <rect x="-24" y="-20" width="48" height="40" rx="5" />
+          <line x1="-12" y1="10" x2="12" y2="-10" />
         </g>
-        <g className="ol-cap" transform="translate(625 367)">
-          <line x1="-18" y1="-11" x2="18" y2="-11" /><line x1="-18" y1="3" x2="18" y2="3" /><line x1="0" y1="3" x2="0" y2="20" />
-          <text x="42" y="0">CAP-1</text><text x="42" y="17" className="ol-sub">DISCHARGE + ACCESS</text>
+        <text x="140" y="52" textAnchor="middle">HV SWITCHING</text><text x="140" y="68" textAnchor="middle" className="ol-sub">EXACT TAG PENDING</text>
+
+        <g className="ol-xfmr" transform="translate(245 92) rotate(90)">
+          <circle cx="0" cy="-11" r="21" /><circle cx="0" cy="13" r="21" />
+        </g>
+        <text x="245" y="44" textAnchor="middle">XFMR_MAIN</text><text x="245" y="60" textAnchor="middle" className="ol-sub">138 / 4.16 kV</text>
+
+        <g className="ol-breaker" transform="translate(360 92) rotate(90)">
+          <rect x="-24" y="-20" width="48" height="40" rx="5" />
+          <line x1="-12" y1="10" x2="12" y2="-10" />
+        </g>
+        <text x="360" y="44" textAnchor="middle">CB_MAIN</text><text x="360" y="60" textAnchor="middle" className="ol-sub">NORMALIZED TRAINER TAG</text>
+        <text x="690" y="79" textAnchor="middle">BUS_4KV · 4.16 kV</text>
+
+        <g className="ol-relay" transform="translate(705 24)">
+          <rect x="-86" y="-17" width="172" height="34" rx="7" />
+          <text textAnchor="middle" y="-2">SEL / CT / 86 INPUTS</text><text textAnchor="middle" y="12" className="ol-sub">PROTECTION REMAINS RELAY-OWNED</text>
+          <path d="M0 17V53" strokeDasharray="5 5" />
         </g>
 
-        <g className="ol-breaker" transform="translate(820 283)">
-          <rect x="-25" y="-20" width="50" height="40" rx="5" />
-          <line x1="-13" y1="10" x2="13" y2="-10" />
-          <text x="42" y="-3">CB-302</text><text x="42" y="14" className="ol-sub">K2 KEY</text>
+        <g className="ol-relay" transform="translate(466 213)">
+          <rect x="-58" y="-23" width="116" height="46" rx="7" />
+          <text textAnchor="middle" y="-2">FEEDERS A–C</text><text textAnchor="middle" y="13" className="ol-sub">+ CLOUDED ADDITIONS</text>
         </g>
-        <g className="ol-cap" transform="translate(820 367)">
-          <line x1="-18" y1="-11" x2="18" y2="-11" /><line x1="-18" y1="3" x2="18" y2="3" /><line x1="0" y1="3" x2="0" y2="20" />
-          <text x="42" y="0">CAP-2</text><text x="42" y="17" className="ol-sub">INDEPENDENT K2</text>
+        <g className="ol-relay" transform="translate(565 213)">
+          <rect x="-43" y="-23" width="86" height="46" rx="7" />
+          <text textAnchor="middle" y="-2">MOTOR / LOAD</text><text textAnchor="middle" y="13" className="ol-sub">MONITOR ONLY</text>
         </g>
-        <g className="ol-relay" transform="translate(735 84)">
-          <rect x="-70" y="-28" width="140" height="56" rx="8" />
-          <text textAnchor="middle" y="-3">50/51 · 27/59 · 86</text><text textAnchor="middle" y="15" className="ol-sub">RELAY TRIPS WIN</text>
-          <path d="M0 28V86" strokeDasharray="5 5" />
-        </g>
-        <text x="900" y="195" textAnchor="end" className="ol-note">TRAINING MODEL · NO LIVE BUS</text>
+
+        {[655, 755, 855, 955].map((x, i) => (
+          <g key={x}>
+            <g className="ol-breaker" transform={`translate(${x} 292)`}>
+              <rect x="-22" y="-20" width="44" height="40" rx="5" />
+              <line x1="-11" y1="10" x2="11" y2="-10" />
+            </g>
+            <text x={x} y="255" textAnchor="middle">CB_CAP{i + 1}</text>
+            <text x={x} y="332" textAnchor="middle" className="ol-sub">K{i + 1} KEY</text>
+            <g className="ol-cap" transform={`translate(${x} 371)`}>
+              <line x1="-16" y1="-10" x2="16" y2="-10" /><line x1="-16" y1="3" x2="16" y2="3" /><line x1="0" y1="3" x2="0" y2="19" />
+            </g>
+            <text x={x} y="412" textAnchor="middle">CAP-{i + 1}</text>
+          </g>
+        ))}
+
+        <text x="20" y="410" className="ol-note">DRAWING-INFORMED TRAINER SUBSET · DEVICE TAGS / RATINGS REQUIRE ORIGINAL PDF</text>
       </svg>
     </div>
   );
@@ -268,8 +283,8 @@ export default function ProjectNotebook() {
         <h1>Substation PLC simulator<br /><em>from one-line to trainer</em></h1>
         <p>
           A buildable learning project for Studio 5000 or RSLogix 500 with a Wonderware / AVEVA HMI,
-          organized around breakers, transformer and relay supervision, CT/VT simulation, two Kirk-keyed capacitor
-          banks, permissives, timers, counters and one-shots.
+          organized around the uploaded 138/4.16 kV one-line: high-side and transformer supervision, the 4.16 kV
+          main/bus, feeder and motor monitoring, four Kirk-keyed capacitor banks, permissives, timers, counters and one-shots.
         </p>
         <div className="notebook-actions">
           <a href="#plan" className="btn btn-primary">Start the build plan ↓</a>
@@ -304,10 +319,19 @@ export default function ProjectNotebook() {
 
         <main className="notebook-main">
           <section className="notebook-chapter" id="basis">
-            <ChapterHead number="01" eyebrow="Start with documents, not rungs" title="Design basis">
-              The substation drawing was not included in the repository, so the topology below is an explicit, editable
-              assumption—not a claim about the real station. Replace it before using anything beyond emulation.
+            <ChapterHead number="01" eyebrow="Drawing received · transcription still controlled" title="Design basis">
+              The uploaded screenshot establishes the 138/4.16 kV architecture and four capacitor-bank branches. Its
+              resolution is not adequate for reliable character-by-character device tags, ratings or protection settings,
+              so the notebook uses normalized simulator names and keeps exact transcription as an open document-control task.
             </ChapterHead>
+
+            <div className="card drawing-review-card">
+              <div className="card-hd"><h3>Uploaded one-line review</h3><span className="st st-practice">drawing-informed</span></div>
+              <div className="card-bd"><Table rows={DRAWING_OBSERVATIONS} columns={[
+                { key: 'area', label: 'Area' }, { key: 'observed', label: 'What is visible' },
+                { key: 'confidence', label: 'Reading status' }, { key: 'action', label: 'Required confirmation' }
+              ]} /></div>
+            </div>
 
             <div className="basis-grid">
               <div className="card basis-form-card">
@@ -328,8 +352,15 @@ export default function ProjectNotebook() {
               </div>
             </div>
 
+            <div className="card controller-basis-card">
+              <div className="card-hd"><h3>CompactLogix L18ER fit check</h3><span className="st st-vendor">confirm full catalog</span></div>
+              <div className="card-bd"><Table rows={CONTROLLER_BASIS} columns={[
+                { key: 'item', label: 'Item' }, { key: 'selection', label: 'Current basis' }, { key: 'designEffect', label: 'Project effect' }
+              ]} /></div>
+            </div>
+
             <div className="card oneline-card">
-              <div className="card-hd"><h3>Assumed training one-line</h3><span className="st st-site-specific">replace from drawing</span></div>
+              <div className="card-hd"><h3>Drawing-informed trainer subset</h3><span className="st st-site-specific">exact tags pending PDF</span></div>
               <div className="card-bd"><OneLineDiagram /></div>
             </div>
 
@@ -337,7 +368,7 @@ export default function ProjectNotebook() {
               <div className="card-hd"><h3>Device register</h3><span className="hd-note">the model boundary</span></div>
               <div className="card-bd">
                 <Table compact rows={ASSUMED_TOPOLOGY} columns={[
-                  { key: 'tag', label: 'Assumed tag', mono: true }, { key: 'device', label: 'Device' }, { key: 'role', label: 'Modeled role' }
+                  { key: 'tag', label: 'Normalized simulator tag', mono: true }, { key: 'device', label: 'Drawing equipment' }, { key: 'role', label: 'Modeled role' }
                 ]} />
               </div>
             </div>
@@ -360,21 +391,25 @@ export default function ProjectNotebook() {
           </section>
 
           <section className="notebook-chapter" id="io">
-            <ChapterHead number="03" eyebrow="Thirty-two inputs, eight outputs" title="Physical trainer I/O map">
-              The addresses are rack examples, not guarantees. Match the actual modules, terminal bases and processor
-              addressing. Leave the sixteenth channel in each digital input group spare.
+            <ChapterHead number="03" eyebrow="Thirty-two inputs, eight outputs" title="L18ER trainer I/O map">
+              Use the L18ER embedded I/O where the confirmed full catalog supports it, then add one compatible 16-point
+              local POINT I/O input group for the momentary controls. Generated module addresses replace the examples below.
             </ChapterHead>
 
             <div className="io-allocation">
               {[
-                ['Slot 1', '15 × maintained DI', '1 spare'], ['Slot 2', '15 × momentary DI', '1 spare'],
-                ['Slot 3', '2 × isolated AI', 'calibrate'], ['Slot 4', '6 green + 2 amber DO', '8 used']
+                ['Embedded DI', '15 × maintained', '1 spare'], ['POINT I/O DI', '15 × momentary', '1 spare'],
+                ['Analog inputs', '2 × isolated pots', 'catalog check'], ['Embedded DO', '6 green + 2 amber', '8 spares']
               ].map(([slot, use, meta]) => <div key={slot}><span>{slot}</span><b>{use}</b><small>{meta}</small></div>)}
             </div>
 
             <div className="callout callout-warn">
               <h4>Before wiring</h4>
               <div>Verify input/output voltage, commons, source/sink type, analog signal mode, isolation, fusing and LED current against the exact PLC and trainer manuals. “Potentiometer” does not by itself identify a safe signal for an analog module.</div>
+            </div>
+            <div className="callout callout-info" style={{ marginTop: 10 }}>
+              <h4>How four banks fit the available controls</h4>
+              <div>M08–M11 prove the four breaker states and M12–M15 simulate K1–K4 at their breakers. P03–P10 provide each bank's close/open requests. Individual access/disconnect states and key-release requests remain HMI simulation points unless the trainer gains more inputs. Pot 1 proves current only for the bank selected on the HMI; every unselected bank is fail-blocked.</div>
             </div>
 
             {[
@@ -448,9 +483,9 @@ export default function ProjectNotebook() {
           </section>
 
           <section className="notebook-chapter" id="kirk">
-            <ChapterHead number="05" eyebrow="Mechanical authority, PLC supervision" title="Kirk key system for capacitor banks">
-              Model two independent key exchanges. The PLC may display that electrical preconditions for a release are met;
-              only the approved mechanical interlock scheme and work procedure establish the real sequence.
+            <ChapterHead number="05" eyebrow="Four independent keys · mechanical authority" title="Kirk key system for capacitor banks">
+              Model K1 through K4 as separate key exchanges around the four drawing-observed capacitor branches. The PLC may
+              display electrical release preconditions; only the approved mechanical scheme and work procedure establish the real sequence.
             </ChapterHead>
 
             <div className="kirk-rule">
@@ -487,7 +522,7 @@ export default function ProjectNotebook() {
               <div className="callout callout-ok">
                 <h4>What to test twice</h4>
                 <ul>
-                  <li>K1 state never releases or blocks K2 by accident.</li>
+                  <li>K1–K4 never share state, timers, counters or ONS storage.</li>
                   <li>Loss of any proof resets its discharge timer.</li>
                   <li>Power cycle cannot skip into RELEASE PERMITTED.</li>
                   <li>Key/access change blocks close immediately.</li>
