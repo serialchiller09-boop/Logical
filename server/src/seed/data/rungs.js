@@ -415,5 +415,71 @@ export const RUNGS = [
     ],
     status: 'illustrative-example',
     mnemonics: ['XIC', 'XIO', 'OTE', 'TON', 'OTL']
+  },
+
+  {
+    id: 'rung-cap-close',
+    title: 'Switched capacitor bank close: discharge wait and key interlock',
+    category: 'Capacitor banks / switchgear',
+    level: 'Intermediate',
+    oneLine: 'Close CAP-1 only when the bank is discharged, the key is at the breaker, and every electrical permissive is true.',
+    purpose: 'Supplemental close gate for a switched capacitor bank (repeat with independent tags, timer, ONS storage and transfer key K2 for CAP-2 - never share state between banks). The close command goes out when: bus energized and voltage proven, relay protection healthy, the transfer key is trapped at the breaker, disconnect/access is closed, no 86 lockout is latched, the breaker is proven open, and the bank discharge timer has run to .DN. The command is written to the close coil as a bounded pulse; the breaker\'s own 52a feedback is what proves the mechanism actually moved. The PLC indication is supplemental to the mechanical Kirk key system and the approved safe-work process - it never proves discharge or absence of voltage.',
+    boolean: 'CAP1_CLOSE_CMD = CAP1_CloseReq AND BUS101_Energized AND CAP1_RelayHealthy AND DI_K1AtBreaker AND NOT CAP1_DisconnectOpen AND NOT L_86Lockout AND T_CAP1_Discharge.DN AND NOT CAP1_52a',
+    ladder: {
+      t: 'and',
+      c: [
+        { t: 'no', a: 'CAP1_CloseReq', l: 'Close request accepted' },
+        { t: 'no', a: 'BUS101_Energized', l: 'Bus energized, voltage in band' },
+        { t: 'no', a: 'CAP1_RelayHealthy', l: 'Relay / protection healthy' },
+        { t: 'no', a: 'DI_K1AtBreaker', l: 'K1 trapped at breaker' },
+        { t: 'nc', a: 'CAP1_DisconnectOpen', l: 'Disconnect / access closed' },
+        { t: 'nc', a: 'L_86Lockout', l: 'No lockout' },
+        { t: 'no', a: 'T_CAP1_Discharge.DN', l: 'Discharge wait complete' },
+        { t: 'nc', a: 'CAP1_52a', l: 'Breaker proven open' },
+        { t: 'coil', k: 'OTE', a: 'CAP1_CloseCmd', l: 'Close command (bounded pulse)' }
+      ]
+    },
+    dischargeRung: {
+      note: 'The discharge timer is the half that is easy to forget: it only runs when the breaker is proven open, current is gone, and a key release has been requested. Current returning resets it - a TON is non-retentive - so .DN is not a measurement of discharged bank, it is a waited clock:',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'nc', a: 'CAP1_52a', l: 'Breaker proven open' },
+          { t: 'no', a: 'CAP1_NoCurrent', l: 'No-current proof true' },
+          { t: 'no', a: 'CAP1_KeyReleaseReq', l: 'Key release requested' },
+          { t: 'blk', k: 'TON', a: 'T_CAP1_Discharge', l: 'Discharge wait timer', p: [{ k: 'PRE', v: 'PLACEHOLDER - manufacturer / approved procedure' }, { k: 'DN', v: 'wait complete' }] }
+        ]
+      }
+    },
+    io: [
+      { tag: 'CAP1_CloseReq', type: 'BIT', addr: 'B3:7/0', role: 'Accepted close request, latched once by the upstream request-acceptance rung', initial: 0 },
+      { tag: 'BUS101_Energized', type: 'DI', addr: 'I:1/3', role: 'Bus energized, voltage relay proof', initial: 0 },
+      { tag: 'CAP1_RelayHealthy', type: 'DI', addr: 'I:1/4', role: 'Cap-bank relay composite healthy', initial: 0 },
+      { tag: 'DI_K1AtBreaker', type: 'DI', addr: 'I:1/11', role: 'K1 transfer key inserted / trapped at breaker', initial: 1 },
+      { tag: 'CAP1_DisconnectOpen', type: 'DI', addr: 'I:1/13', role: 'Disconnect or access door open - blocks close', initial: 0 },
+      { tag: 'L_86Lockout', type: 'BIT', addr: 'B3:10/0', role: 'Master lockout latched on any trip', initial: 0 },
+      { tag: 'T_CAP1_Discharge', type: 'TIMER', addr: 'T4:0', role: 'Bank discharge wait; the preset comes from the capacitor-bank nameplate and the approved procedure at your site - never from this page', initial: 0 },
+      { tag: 'CAP1_52a', type: 'DI', addr: 'I:1/9', role: 'CAP-1 closed indication', initial: 0 },
+      { tag: 'CAP1_NoCurrent', type: 'DI', addr: 'I:1/15', role: 'CT no-current indication on the bank', initial: 0 },
+      { tag: 'CAP1_KeyReleaseReq', type: 'BIT', addr: 'B3:7/1', role: 'Key-release request from the operator sequence', initial: 0 },
+      { tag: 'CAP1_CloseCmd', type: 'DO', addr: 'O:4/0', role: 'CAP-1 close coil command (pulsed, not sealed in)', initial: 0 }
+    ],
+    readThisWay: [
+      'Every element is in series, so it is one AND chain: open any contact and the close command does not go out. That is the point - a capacitor bank close has no optional permissive.',
+      'The discharge rung runs first in the program order. .DN only sets after breaker-open plus no-current plus release request stay true for the whole preset, so the close rung above can never fire while the bank is still holding charge.',
+      'The coil is an OTE command pulse, not an OTL seal-in. If you seal the output in yourself you lose the 52a proof that the mechanism actually closed - and a welded contactor looks like a successful close to anything reading only the output bit.',
+      'CAP-2 gets its own complete copy: P_CAP2_Close, T_CAP2_Discharge, K2, its own ONS storage bits and counters. A shared timer or storage bit between banks is how the wrong bank gets released.'
+    ],
+    defects: [
+      'Commanding close from the request button instead of the permissive chain: one press with the key removed, or during lockout, still fires the close coil.',
+      'Treating the timer .DN as proof the bank is discharged. It is a clock, not a measurement - the no-current proof and the approved discharge procedure do the proving.',
+      'Counting close requests or command bits in the operations counter. A rejected or failed close must not count; only the proven 52a off-to-on edge counts as an operation.',
+      'Sharing the discharge timer, one-shot storage bit or key bit between CAP-1 and CAP-2. A fault on one bank can then release the other.',
+      'Letting the PLC own the Kirk key. The PLC may indicate \"release permitted\"; the trapped-key hardware, grounding and absence-of-voltage test own the safety.',
+      'No reject path: when a close is blocked, the operator needs the exact blocked reason (key out, 86 latched, discharge running) rather than a silent no-op.'
+    ],
+    status: 'illustrative-example',
+    mnemonics: ['XIC', 'XIO', 'OTE', 'TON'],
+    note: 'Authored example for a cap bank project. The tags are invented and every address, timer preset and limit is a placeholder - not a design value and not a starting point for yours. The discharge preset comes from the capacitor-bank manufacturer / nameplate and the adopted electrical safe-work procedure; the mechanical Kirk system remains authoritative over any PLC indication.'
   }
 ];

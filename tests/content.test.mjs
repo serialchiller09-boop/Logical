@@ -87,7 +87,7 @@ test('the badge describes the evidence on the row: no strong badge on a section-
 
 test('example rungs are badged as authored examples and say the numbers are placeholders', () => {
   const rungs = ENTRIES.filter((e) => e.section === 'rungs');
-  assert.equal(rungs.length, 16);
+  assert.equal(rungs.length, 17);
   for (const e of rungs) {
     assert.equal(e.status, 'illustrative-example', `${e.id} is not badged as an authored example`);
     assert.match(e.payload.exampleNotice || '', /not a design value/i, `${e.id} is missing the design-value disclaimer`);
