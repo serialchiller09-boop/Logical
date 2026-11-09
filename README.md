@@ -4,7 +4,8 @@ A pocket reference and working tool for **reading and writing ladder logic aroun
 ISA-5.1 tags, valves and actuators, transmitters and analysers, IEC 61131-3 data types, ladder elements,
 function blocks, PID/loop structure, gas process stages, equipment, safety and interlock vocabulary, units,
 and a standards index. Plus a rung simulator you can actually step, bookmarks, notes, an editor for
-plant-specific answers, and a printable **substation PLC project notebook** for taking a software emulator through an isolated physical trainer.
+plant-specific answers, a searchable **Gas Plant Controls & Automation Reference Manual**, and a printable
+**substation PLC project notebook** for taking a software emulator through an isolated physical trainer.
 
 734 entries across 14 sections. Everything is one codebase: an Express + SQLite API whose content is
 version-controlled data modules, and a React front end that renders them.
@@ -36,8 +37,7 @@ because of two disciplines:
    name and scope depend on your platform and revision; `site-specific` means your documents decide;
    `unverified` means a lead, not a fact; `authored example` means written here to teach a pattern. Nothing is a
    paraphrase of a paywalled standard — entries cite the document, they do not reproduce it.
-2. **Setpoints, alarm and trip limits, relief settings and process conditions are deliberately absent.** The only
-   arithmetic here is definitional: `4–20 mA` maps linearly to `%` of span, `psia = psig + atmospheric`,
+2. **Plant setpoints, alarm and trip limits, relief settings and process conditions are deliberately absent from the curated reference entries.** The separate uploaded controls notebook is reproduced as supplied and retains its illustrative numbers and examples; it must not be mistaken for approved plant values. The curated entries' arithmetic is definitional: `4–20 mA` maps linearly to `%` of span, `psia = psig + atmospheric`,
    `Kc = 100 / PB%`, `MMBtu/d = Mcf/d × Btu/scf ÷ 1000`, IEC bit widths and ranges. Worked examples carry
    invented tags and placeholders that are labelled as such; published tuning rules are shown as classroom
    relations with a "not design values" warning. Where ISA-5.1 assigns a letter to *"user's choice"*, the tag
@@ -74,6 +74,28 @@ manuals — not from this app.
 | Safety & interlocks | 22 | Fail-safe philosophy, SIL/SIF vocabulary, bypass and override discipline, ESD levels, proof testing, first-out, MOC |
 | Units & formulas | 39 | Definitional conversions and relations, with reference conditions called out |
 | Standards index | 38 | What each named document actually governs and why it appears here (scope, never content) |
+
+## Controls notebook
+
+Open **Controls notebook** in the Workspace navigation (route `/controls-notebook`). This is the supplied
+*Gas Plant Controls & Automation Reference Manual*, revision 1.2 (October 27, 2026), reproduced as its original
+108-page printer-friendly PDF. The reader includes chapter and lab links, a field-card shortcut, page navigation,
+a text preview, full-text page search, and a link to open or download the PDF for printing. Global search also
+returns notebook page matches separately from curated Logical entries. For example, `/controls-notebook?page=41#reader`
+opens the ladder patterns at their original PDF page.
+
+The text index is a best-effort extraction for finding pages, not a substitute for the original PDF: tables,
+symbols and warnings can extract imperfectly. The original document includes illustrative values and examples,
+some marked unverified. It is **not** an approved operating procedure or a source of plant setpoints; approved
+site drawings, procedures, authorization and protective systems govern. The document cover marks it as
+internal use. The PDF and search index are shipped as public static assets in this repository and any deployment;
+use only where publication is authorized. The notebook does not change the SQLite database, so a Render deploy
+with an existing persistent disk does not require reseeding or resetting user data.
+
+The PDF is `web/public/documents/controls-notebook-v1.2.pdf`, and its page index is the adjacent
+`controls-notebook-v1.2.search.json`. To regenerate the index after an authorized document update, install
+`pypdf==7.0.0` locally and run `python scripts/index-controls-notebook.py`; update the revision, PDF checksum,
+chapter page map and tests together. No Python dependency is needed by the deployed app.
 
 ## Substation project notebook
 
@@ -115,7 +137,8 @@ web/
   src/lib/api.js, store.jsx  fetch layer, app state, toasts, ⌘K
   src/components/            RungDiagram + RungSimulator, Fields (renders any payload), TagDecoder,
                              Calculators, SearchPalette, status/badge/provenance bits
-  src/pages/                 Home, Browse (section + search), Entry, Tools, Saved, Admin
+  src/pages/                 Home, Browse, Entry, Tools, ControlsNotebook, ProjectNotebook, Saved, Admin
+  public/documents/          original controls notebook PDF and its page-level search index
   src/styles.css             the whole design system, plus a print stylesheet
 tests/ladder.test.mjs        engine + rung-data semantics (node --test)
 tests/render-check.entry.jsx renders every entry through every component (needs the API up)
@@ -132,7 +155,7 @@ docs/ADMIN.md                the admin token, what an edit does, how reseeding p
 | `npm run seed` | create `server/data/logical.db` from the data modules (no-op if already seeded) |
 | `npm run seed:force` | re-apply reference content from source; rows you edited or created are kept |
 | `npm run seed:reset` | delete the database and rebuild it (this does clear bookmarks/notes — export first) |
-| `npm test` | 37 tests: ladder semantics, geometry integrity, I/O completeness, drawing-driven four-bank/L18ER allocations, notebook safety boundaries, and the content policy below |
+| `npm test` | Ladder semantics, geometry integrity, controls notebook search/source integrity, drawing-driven four-bank/L18ER trainer allocations, safety boundaries, and the content policy below |
 | `npm run verify` | production build plus the test suite; useful as a hosting build check |
 | `npm run check:render` | render all 734 entries (cards, detail bodies, rung diagrams and simulators) into strings and fail on any throw - needs the API up; uses the esbuild that ships with vite |
 

@@ -37,10 +37,15 @@ app.use('/api', adminRouter);
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route' }));
 
+/* Serve notebook assets with HEAD/range support for browser PDF viewers. Missing
+ * documents must be a real 404, not the SPA's index.html with a 200 response. */
+app.use('/documents', express.static(join(WEB_DIST, 'documents'), { index: false }));
+app.use('/documents', (_req, res) => res.status(404).type('text').send('Document not found'));
+
 /* ---------- static SPA in production (vite build output) ---------- */
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript',
-  '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
+  '.css': 'text/css', '.json': 'application/json', '.pdf': 'application/pdf', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.map': 'application/json'
 };
 

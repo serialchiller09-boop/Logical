@@ -1,6 +1,11 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api, useAsync, useDebounced } from '../lib/api.js';
 import { useApp, useTitle } from '../lib/store.jsx';
+import { notebookPageHref, searchNotebookPages } from '../lib/controlsNotebook.js';
+import { useControlsNotebookIndex } from '../lib/useControlsNotebook.js';
+import { RELATED_CONTROLS_READING } from '../data/controlsNotebook.js';
+import { NotebookResults } from '../components/NotebookResults.jsx';
 import { EntryCard, ErrorBox, Loader } from '../components/Bits.jsx';
 
 const STATUSES = ['standard', 'practice', 'vendor', 'site-specific', 'unverified', 'illustrative-example'];
@@ -10,7 +15,9 @@ export default function Browse() {
   const [sp, setSp] = useSearchParams();
   const kind = sp.get('kind') || '';
   const status = sp.get('status') || '';
-  const q = sp.get('q') || '';
+  const urlQuery = sp.get('q') || '';
+  const [q, setQuery] = useState(urlQuery);
+  useEffect(() => setQuery(urlQuery), [urlQuery]);
   const mode = sp.get('view') === 'list' ? 'list' : 'grid';
   const { sections, isMarked, toggleBookmark } = useApp();
   const section = sections.find((s) => s.slug === slug);
@@ -18,6 +25,10 @@ export default function Browse() {
 
   const isSearch = !slug || slug === 'search';
   const searchQ = useDebounced(q, 200);
+  const notebookEnabled = isSearch && searchQ.trim().length >= 2;
+  const { index: notebookIndex, loading: notebookLoading, error: notebookError, retry: retryNotebook } = useControlsNotebookIndex(notebookEnabled);
+  const notebookHits = useMemo(() => notebookEnabled ? searchNotebookPages(notebookIndex, searchQ) : [], [notebookEnabled, notebookIndex, searchQ]);
+  const relatedReading = RELATED_CONTROLS_READING[slug];
 
   const { data, loading, error, reload } = useAsync(() => {
     if (isSearch) return api.search(searchQ);
@@ -54,18 +65,25 @@ export default function Browse() {
         </section>
       )}
 
+      {section && relatedReading && <div className="manual-related-reading">
+        <span><b>Related notebook reading</b> · {relatedReading.label}</span>
+        <Link to={notebookPageHref(relatedReading.page)}>Open source PDF · p. {relatedReading.page} ↗</Link>
+      </div>}
+
       {isSearch && (
         <section className="hero" style={{ marginBottom: 4 }}>
           <h1 style={{ fontSize: 30 }}>Search{q ? `: “${q}”` : ''}</h1>
-          <p className="hero-lead">{data ? `${total} entries match` : 'Type at least two characters.'}</p>
+          <p className="hero-lead">{q.trim().length < 2 ? 'Type at least two characters.' : data ? `${total} curated reference entries match${notebookEnabled && notebookIndex ? ` · ${notebookHits.length} notebook pages` : ''}` : 'Searching…'}</p>
+          <p className="manual-search-source-note">Notebook results come from the original source PDF, separately from curated reference entries.</p>
         </section>
       )}
 
       <div className="card" style={{ marginTop: isSearch ? 14 : 16 }}>
         <div className="filters">
           {isSearch ? (
-            <input className="search-input" autoFocus defaultValue={q} placeholder="every field, all sections - try 'stiction', 'OTL', 'amine', 'Td'"
-              onChange={(e) => set('q', e.target.value)} />
+            <input className="search-input" autoFocus value={q} aria-label="Search reference entries and controls notebook" placeholder="every field and notebook page — try 'stiction', 'OTL', 'HART'"
+              onChange={(e) => setQuery(e.target.value)} onBlur={() => { if (q !== urlQuery) set('q', q); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
           ) : (
             <span className="muted small" style={{ marginRight: 4 }}>Filter by kind:</span>
           )}
@@ -90,9 +108,8 @@ export default function Browse() {
           <ErrorBox error={error} onRetry={reload} />
           {!loading && !error && entries.length === 0 && (
             <div className="empty">
-              <b>Nothing here yet</b>
-              <p className="muted small">No entry matches that combination of section, kind and status. Clear a filter, or add the plant-specific answer yourself in{' '}
-                <Link to="/admin">plant data</Link> — that is what the editor is for.</p>
+              <b>{isSearch ? 'No curated reference entries found' : 'Nothing here yet'}</b>
+              <p className="muted small">{isSearch ? 'Try another search, and check for matching notebook pages below.' : <>No entry matches that combination of filters. Clear a filter, or record the plant-specific answer in <Link to="/admin">plant data</Link>.</>}</p>
             </div>
           )}
           {!loading && entries.length > 0 && (
@@ -109,6 +126,18 @@ export default function Browse() {
           )}
         </div>
       </div>
+
+      {notebookEnabled && <section className="card" style={{ marginTop: 18 }} aria-labelledby="notebook-results-heading">
+        <div className="card-hd"><h3 id="notebook-results-heading">Controls notebook pages</h3><span className="hd-note">original source · rev 1.2</span></div>
+        <div className="card-bd">
+          <p className="small muted">Search matches are extracted from the supplied notebook, not vetted reference entries. Open the original page for its complete context and warnings.</p>
+          {notebookLoading && !notebookIndex && <Loader label="reading notebook index" />}
+          {notebookError && <p className="small">Could not load notebook search. <button className="inline-action" onClick={retryNotebook}>Try again</button> or <Link to="/controls-notebook">open the notebook</Link>.</p>}
+          {!notebookError && notebookIndex && (notebookHits.length
+            ? <NotebookResults hits={notebookHits} query={searchQ} />
+            : <p className="small muted">No notebook pages contain all those terms.</p>)}
+        </div>
+      </section>}
     </>
   );
 }

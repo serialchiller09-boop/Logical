@@ -9,6 +9,7 @@ import Tools from './pages/Tools.jsx';
 import Saved from './pages/Saved.jsx';
 import Admin from './pages/Admin.jsx';
 import ProjectNotebook from './pages/ProjectNotebook.jsx';
+import ControlsNotebook from './pages/ControlsNotebook.jsx';
 import './styles.css';
 
 class Boundary extends React.Component {
@@ -42,6 +43,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="s/:slug" element={<Browse />} />
             <Route path="e/:id" element={<EntryPage />} />
             <Route path="tools" element={<Tools />} />
+            <Route path="controls-notebook" element={<ControlsNotebook />} />
             <Route path="notebook" element={<ProjectNotebook />} />
             <Route path="saved" element={<Saved />} />
             <Route path="admin" element={<Admin />} />
