@@ -32,7 +32,7 @@ export const SECTIONS = [
   },
   {
     slug: 'rungs', label: 'Example rungs', group: 'Ladder logic', icon: '|=|', sort: 7,
-    blurb: 'Sixteen gas plant rungs drawn as vector diagrams - and runnable in a scan simulator.',
+    blurb: 'Seventeen gas plant rungs drawn as vector diagrams - and runnable in a scan simulator.',
     long: 'Seal-in, latch/acknowledge, 2oo3 voting, restart lockout, run-on timers, stroke counting, alarm deadbands, J-T permissives, purge-before-ignition, first-out capture, anti-surge, lead/lag, analog scaling, and a step sequencer. Each one: what it does, how to read it, and the defects it hides.'
   },
   {

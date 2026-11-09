@@ -65,7 +65,7 @@ manuals — not from this app.
 | Transmitters & analysers | 48 | dP/radar/ultrasonic/displacer level, flow, pressure, temperature, GC, moisture, H₂S, and signal types |
 | ISA-5.1 letters | 57 | First letters, succeeding letters, modifier/limit letters — including the ones the standard leaves to you |
 | Ladder elements | 48 | XIC/XIO, OTE/OTL/OTU, ONS, TON/TOF/RTO, CTU/CTD, RES, comparators, MOV/CPT/SEL/LIM, JSR/LBL, MCR, plus scan-order concepts |
-| Example rungs | 16 | Seal-in, latch/acknowledge, 2oo3, deadband alarm, restart lockout, run-on, stroke counting, proven position, first-out, purge sequence, PID with override, anti-surge, F&G-to-ESD, lead/lag, scaling, step sequencer — all diagrammed and runnable |
+| Example rungs | 17 | Seal-in, latch/acknowledge, 2oo3, deadband alarm, restart lockout, run-on, stroke counting, proven position, first-out, purge sequence, PID with override, anti-surge, F&G-to-ESD, lead/lag, scaling, step sequencer, capacitor-bank close with discharge wait — all diagrammed and runnable |
 | Function blocks | 37 | The IEC block set plus what each pin means, grouped by family |
 | Data types | 33 | IEC 61131-3 elementary and derived types, sizes, ranges, defaults, literal syntax, cross-vendor names |
 | PID & loops | 48 | Terms, structures (cascade, ratio, split-range, feedforward), tuning relations with their caveats, typical gas plant loop characters |
