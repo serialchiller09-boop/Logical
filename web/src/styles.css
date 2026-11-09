@@ -673,3 +673,7 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   .oneline .ol-wire .ol-bus { stroke: #333; filter: none; }
   .oneline .ol-sub, .oneline .ol-note { fill: #444; }
 }
+
+/* uploaded one-line / L18ER additions */
+.drawing-review-card { margin-bottom: 12px !important; }
+.controller-basis-card { margin-top: 12px !important; }

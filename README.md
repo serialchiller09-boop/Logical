@@ -80,16 +80,19 @@ manuals — not from this app.
 Open **Substation notebook** in the Workspace navigation (route `/notebook`). It is a self-contained, printable build
 workbook for a Studio 5000 or RSLogix 500 simulator with a Wonderware / AVEVA InTouch HMI. It includes:
 
-- an explicitly assumed source/main bus/transformer/two-cap-bank one-line to replace with the approved drawing;
+- a drawing-informed 138/4.16 kV source/transformer/bus model with feeder/motor monitoring and four capacitor banks, while soft device tags remain pending the original PDF;
 - a 12-phase, 60-check build plan whose progress and editable cover sheet stay in browser storage;
 - an exact assignment for 15 maintained inputs, 15 momentary inputs, two analog pots, six green LEDs, and two amber LEDs;
 - Studio 5000 and RSLogix 500 example address columns plus CSV export;
+- a CompactLogix L18ER fit check covering embedded I/O, POINT I/O expansion, analog channels, firmware/revision, and emulator compatibility;
 - breaker/relay/transformer ownership, close permissives, first-out/86, timers, counters, ONS/OSR, and analog-quality patterns;
-- independent K1/K2 capacitor-bank state tables, with the mechanical Kirk system and approved safe-work process kept authoritative;
+- independent K1–K4 capacitor-bank state tables, with the mechanical Kirk system and approved safe-work process kept authoritative;
 - a seven-screen HMI plan, communication-loss checks, 14-case FAT, handoff register, print/PDF formatting, and source links.
 
-The notebook deliberately provides no relay pickups, voltage bands, CT ratios, discharge delay, breaker travel time, or
-other design value. Those fields point back to the one-line, elementary drawings, relay/cap-bank manuals, key-exchange
+The uploaded screenshot establishes the 138/4.16 kV architecture and four shunt-capacitor branches, but is not sharp
+enough to transcribe every device number or rating safely; normalized simulator tags remain visibly flagged until the
+original PDF is supplied. The notebook deliberately provides no relay pickups, voltage bands, CT ratios, discharge delay,
+breaker travel time, or other design value. Those fields point back to the one-line, elementary drawings, relay/cap-bank manuals, key-exchange
 drawing, cause-and-effect matrix, and adopted electrical safety procedure. The proposed physical interface is an isolated
 low-voltage trainer only; it is not a path for connecting a general-purpose PLC to live protection or instrument-transformer circuits.
 
@@ -129,7 +132,7 @@ docs/ADMIN.md                the admin token, what an edit does, how reseeding p
 | `npm run seed` | create `server/data/logical.db` from the data modules (no-op if already seeded) |
 | `npm run seed:force` | re-apply reference content from source; rows you edited or created are kept |
 | `npm run seed:reset` | delete the database and rebuild it (this does clear bookmarks/notes — export first) |
-| `npm test` | 36 tests: ladder semantics, geometry integrity, I/O completeness, notebook trainer allocations/safety boundaries, and the content policy below (provenance, badges, disclaimers) |
+| `npm test` | 37 tests: ladder semantics, geometry integrity, I/O completeness, drawing-driven four-bank/L18ER allocations, notebook safety boundaries, and the content policy below |
 | `npm run verify` | production build plus the test suite; useful as a hosting build check |
 | `npm run check:render` | render all 734 entries (cards, detail bodies, rung diagrams and simulators) into strings and fail on any throw - needs the API up; uses the esbuild that ships with vite |
 

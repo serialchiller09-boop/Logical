@@ -8,15 +8,37 @@
 
 export const PROJECT_ID = 'SUB-TRAIN-01';
 
+export const DRAWING_OBSERVATIONS = [
+  { area: 'Drawing identity', observed: 'Duke Energy Texas project-substation one-line; title identifies a 138/4.16 kV station.', confidence: 'Readable', action: 'Record the original drawing number and revision from the native PDF/title block.' },
+  { area: 'Incoming transformation', observed: 'A 138 kV source enters through high-side switching/protection and a main step-down transformer to the 4.16 kV system.', confidence: 'Topology visible', action: 'Transcribe transformer, disconnect, breaker, CT and relay device tags from the original drawing.' },
+  { area: '4.16 kV bus and feeders', observed: 'The medium-voltage bus supplies labeled feeder branches (including Feeder A, B and C) plus clouded additions.', confidence: 'Topology visible', action: 'Confirm every feeder name, breaker number, bus section and tie arrangement from the PDF.' },
+  { area: 'Motor/load feeders', observed: 'Multiple protected load/motor branches and SEL relay bubbles are shown on the bus.', confidence: 'Visible; labels soft', action: 'Do not create PLC tags from the screenshot—use the relay/elementary drawings.' },
+  { area: 'Capacitor banks', observed: 'Four repeated three-phase shunt-capacitor branches appear in the lower addition cloud.', confidence: 'Count visible', action: 'Confirm bank designations, ratings, breaker numbers, CTs, discharge devices and key schedule.' },
+  { area: 'Protection/communications', observed: 'CTs, protective-relay functions and communications connections are depicted.', confidence: 'Architecture visible', action: 'Protection remains relay-owned; obtain settings, cause/effect and communications point lists separately.' }
+];
+
+export const CONTROLLER_BASIS = [
+  { item: 'Controller family', selection: 'CompactLogix 5370 L1 — user specified L18ER', designEffect: 'Use the L1 embedded I/O plus local 1734 POINT I/O; confirm the complete nameplate catalog before creating the ACD.' },
+  { item: 'Likely full catalog', selection: '1769-L18ER-BB1B — CONFIRM', designEffect: 'Rockwell literature lists 16 embedded DC inputs and 16 embedded DC outputs for this family; the selected catalog also determines onboard analog capability.' },
+  { item: 'Maintained switches', selection: '15 embedded digital inputs + 1 spare', designEffect: 'Fits one 16-point bank after voltage, sourcing/sinking and common wiring are confirmed.' },
+  { item: 'Momentary switches', selection: '15 additional digital inputs + 1 spare', designEffect: 'Requires compatible local POINT I/O expansion; select the module only after the trainer electrical interface is known.' },
+  { item: 'LED outputs', selection: '8 of 16 embedded digital outputs', designEffect: 'Leaves 8 spares; verify sourcing behavior, output current and whether interposing devices are required.' },
+  { item: 'Potentiometers', selection: '2 analog input channels', designEffect: 'Use isolated onboard/expansion analog channels compatible with the measured trainer signal; do not assume a bare pot can connect directly.' },
+  { item: 'Studio 5000 revision', selection: 'MATCH CONTROLLER FIRMWARE', designEffect: 'Record firmware and compatible Logix Designer revision before creating or flashing the project.' },
+  { item: 'Emulation strategy', selection: 'Confirm installed emulator support; keep internal plant model', designEffect: 'The ACD target and emulator must be compatible. If not, validate logic on a supported virtual target and separately prove the L18ER hardware mapping.' }
+];
+
+/** Normalized simulator names. They are intentionally not presented as the drawing's device tags: the
+ * screenshot is sufficient for topology/count but not reliable character-by-character transcription. */
 export const ASSUMED_TOPOLOGY = [
-  { tag: 'SRC-101', device: 'Training source', role: 'Supplies the incoming side of the model; availability is simulated.' },
-  { tag: 'CB-101', device: 'Main breaker', role: 'Connects the source to BUS-101. Model includes 52a/52b state, close/open requests and trip ownership.' },
-  { tag: 'BUS-101', device: 'Main bus', role: 'Derived energized state; no live medium-voltage equipment is connected to the trainer.' },
-  { tag: 'T-101', device: 'Power transformer', role: 'Feeder load with simulated protection health/trip contacts and alarm indications.' },
-  { tag: 'CB-201', device: 'Transformer feeder breaker', role: 'Connects BUS-101 to T-101 in the training one-line.' },
-  { tag: 'CB-301 / CAP-1', device: 'Capacitor bank 1 breaker', role: 'Switched bank with operation count, anti-repeat logic and K1 transfer-key state.' },
-  { tag: 'CB-302 / CAP-2', device: 'Capacitor bank 2 breaker', role: 'Second switched bank with independent permissives and K2 transfer-key state.' },
-  { tag: '86-L', device: 'Master lockout relay model', role: 'Latches protective trips and blocks closes until the trip cause is clear and reset is accepted.' }
+  { tag: 'UTILITY_138KV', device: '138 kV source', role: 'Drawing-observed incoming source; availability is simulated on the isolated trainer.' },
+  { tag: 'SW_HV / CB_HV', device: 'High-side switching and protection', role: 'Monitored as a simplified healthy/available state until the elementary drawings provide exact device points.' },
+  { tag: 'XFMR_MAIN', device: '138/4.16 kV main transformer', role: 'Drawing-observed step-down transformer with relay-owned protection and PLC supervision only.' },
+  { tag: 'CB_MAIN', device: '4.16 kV main breaker', role: 'Normalized trainer breaker with 52a/52b state, close/open requests, trip ownership and operation count.' },
+  { tag: 'BUS_4KV', device: '4.16 kV bus', role: 'Derived energized/quality state; no live medium-voltage equipment is connected to the trainer.' },
+  { tag: 'FDR_A… / MOTOR_LOADS', device: 'Feeder and motor branches', role: 'Shown on the HMI as monitored load branches; exact tags remain a drawing-transcription task.' },
+  { tag: 'CB_CAP1…CB_CAP4', device: 'Four shunt-capacitor bank breakers', role: 'Independent switched-bank instances with operation count, discharge sequence and K1–K4 trapped-key state.' },
+  { tag: '86_LOCKOUT', device: 'Master lockout model', role: 'Latches imported protective trips and blocks closes until causes are clear and reset is accepted.' }
 ];
 
 export const TRAINER_IO = {
@@ -24,51 +46,51 @@ export const TRAINER_IO = {
     { channel: 'M01', tag: 'DI_SafetyChainHealthy', studio: 'Local:1:I.Data.0', rslogix: 'I:1/0', device: 'Safety chain healthy simulation', normal: 'ON', note: 'Status input only. A real emergency stop remains hardwired and safety-rated.' },
     { channel: 'M02', tag: 'DI_ControlPowerHealthy', studio: 'Local:1:I.Data.1', rslogix: 'I:1/1', device: 'Control power healthy', normal: 'ON', note: 'Drops every close permissive.' },
     { channel: 'M03', tag: 'DI_RemoteMode', studio: 'Local:1:I.Data.2', rslogix: 'I:1/2', device: 'Local / remote selector', normal: 'OFF', note: 'ON selects HMI/trainer remote control.' },
-    { channel: 'M04', tag: 'DI_SourceAvailable', studio: 'Local:1:I.Data.3', rslogix: 'I:1/3', device: 'Training source available', normal: 'ON', note: 'Simulation of source voltage relay status.' },
-    { channel: 'M05', tag: 'DI_XfmrProtectionHealthy', studio: 'Local:1:I.Data.4', rslogix: 'I:1/4', device: 'Transformer protection healthy', normal: 'ON', note: 'Composite training contact; real relay contacts remain independent.' },
-    { channel: 'M06', tag: 'DI_FeederRelayHealthy', studio: 'Local:1:I.Data.5', rslogix: 'I:1/5', device: '50/51 relay healthy', normal: 'ON', note: 'Device-health indication, not a substitute for its trip output.' },
-    { channel: 'M07', tag: 'DI_VoltageRelayHealthy', studio: 'Local:1:I.Data.6', rslogix: 'I:1/6', device: '27/59 relay healthy', normal: 'ON', note: 'Training healthy contact for under/over-voltage relay.' },
-    { channel: 'M08', tag: 'DI_CB101_52a', studio: 'Local:1:I.Data.7', rslogix: 'I:1/7', device: 'CB-101 closed indication', normal: 'OFF', note: 'Trainer uses one toggle. Real gear should bring independent 52a and 52b contacts.' },
-    { channel: 'M09', tag: 'DI_CB201_52a', studio: 'Local:1:I.Data.8', rslogix: 'I:1/8', device: 'CB-201 closed indication', normal: 'OFF', note: '52b is derived only in training mode.' },
-    { channel: 'M10', tag: 'DI_CB301_52a', studio: 'Local:1:I.Data.9', rslogix: 'I:1/9', device: 'CB-301 / CAP-1 closed', normal: 'OFF', note: 'Drives CAP-1 status and operation edge count.' },
-    { channel: 'M11', tag: 'DI_CB302_52a', studio: 'Local:1:I.Data.10', rslogix: 'I:1/10', device: 'CB-302 / CAP-2 closed', normal: 'OFF', note: 'Drives CAP-2 status and operation edge count.' },
-    { channel: 'M12', tag: 'DI_K1AtBreaker', studio: 'Local:1:I.Data.11', rslogix: 'I:1/11', device: 'K1 inserted/trapped at breaker', normal: 'ON', note: 'Simulation of a key-position switch; the physical key system remains mechanical.' },
-    { channel: 'M13', tag: 'DI_K2AtBreaker', studio: 'Local:1:I.Data.12', rslogix: 'I:1/12', device: 'K2 inserted/trapped at breaker', normal: 'ON', note: 'Required for CAP-2 close permissive.' },
-    { channel: 'M14', tag: 'DI_CAP1DisconnectOpen', studio: 'Local:1:I.Data.13', rslogix: 'I:1/13', device: 'CAP-1 disconnect/access open', normal: 'OFF', note: 'ON blocks close. Confirm the actual lock sequence and switch truth table.' },
-    { channel: 'M15', tag: 'DI_CAP2DisconnectOpen', studio: 'Local:1:I.Data.14', rslogix: 'I:1/14', device: 'CAP-2 disconnect/access open', normal: 'OFF', note: 'ON blocks close. This is indication, not personnel protection.' }
+    { channel: 'M04', tag: 'DI_SourceAvailable', studio: 'Local:1:I.Data.3', rslogix: 'I:1/3', device: '138 kV source available', normal: 'ON', note: 'Simulation of incoming-source and high-side availability—not a live voltage indication.' },
+    { channel: 'M05', tag: 'DI_XfmrProtectionHealthy', studio: 'Local:1:I.Data.4', rslogix: 'I:1/4', device: 'Main transformer protection healthy', normal: 'ON', note: 'Composite trainer contact; actual relay alarm/trip contacts remain separate.' },
+    { channel: 'M06', tag: 'DI_MVRelayHealthy', studio: 'Local:1:I.Data.5', rslogix: 'I:1/5', device: '4.16 kV protection healthy', normal: 'ON', note: 'Composite trainer health input for the drawing-observed protective-relay layer.' },
+    { channel: 'M07', tag: 'DI_CBMain_52a', studio: 'Local:1:I.Data.6', rslogix: 'I:1/6', device: '4.16 kV main breaker closed', normal: 'OFF', note: 'Trainer has one contact per breaker; 52b may be derived only in training mode.' },
+    { channel: 'M08', tag: 'DI_CBCap1_52a', studio: 'Local:1:I.Data.7', rslogix: 'I:1/7', device: 'CAP-1 breaker closed', normal: 'OFF', note: 'Drives CAP-1 state and proven-operation count.' },
+    { channel: 'M09', tag: 'DI_CBCap2_52a', studio: 'Local:1:I.Data.8', rslogix: 'I:1/8', device: 'CAP-2 breaker closed', normal: 'OFF', note: 'Drives CAP-2 state and proven-operation count.' },
+    { channel: 'M10', tag: 'DI_CBCap3_52a', studio: 'Local:1:I.Data.9', rslogix: 'I:1/9', device: 'CAP-3 breaker closed', normal: 'OFF', note: 'Drives CAP-3 state and proven-operation count.' },
+    { channel: 'M11', tag: 'DI_CBCap4_52a', studio: 'Local:1:I.Data.10', rslogix: 'I:1/10', device: 'CAP-4 breaker closed', normal: 'OFF', note: 'Drives CAP-4 state and proven-operation count.' },
+    { channel: 'M12', tag: 'DI_K1AtBreaker', studio: 'Local:1:I.Data.11', rslogix: 'I:1/11', device: 'K1 inserted/trapped at CAP-1 breaker', normal: 'ON', note: 'Simulation of key-position indication; the physical key system remains mechanical.' },
+    { channel: 'M13', tag: 'DI_K2AtBreaker', studio: 'Local:1:I.Data.12', rslogix: 'I:1/12', device: 'K2 inserted/trapped at CAP-2 breaker', normal: 'ON', note: 'Independent CAP-2 close proof.' },
+    { channel: 'M14', tag: 'DI_K3AtBreaker', studio: 'Local:1:I.Data.13', rslogix: 'I:1/13', device: 'K3 inserted/trapped at CAP-3 breaker', normal: 'ON', note: 'Independent CAP-3 close proof.' },
+    { channel: 'M15', tag: 'DI_K4AtBreaker', studio: 'Local:1:I.Data.14', rslogix: 'I:1/14', device: 'K4 inserted/trapped at CAP-4 breaker', normal: 'ON', note: 'Independent CAP-4 close proof.' }
   ],
   momentary: [
-    { channel: 'P01', tag: 'DI_PB_CB101_Close', studio: 'Local:2:I.Data.0', rslogix: 'I:2/0', device: 'CB-101 CLOSE', action: 'Request' },
-    { channel: 'P02', tag: 'DI_PB_CB101_Open', studio: 'Local:2:I.Data.1', rslogix: 'I:2/1', device: 'CB-101 OPEN', action: 'Request' },
-    { channel: 'P03', tag: 'DI_PB_CB201_Close', studio: 'Local:2:I.Data.2', rslogix: 'I:2/2', device: 'CB-201 CLOSE', action: 'Request' },
-    { channel: 'P04', tag: 'DI_PB_CB201_Open', studio: 'Local:2:I.Data.3', rslogix: 'I:2/3', device: 'CB-201 OPEN', action: 'Request' },
-    { channel: 'P05', tag: 'DI_PB_CB301_Close', studio: 'Local:2:I.Data.4', rslogix: 'I:2/4', device: 'CAP-1 CLOSE', action: 'Request' },
-    { channel: 'P06', tag: 'DI_PB_CB301_Open', studio: 'Local:2:I.Data.5', rslogix: 'I:2/5', device: 'CAP-1 OPEN', action: 'Request' },
-    { channel: 'P07', tag: 'DI_PB_CB302_Close', studio: 'Local:2:I.Data.6', rslogix: 'I:2/6', device: 'CAP-2 CLOSE', action: 'Request' },
-    { channel: 'P08', tag: 'DI_PB_CB302_Open', studio: 'Local:2:I.Data.7', rslogix: 'I:2/7', device: 'CAP-2 OPEN', action: 'Request' },
-    { channel: 'P09', tag: 'DI_PB_MasterTrip', studio: 'Local:2:I.Data.8', rslogix: 'I:2/8', device: 'MASTER TRIP', action: 'Trip input' },
-    { channel: 'P10', tag: 'DI_PB_86Reset', studio: 'Local:2:I.Data.9', rslogix: 'I:2/9', device: '86 RESET', action: 'Reset request' },
-    { channel: 'P11', tag: 'DI_PB_AlarmAck', studio: 'Local:2:I.Data.10', rslogix: 'I:2/10', device: 'ALARM ACKNOWLEDGE', action: 'Acknowledge' },
-    { channel: 'P12', tag: 'DI_PB_CountReset', studio: 'Local:2:I.Data.11', rslogix: 'I:2/11', device: 'COUNTER RESET', action: 'Maintenance request' },
-    { channel: 'P13', tag: 'DI_PB_K1ReleaseRequest', studio: 'Local:2:I.Data.12', rslogix: 'I:2/12', device: 'K1 RELEASE REQUEST', action: 'Sequence request' },
-    { channel: 'P14', tag: 'DI_PB_K2ReleaseRequest', studio: 'Local:2:I.Data.13', rslogix: 'I:2/13', device: 'K2 RELEASE REQUEST', action: 'Sequence request' },
+    { channel: 'P01', tag: 'DI_PB_CBMain_Close', studio: 'Local:2:I.Data.0', rslogix: 'I:2/0', device: '4.16 kV MAIN CLOSE', action: 'Request' },
+    { channel: 'P02', tag: 'DI_PB_CBMain_Open', studio: 'Local:2:I.Data.1', rslogix: 'I:2/1', device: '4.16 kV MAIN OPEN', action: 'Request' },
+    { channel: 'P03', tag: 'DI_PB_Cap1_Close', studio: 'Local:2:I.Data.2', rslogix: 'I:2/2', device: 'CAP-1 CLOSE', action: 'Request' },
+    { channel: 'P04', tag: 'DI_PB_Cap1_Open', studio: 'Local:2:I.Data.3', rslogix: 'I:2/3', device: 'CAP-1 OPEN', action: 'Request' },
+    { channel: 'P05', tag: 'DI_PB_Cap2_Close', studio: 'Local:2:I.Data.4', rslogix: 'I:2/4', device: 'CAP-2 CLOSE', action: 'Request' },
+    { channel: 'P06', tag: 'DI_PB_Cap2_Open', studio: 'Local:2:I.Data.5', rslogix: 'I:2/5', device: 'CAP-2 OPEN', action: 'Request' },
+    { channel: 'P07', tag: 'DI_PB_Cap3_Close', studio: 'Local:2:I.Data.6', rslogix: 'I:2/6', device: 'CAP-3 CLOSE', action: 'Request' },
+    { channel: 'P08', tag: 'DI_PB_Cap3_Open', studio: 'Local:2:I.Data.7', rslogix: 'I:2/7', device: 'CAP-3 OPEN', action: 'Request' },
+    { channel: 'P09', tag: 'DI_PB_Cap4_Close', studio: 'Local:2:I.Data.8', rslogix: 'I:2/8', device: 'CAP-4 CLOSE', action: 'Request' },
+    { channel: 'P10', tag: 'DI_PB_Cap4_Open', studio: 'Local:2:I.Data.9', rslogix: 'I:2/9', device: 'CAP-4 OPEN', action: 'Request' },
+    { channel: 'P11', tag: 'DI_PB_MasterTrip', studio: 'Local:2:I.Data.10', rslogix: 'I:2/10', device: 'MASTER TRIP', action: 'Trip input' },
+    { channel: 'P12', tag: 'DI_PB_86Reset', studio: 'Local:2:I.Data.11', rslogix: 'I:2/11', device: '86 RESET', action: 'Reset request' },
+    { channel: 'P13', tag: 'DI_PB_AlarmAck', studio: 'Local:2:I.Data.12', rslogix: 'I:2/12', device: 'ALARM ACKNOWLEDGE', action: 'Acknowledge' },
+    { channel: 'P14', tag: 'DI_PB_CountReset', studio: 'Local:2:I.Data.13', rslogix: 'I:2/13', device: 'COUNTER RESET', action: 'Maintenance request' },
     { channel: 'P15', tag: 'DI_PB_LampTest', studio: 'Local:2:I.Data.14', rslogix: 'I:2/14', device: 'LAMP TEST', action: 'Test' }
   ],
   analog: [
-    { channel: 'AI01', tag: 'AI_FeederCurrentRaw', studio: 'Local:3:I.Ch0Data', rslogix: 'I:3.0', device: 'Potentiometer 1 — isolated CT/current simulator', engineering: 'AI_FeederCurrent_A', note: 'Scale raw minimum/maximum to the trainer range. Never connect a trainer analog input directly to an energized CT secondary.' },
-    { channel: 'AI02', tag: 'AI_BusVoltageRaw', studio: 'Local:3:I.Ch1Data', rslogix: 'I:3.1', device: 'Potentiometer 2 — isolated VT/bus-voltage simulator', engineering: 'AI_BusVoltage_Pct', note: 'Use percent-of-nominal in the emulator until the approved VT ratio is known.' }
+    { channel: 'AI01', tag: 'AI_SelectedCapCurrentRaw', studio: 'Local:3:I.Ch0Data', rslogix: 'I:3.0', device: 'Potentiometer 1 — selected-bank isolated CT/current simulator', engineering: 'AI_SelectedCapCurrent_Pct', note: 'HMI selects CAP-1…4 for one-at-a-time checkout. Never connect a trainer input to an energized CT secondary.' },
+    { channel: 'AI02', tag: 'AI_BusVoltageRaw', studio: 'Local:3:I.Ch1Data', rslogix: 'I:3.1', device: 'Potentiometer 2 — isolated 4.16 kV bus VT simulator', engineering: 'AI_BusVoltage_Pct', note: 'Use percent-of-nominal until the approved VT ratio and module calibration are transcribed.' }
   ],
   green: [
     { channel: 'G01', tag: 'DO_LED_ControlHealthy', studio: 'Local:4:O.Data.0', rslogix: 'O:4/0', device: 'CONTROL HEALTHY' },
-    { channel: 'G02', tag: 'DO_LED_BusEnergized', studio: 'Local:4:O.Data.1', rslogix: 'O:4/1', device: 'BUS ENERGIZED' },
-    { channel: 'G03', tag: 'DO_LED_CB101Closed', studio: 'Local:4:O.Data.2', rslogix: 'O:4/2', device: 'CB-101 CLOSED' },
-    { channel: 'G04', tag: 'DO_LED_CB201Closed', studio: 'Local:4:O.Data.3', rslogix: 'O:4/3', device: 'CB-201 CLOSED' },
-    { channel: 'G05', tag: 'DO_LED_CAP1Closed', studio: 'Local:4:O.Data.4', rslogix: 'O:4/4', device: 'CAP-1 CLOSED' },
-    { channel: 'G06', tag: 'DO_LED_CAP2Closed', studio: 'Local:4:O.Data.5', rslogix: 'O:4/5', device: 'CAP-2 CLOSED' }
+    { channel: 'G02', tag: 'DO_LED_BusEnergized', studio: 'Local:4:O.Data.1', rslogix: 'O:4/1', device: '4.16 kV BUS ENERGIZED' },
+    { channel: 'G03', tag: 'DO_LED_Cap1Closed', studio: 'Local:4:O.Data.2', rslogix: 'O:4/2', device: 'CAP-1 CLOSED' },
+    { channel: 'G04', tag: 'DO_LED_Cap2Closed', studio: 'Local:4:O.Data.3', rslogix: 'O:4/3', device: 'CAP-2 CLOSED' },
+    { channel: 'G05', tag: 'DO_LED_Cap3Closed', studio: 'Local:4:O.Data.4', rslogix: 'O:4/4', device: 'CAP-3 CLOSED' },
+    { channel: 'G06', tag: 'DO_LED_Cap4Closed', studio: 'Local:4:O.Data.5', rslogix: 'O:4/5', device: 'CAP-4 CLOSED' }
   ],
   amber: [
     { channel: 'A01', tag: 'DO_LED_TripLockout', studio: 'Local:4:O.Data.6', rslogix: 'O:4/6', device: 'TRIP / 86 LOCKOUT' },
-    { channel: 'A02', tag: 'DO_LED_KeyRelease', studio: 'Local:4:O.Data.7', rslogix: 'O:4/7', device: 'KEY RELEASE PERMITTED' }
+    { channel: 'A02', tag: 'DO_LED_KeyRelease', studio: 'Local:4:O.Data.7', rslogix: 'O:4/7', device: 'SELECTED KEY RELEASE PERMITTED' }
   ]
 };
 
@@ -76,20 +98,17 @@ export const INTERNAL_TAGS = [
   { tag: 'SYS_SimMode', type: 'BOOL', owner: 'Configuration', purpose: 'Selects internal breaker plant model. Must be false before trainer outputs are enabled.' },
   { tag: 'SYS_FirstScan', type: 'BOOL', owner: 'Controller', purpose: 'First-scan initialization; map to S:FS in Logix 5000 or S:1/15 in many SLC projects after verifying processor behavior.' },
   { tag: 'SYS_IOHealthy', type: 'BOOL', owner: 'Diagnostics', purpose: 'Combined module/communications health. A failed input module blocks closes.' },
-  { tag: 'BUS101_Energized', type: 'BOOL', owner: 'State model', purpose: 'Derived from source available, main breaker state and voltage proof.' },
-  { tag: 'CB101_52b_Training', type: 'BOOL', owner: 'State model', purpose: 'Training-only complement of 52a. Do not use as an independent proof in real switchgear.' },
-  { tag: 'P_CB101_Close', type: 'BOOL', owner: 'Permissives', purpose: 'All reviewed conditions required to accept a main-breaker close request.' },
-  { tag: 'P_CB201_Close', type: 'BOOL', owner: 'Permissives', purpose: 'Main bus energized, transformer protection healthy, breaker open and no lockout.' },
-  { tag: 'P_CAP1_Close', type: 'BOOL', owner: 'Permissives', purpose: 'Bus/relay healthy, key at breaker, disconnect closed, breaker open, no 86 and no inhibit timer.' },
-  { tag: 'P_CAP2_Close', type: 'BOOL', owner: 'Permissives', purpose: 'Independent CAP-2 equivalent; never share an ONS storage bit with CAP-1.' },
-  { tag: 'TRIP_Any', type: 'BOOL', owner: 'Trips', purpose: 'OR of protective-relay trips, transformer trip, master trip and simulation trip requests.' },
+  { tag: 'SIM_SelectedCapBank', type: 'DINT / N7', owner: 'Configuration', purpose: 'Selects CAP-1…4 for the single physical CT/current potentiometer; only the selected bank may use that proof.' },
+  { tag: 'BUS4KV_Energized', type: 'BOOL', owner: 'State model', purpose: 'Derived from source available, main breaker state, VT simulation and input quality.' },
+  { tag: 'CBMain_52b_Training', type: 'BOOL', owner: 'State model', purpose: 'Training-only complement of 52a. Do not use as an independent proof in real switchgear.' },
+  { tag: 'P_CBMain_Close', type: 'BOOL', owner: 'Permissives', purpose: 'All reviewed conditions required to accept a 4.16 kV main-breaker close request.' },
+  { tag: 'P_CAP[1..4]_Close', type: 'BOOL[4] / B3 range', owner: 'Permissives', purpose: 'Four independent results: bus and relay healthy, matching key at breaker, breaker open, no 86 and no inhibit.' },
+  { tag: 'TRIP_Any', type: 'BOOL', owner: 'Trips', purpose: 'OR of imported SEL/protective-relay trips, transformer trip, master trip and simulation trip requests.' },
   { tag: 'TRIP_FirstOutCode', type: 'DINT / N7', owner: 'Trips', purpose: 'Captures the first active cause; subsequent trips do not overwrite it until a controlled reset.' },
   { tag: 'L_86Lockout', type: 'BOOL', owner: 'Trips', purpose: 'Latched lockout model. Reset only when all causes are clear and reset permissive is true.' },
-  { tag: 'T_CAP1_Discharge', type: 'TIMER / T4', owner: 'Cap bank', purpose: 'Nameplate/engineering-approved discharge wait preset; page deliberately supplies no preset.' },
-  { tag: 'T_CAP2_Discharge', type: 'TIMER / T4', owner: 'Cap bank', purpose: 'Independent timer and independent state for bank 2.' },
-  { tag: 'C_CB101_Operations', type: 'COUNTER / C5', owner: 'Maintenance', purpose: 'Counts rising edges of proven closed feedback, not button presses.' },
-  { tag: 'C_CAP1_Operations', type: 'COUNTER / C5', owner: 'Maintenance', purpose: 'Counts CAP-1 52a off-to-on transitions.' },
-  { tag: 'C_CAP2_Operations', type: 'COUNTER / C5', owner: 'Maintenance', purpose: 'Counts CAP-2 52a off-to-on transitions.' }
+  { tag: 'T_CAP[1..4]_Discharge', type: 'TIMER[4] / T4 range', owner: 'Cap bank', purpose: 'Four independent discharge-wait instances; presets come from the bank documents and key schedule.' },
+  { tag: 'C_CBMain_Operations', type: 'COUNTER / C5', owner: 'Maintenance', purpose: 'Counts rising edges of proven main-breaker closed feedback, not button presses.' },
+  { tag: 'C_CAP[1..4]_Operations', type: 'COUNTER[4] / C5 range', owner: 'Maintenance', purpose: 'Four independent counters driven by each capacitor breaker 52a rising edge.' }
 ];
 
 export const PROGRAM_ROUTINES = [
@@ -99,7 +118,7 @@ export const PROGRAM_ROUTINES = [
   { order: '30', routine: 'ProtectionTrips', purpose: 'Processes relay contacts, first-out capture and 86 lockout before close logic runs.', output: 'Trips always win the scan.' },
   { order: '40', routine: 'Permissives', purpose: 'Calculates one named permissive and one named reason bit for each close condition.', output: 'HMI can explain every blocked close.' },
   { order: '50', routine: 'BreakerControl', purpose: 'Arbitrates trainer and HMI requests, generates bounded command pulses and proves travel.', output: 'Commands are separate from status.' },
-  { order: '60', routine: 'CapBankKirk', purpose: 'Runs both bank state machines, discharge timers and key-release indication.', output: 'No PLC bit is presented as a mechanical key guarantee.' },
+  { order: '60', routine: 'CapBankKirk', purpose: 'Runs four independent bank state machines, discharge timers and selected-key release indication.', output: 'No PLC bit is presented as a mechanical key guarantee.' },
   { order: '70', routine: 'Transformer', purpose: 'Combines alarm indications while preserving independent trip causes.', output: 'Transformer protection is visible without moving it into the PLC.' },
   { order: '80', routine: 'CountersAlarms', purpose: 'Counts proven operations, applies one-shots, latches alarms and handles acknowledgement/reset.', output: 'Maintenance totals and first-out record.' },
   { order: '90', routine: 'OutputMap', purpose: 'Maps internal commands and indications to physical outputs; lamp test affects lamps only.', output: 'One writer for each physical output.' },
@@ -107,11 +126,12 @@ export const PROGRAM_ROUTINES = [
 ];
 
 export const PERMISSIVE_MATRIX = [
-  { device: 'CB-101', closeRequires: 'Safety chain healthy; control power healthy; remote/local authority valid; source available; protection and I/O healthy; 86 reset; breaker proven open', tripOrBlock: 'Master/protective trip, 86 lockout, contradictory 52a/52b, module fault', plcRole: 'Control and indication only; protection trip remains hardwired/relay-owned where required.' },
-  { device: 'CB-201', closeRequires: 'CB-101 closed; BUS-101 voltage proven; transformer protection healthy; feeder relay healthy; 86 reset; breaker open', tripOrBlock: 'Transformer/feeder trip, bus dead, 86 lockout, bad status', plcRole: 'Accept close request and supervise travel.' },
-  { device: 'CB-301 / CAP-1', closeRequires: 'Bus energized and voltage in approved band; relay healthy; K1 at breaker; CAP-1 disconnect/access not open; discharge/reclose inhibit complete; breaker open', tripOrBlock: 'Key removed, access/disconnect open, relay trip, bus dead, 86, bad status', plcRole: 'Supplemental interlock, sequence and indication. Mechanical Kirk system is authoritative.' },
-  { device: 'CB-302 / CAP-2', closeRequires: 'Same classes of proof as CAP-1 using independent tags, timer, ONS storage and key K2', tripOrBlock: 'Same classes of trip/block using CAP-2 device inputs', plcRole: 'Independent sequence; no shared state that can release the wrong key.' },
-  { device: '86-L reset', closeRequires: 'All active trip causes clear; breakers in reviewed state; reset request edge; reset authority valid', tripOrBlock: 'Any active or untrustworthy trip input', plcRole: 'A reset never creates a close command.' }
+  { device: 'CB_MAIN', closeRequires: 'Safety chain and control power healthy; remote/local authority valid; 138 kV source/high-side available; transformer protection and I/O healthy; 86 reset; 4.16 kV breaker proven open', tripOrBlock: 'Imported transformer/bus/protective trip, master trip, 86 lockout, contradictory 52a/52b or module fault', plcRole: 'Training control and indication only; drawing-observed protection remains relay/hardwire-owned.' },
+  { device: 'CB_CAP1 / K1', closeRequires: '4.16 kV bus energized and voltage in approved band; relay healthy; K1 at breaker; access state secured; bank breaker open; no 86 or reclose inhibit', tripOrBlock: 'K1 removed, access open, bank relay trip, bus dead, 86 or bad quality/status', plcRole: 'Supplemental interlock and sequence. Mechanical Kirk system is authoritative.' },
+  { device: 'CB_CAP2 / K2', closeRequires: 'Same classes of proof as CAP-1 using independent CAP-2 tags, timer, ONS storage, counter and K2', tripOrBlock: 'Same classes of trip/block using CAP-2 inputs', plcRole: 'Independent instance; no state shared with another key.' },
+  { device: 'CB_CAP3 / K3', closeRequires: 'Same classes of proof as CAP-1 using independent CAP-3 tags, timer, ONS storage, counter and K3', tripOrBlock: 'Same classes of trip/block using CAP-3 inputs', plcRole: 'Independent instance; no state shared with another key.' },
+  { device: 'CB_CAP4 / K4', closeRequires: 'Same classes of proof as CAP-1 using independent CAP-4 tags, timer, ONS storage, counter and K4', tripOrBlock: 'Same classes of trip/block using CAP-4 inputs', plcRole: 'Independent instance; no state shared with another key.' },
+  { device: '86_LOCKOUT reset', closeRequires: 'All active trip causes clear; breakers in reviewed state; reset request edge; reset authority valid', tripOrBlock: 'Any active or untrustworthy trip input', plcRole: 'A reset never creates a close command.' }
 ];
 
 export const KIRK_STATES = [
@@ -138,11 +158,11 @@ export const LOGIC_PATTERNS = [
     title: 'Main-breaker close acceptance',
     why: 'A request is an event; a permissive is a continuously evaluated condition; an output is a bounded action. Keep all three separate.',
     studio: [
-      'XIC(DI_PB_CB101_Close) ONS(OSR_CB101_CloseReq) OTL(REQ_CB101_Close);',
-      'XIC(REQ_CB101_Close) XIC(P_CB101_Close) XIO(T_CB101_ClosePulse.DN) OTE(CMD_CB101_Close);',
-      'XIC(REQ_CB101_Close) XIC(P_CB101_Close) TON(T_CB101_ClosePulse, PRE_CLOSE_PULSE_PLACEHOLDER);',
-      'XIC(T_CB101_ClosePulse.DN) OTU(REQ_CB101_Close);',
-      'XIC(REQ_CB101_Close) XIO(P_CB101_Close) OTL(ALM_CB101_CloseRejected) OTU(REQ_CB101_Close);'
+      'XIC(DI_PB_CBMain_Close) ONS(OSR_CBMain_CloseReq) OTL(REQ_CBMain_Close);',
+      'XIC(REQ_CBMain_Close) XIC(P_CBMain_Close) XIO(T_CBMain_ClosePulse.DN) OTE(CMD_CBMain_Close);',
+      'XIC(REQ_CBMain_Close) XIC(P_CBMain_Close) TON(T_CBMain_ClosePulse, PRE_CLOSE_PULSE_PLACEHOLDER);',
+      'XIC(T_CBMain_ClosePulse.DN) OTU(REQ_CBMain_Close);',
+      'XIC(REQ_CBMain_Close) XIO(P_CBMain_Close) OTL(ALM_CBMain_CloseRejected) OTU(REQ_CBMain_Close);'
     ],
     rslogix: 'Use OSR with a dedicated B3 storage bit, T4:x for the pulse timer and B3 bits for REQ/CMD. Verify the chosen processor instruction syntax.'
   },
@@ -151,8 +171,8 @@ export const LOGIC_PATTERNS = [
     why: 'Trip logic executes before close logic and drops commands in the same scan. Reset is edge-triggered and cannot issue a close.',
     studio: [
       'XIC(TRIP_Any) OTL(L_86Lockout);',
-      'XIC(TRIP_Any) OTU(REQ_CB101_Close) OTU(REQ_CB201_Close);',
-      'XIC(TRIP_Any) OTU(REQ_CAP1_Close) OTU(REQ_CAP2_Close);',
+      'XIC(TRIP_Any) OTU(REQ_CBMain_Close);',
+      'XIC(TRIP_Any) OTU(REQ_CAP1_Close) OTU(REQ_CAP2_Close) OTU(REQ_CAP3_Close) OTU(REQ_CAP4_Close);',
       'XIC(DI_PB_86Reset) ONS(OSR_86Reset) XIC(P_86Reset) OTU(L_86Lockout);'
     ],
     rslogix: 'Use OTL/OTU only when the reset path is explicit and tested. A real 86 device may require physical/manual reset and must not be bypassed in PLC logic.'
@@ -172,10 +192,12 @@ export const LOGIC_PATTERNS = [
     title: 'Count proven breaker operations once',
     why: 'A button press can be rejected and a close coil can fail. Count the state transition that proves the mechanism moved.',
     studio: [
-      'XIC(CB101_52a) ONS(OSR_CB101_ClosedEdge) CTU(C_CB101_Operations);',
+      'XIC(CBMain_52a) ONS(OSR_CBMain_ClosedEdge) CTU(C_CBMain_Operations);',
       'XIC(CAP1_52a) ONS(OSR_CAP1_ClosedEdge) CTU(C_CAP1_Operations);',
       'XIC(CAP2_52a) ONS(OSR_CAP2_ClosedEdge) CTU(C_CAP2_Operations);',
-      'XIC(MaintResetAuthorized) XIC(DI_PB_CountReset) ONS(OSR_CountReset) RES(C_CB101_Operations);'
+      'XIC(CAP3_52a) ONS(OSR_CAP3_ClosedEdge) CTU(C_CAP3_Operations);',
+      'XIC(CAP4_52a) ONS(OSR_CAP4_ClosedEdge) CTU(C_CAP4_Operations);',
+      'XIC(MaintResetAuthorized) XIC(DI_PB_CountReset) ONS(OSR_CountReset) RES(C_CBMain_Operations);'
     ],
     rslogix: 'Use separate OSR storage bits and C5 counters. Save totals externally before download/reset if maintenance depends on them.'
   },
@@ -183,16 +205,16 @@ export const LOGIC_PATTERNS = [
     title: 'Analog input scaling and quality',
     why: 'Separate raw counts, engineering value and quality. A bad channel must not quietly become a valid zero.',
     studio: [
-      'CPT(AI_FeederCurrent_Pct, (AI_FeederCurrentRaw - RAW_MIN) * 100.0 / (RAW_MAX - RAW_MIN));',
-      'LIM(RAW_VALID_LOW, AI_FeederCurrentRaw, RAW_VALID_HIGH) OTE(AI_FeederCurrent_QualityGood);',
-      'XIC(AI_FeederCurrent_QualityGood) LES(AI_FeederCurrent_Pct, CAP_NO_CURRENT_THRESHOLD_APPROVED) OTE(CAP_NoCurrentIndication);'
+      'CPT(AI_SelectedCapCurrent_Pct, (AI_SelectedCapCurrentRaw - RAW_MIN) * 100.0 / (RAW_MAX - RAW_MIN));',
+      'LIM(RAW_VALID_LOW, AI_SelectedCapCurrentRaw, RAW_VALID_HIGH) OTE(AI_SelectedCapCurrent_QualityGood);',
+      'XIC(AI_SelectedCapCurrent_QualityGood) LES(AI_SelectedCapCurrent_Pct, CAP_NO_CURRENT_THRESHOLD_APPROVED) OTE(SelectedCAP_NoCurrentIndication);'
     ],
     rslogix: 'Use SCP where supported or compute with F8 values and explicit divide-by-zero protection. Raw limits and thresholds come from module configuration and approved design data.'
   }
 ];
 
 export const HMI_SCREENS = [
-  { screen: '01 — One-line overview', includes: 'Source, four breakers, bus, transformer, both cap banks, 86 and analog meters', operatorAction: 'Open faceplates; no direct output writes', acceptance: 'Every color has a text/state label; bad quality is gray/hatched, not “open”.' },
+  { screen: '01 — Drawing overview', includes: '138 kV source/high-side, main transformer, 4.16 kV main, feeders/motors, four cap banks, 86 and analog meters', operatorAction: 'Open faceplates; no direct output writes', acceptance: 'Every color has a text/state label; untranscribed drawing tags remain visibly flagged.' },
   { screen: '02 — Breaker faceplate', includes: '52a/52b, close/open request, permissive summary, command pulse, fail-to-open/close, local/remote', operatorAction: 'Two-step select then execute for training', acceptance: 'Close rejected reason is visible and requests self-clear in PLC.' },
   { screen: '03 — Cap bank / Kirk sequence', includes: 'Key location, breaker proof, CT no-current indication, discharge timer state, disconnect/access indication', operatorAction: 'Request release or cancel; follow mechanical procedure', acceptance: 'Banner says PLC indication is supplemental and never “safe to touch”.' },
   { screen: '04 — Alarms & first-out', includes: 'Active, unacknowledged, first-out code, timestamp from HMI historian, 86 state', operatorAction: 'Acknowledge; reset only from dedicated control', acceptance: 'Acknowledge does not clear the trip or 86.' },
@@ -218,9 +240,9 @@ export const BUILD_PHASES = [
   {
     id: 'basis', number: '01', title: 'Freeze the training design basis', outcome: 'A signed-off scope with every unknown visible.',
     tasks: [
-      'Attach the actual one-line, elementary diagrams, relay list, breaker control schematics, cap-bank manual and Kirk key exchange drawing.',
-      'Replace the assumed tags SRC-101, CB-101, CB-201, CB-301, CB-302, T-101 and 86-L with drawing tags.',
-      'Record controller catalog number, firmware, programming software revision, emulator and Wonderware/AVEVA version.',
+      'Attach the original PDF of the uploaded 138/4.16 kV one-line, plus elementary diagrams, relay list, cap-bank manual and Kirk key exchange drawing.',
+      'Transcribe exact source, transformer, bus, feeder, motor, four cap-bank breaker and 86/relay tags; do not read soft characters from the screenshot.',
+      'Record the CompactLogix L18ER full catalog number, firmware, Studio 5000 revision, emulator strategy and Wonderware/AVEVA version.',
       'Declare the boundary: software only, isolated low-voltage trainer, or observation of real equipment. Do not mix modes.',
       'Write an “out of scope” list: protection settings, synchronization, arc-flash calculations and live switching are not implemented here.'
     ],
@@ -231,7 +253,7 @@ export const BUILD_PHASES = [
     tasks: [
       'For every breaker, list 52a, 52b, local/remote, spring/energy charged, trip-circuit healthy, close coil and trip coil points actually available.',
       'For every relay, list healthy, alarm and trip contacts independently; identify hardwired trip paths the PLC only monitors.',
-      'For T-101, list only indications present on the drawings (for example winding temperature, pressure/gas, sudden pressure or lockout) without inventing contacts.',
+      'For XFMR_MAIN, list only indications present on the transformer/relay drawings (for example winding temperature, pressure/gas, sudden pressure or lockout) without inventing contacts.',
       'For each cap bank, document key trapped/released positions, disconnect/ground switch/access-door sequence and discharge requirement from approved documents.',
       'Create OPEN, CLOSED, MOVING, BAD STATUS and BAD QUALITY truth tables. Do not treat missing data as OPEN.'
     ],
@@ -293,15 +315,15 @@ export const BUILD_PHASES = [
     evidence: 'Permissive matrix, rung printout and breaker FAT cases.'
   },
   {
-    id: 'kirk', number: '08', title: 'Build both cap-bank Kirk sequences', outcome: 'Independent, testable supplemental indications around a real mechanical boundary.',
+    id: 'kirk', number: '08', title: 'Build all four cap-bank Kirk sequences', outcome: 'Independent, testable supplemental indications around a real mechanical boundary.',
     tasks: [
-      'Create separate K1 and K2 state tags, release requests, discharge timers, no-current indications and alarms.',
-      'Require proven open, current below the approved threshold and the approved discharge wait before indicating release permitted.',
-      'Block close whenever the key is not at the breaker, disconnect/access is open, sequence is active or input quality is bad.',
-      'Require key return and access/disconnect restoration before the bank can return to READY.',
-      'Walk every state and failure: timer reset, current returns, key changes early, access opens, relay trips and power cycles.'
+      'Create separate K1–K4 state tags, HMI release requests, discharge timers, selected-bank no-current proof and alarms.',
+      'Require proven open, current below the approved threshold and the approved discharge wait before indicating release permitted for the selected bank.',
+      'Block close whenever that bank key is not at its breaker, access is open, sequence is active or any required quality is bad.',
+      'Require key return and access/disconnect restoration before the selected bank can return to READY.',
+      'Walk every state and failure on all four instances: timer reset, current returns, wrong bank selected, key changes early, relay trips and power cycles.'
     ],
-    evidence: 'Approved key-exchange truth table and independent CAP-1/CAP-2 sequence FAT.'
+    evidence: 'Approved key-exchange truth table and independent CAP-1 through CAP-4 sequence FAT.'
   },
   {
     id: 'elements', number: '09', title: 'Add timers, counters, one-shots and alarms', outcome: 'Each stateful instruction has an owner, reset and power-up behavior.',
@@ -351,13 +373,13 @@ export const BUILD_PHASES = [
 
 export const FAT_TESTS = [
   { id: 'FAT-01', test: 'Power-up / first scan', action: 'Restart controller in each mode', expected: 'No spontaneous close; transient requests clear; intentional retentive data behaves as documented.' },
-  { id: 'FAT-02', test: 'Main close success', action: 'Make all CB-101 permissives, pulse close and prove status', expected: 'One request, bounded command, one operation count, CLOSED indication.' },
+  { id: 'FAT-02', test: 'Main close success', action: 'Make all CB_MAIN permissives, pulse close and prove status', expected: 'One request, bounded command, one operation count, CLOSED indication.' },
   { id: 'FAT-03', test: 'Each close block', action: 'Drop one permissive at a time', expected: 'No output; exact block reason; rejected request self-clears.' },
   { id: 'FAT-04', test: 'Trip during close', action: 'Assert master/protective trip during command', expected: 'Command drops, 86 latches, trip is first-out, closes remain blocked.' },
   { id: 'FAT-05', test: 'Aux contact disagreement', action: 'Simulate impossible 52a/52b combinations', expected: 'BAD STATUS; neither OPEN nor CLOSED claimed; close blocked.' },
   { id: 'FAT-06', test: 'CAP discharge interruption', action: 'Begin K1 release then restore current/proof loss', expected: 'Timer resets and release-permitted drops immediately.' },
-  { id: 'FAT-07', test: 'Wrong key location', action: 'Remove K1 or open CAP-1 access then request close', expected: 'CAP-1 close blocked; CAP-2 remains independent.' },
-  { id: 'FAT-08', test: 'Bank independence', action: 'Operate both banks and inject one bank fault', expected: 'No shared timer/ONS/counter state; only intended common bus/86 effects cross over.' },
+  { id: 'FAT-07', test: 'Wrong key location', action: 'Remove each K1–K4 in turn, then request its bank close', expected: 'Only the matching bank close is blocked; all other bank state remains independent.' },
+  { id: 'FAT-08', test: 'Four-bank independence', action: 'Operate all bank instances and inject one bank fault', expected: 'No shared timer/ONS/counter state; only intended common bus/86 effects cross over.' },
   { id: 'FAT-09', test: 'HMI communications loss', action: 'Disconnect driver while command is pressed', expected: 'No stuck request/output; quality goes bad; operator is notified.' },
   { id: 'FAT-10', test: 'Analog bad quality', action: 'Drive raw value outside configured valid range / fault module', expected: 'Bad quality, no-current proof invalid, key release blocked.' },
   { id: 'FAT-11', test: 'Counter integrity', action: 'Press close repeatedly without feedback, then complete one close', expected: 'Rejected/failed presses do not count; one proven rising edge counts once.' },
@@ -379,6 +401,8 @@ export const PLATFORM_CROSSWALK = [
 
 export const REFERENCE_LINKS = [
   { label: 'Rockwell Automation Literature Library', url: 'https://literature.rockwellautomation.com/', use: 'Controller, module and instruction manuals—select the exact catalog, firmware and publication revision.' },
+  { label: 'CompactLogix 5370 L1 product profile (1769-PP012)', url: 'https://literature.rockwellautomation.com/idc/groups/literature/documents/pp/1769-pp012_-en-e.pdf', use: 'L18ER family embedded I/O, memory, expansion and communications starting point; verify the current revision and full catalog.' },
+  { label: 'CompactLogix controller specifications (1769-TD005)', url: 'https://literature.rockwellautomation.com/idc/groups/literature/documents/td/1769-td005_-en-p.pdf', use: 'Controller and embedded-I/O technical data; use the publication revision applicable to the installed unit.' },
   { label: 'Studio 5000 Logix Designer product page', url: 'https://www.rockwellautomation.com/en-us/products/software/factorytalk/designsuite/studio-5000.html', use: 'Project environment and compatibility starting point.' },
   { label: 'AVEVA InTouch HMI', url: 'https://www.aveva.com/en/products/intouch-hmi/', use: 'HMI/communications documentation starting point; product naming varies by installed generation.' },
   { label: 'Kirk Key Interlock resources', url: 'https://www.kirkkey.com/resources/', use: 'Obtain the actual key-interlock scheme, operation/maintenance instructions and project drawing.' },
