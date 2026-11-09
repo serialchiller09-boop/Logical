@@ -831,3 +831,7 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
 .home-manual-copy b { color: #eef6f7; font-size: 15px; }.home-manual-copy > span { color: #9bb1bd; font-size: 12px; }
 .home-manual-arrow { color: #83c7d0; font-size: 20px; }
 @media print { .home-manual-feature { color: #111; border-color: #aaa; background: white; }.home-manual-copy b { color: #111; }.home-manual-copy > span, .home-manual-copy small { color: #333; } }
+
+/* uploaded one-line / L18ER additions */
+.drawing-review-card { margin-bottom: 12px !important; }
+.controller-basis-card { margin-top: 12px !important; }

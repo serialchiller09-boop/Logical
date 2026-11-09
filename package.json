@@ -21,10 +21,11 @@
     "seed:reset": "node --disable-warning=ExperimentalWarning server/src/seed/run.js --reset",
     "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.mjs",
     "check:render": "node --disable-warning=ExperimentalWarning scripts/render-check.mjs",
+    "notebook:docs": "node scripts/generate-substation-notebook.mjs",
     "verify": "npm run build && npm test"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
+    "concurrently": "^9.2.5",
     "esbuild": "^0.28.2"
   }
 }

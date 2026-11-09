@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   ALL_IO_ROWS,
   BUILD_PHASES,
+  CONTROLLER_BASIS,
+  DRAWING_OBSERVATIONS,
   FAT_TESTS,
   KIRK_STATES,
   PERMISSIVE_MATRIX,
@@ -25,6 +27,21 @@ test('substation trainer map uses the requested physical controls and lamps exac
     assert.ok(row.studio, `${row.tag} has no Studio 5000 example address`);
     assert.ok(row.rslogix, `${row.tag} has no RSLogix 500 example address`);
     assert.ok(row.device, `${row.tag} has no panel label/purpose`);
+  }
+});
+
+test('the uploaded one-line and L18ER basis drive four independent capacitor-bank instances', () => {
+  assert.match(JSON.stringify(DRAWING_OBSERVATIONS), /138\/4\.16 kV/i);
+  assert.match(JSON.stringify(DRAWING_OBSERVATIONS), /four repeated three-phase shunt-capacitor/i);
+  assert.match(JSON.stringify(CONTROLLER_BASIS), /L18ER/i);
+
+  const maintainedTags = new Set(TRAINER_IO.maintained.map((row) => row.tag));
+  const momentaryTags = new Set(TRAINER_IO.momentary.map((row) => row.tag));
+  for (let n = 1; n <= 4; n += 1) {
+    assert.ok(maintainedTags.has(`DI_CBCap${n}_52a`), `CAP-${n} needs a physical state input`);
+    assert.ok(maintainedTags.has(`DI_K${n}AtBreaker`), `K${n} needs an independent key-position input`);
+    assert.ok(momentaryTags.has(`DI_PB_Cap${n}_Close`), `CAP-${n} needs a close request`);
+    assert.ok(momentaryTags.has(`DI_PB_Cap${n}_Open`), `CAP-${n} needs an open request`);
   }
 });
 
