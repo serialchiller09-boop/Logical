@@ -1,8 +1,10 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AppProvider, groupSections, useApp } from './lib/store.jsx';
 import { SearchPalette } from './components/SearchPalette.jsx';
+import { notebookPdfHref } from './lib/controlsNotebook.js';
 
 const TOOL_LINKS = [
+  { to: '/controls-notebook', label: 'Controls notebook', icon: 'CN' },
   { to: '/notebook', label: 'Substation notebook', icon: 'SS' },
   { to: '/tools', label: 'Tools & simulator', icon: '⌗' },
   { to: '/saved', label: 'My list', icon: '★' },
@@ -58,10 +60,8 @@ function Sidebar({ onNavigate, open = false }) {
       </div>
 
       <div className="sidebar-foot">
-        <div className="small"><span className="dot" style={{ background: 'var(--power)' }} /> no plant data here</div>
-        <div style={{ marginTop: 5 }}>Definitions and patterns only — setpoints, alarm limits and relief
-          settings are deliberately not included. Verify against your P&amp;ID legend, tag register and
-          cause-and-effect matrix.</div>
+        <div className="small"><span className="dot" style={{ background: 'var(--power)' }} /> plant documents govern</div>
+        <div style={{ marginTop: 5 }}>Curated reference entries omit plant setpoints. The source notebook contains illustrative values and examples; verify against your approved drawings, procedures and cause-and-effect matrix.</div>
       </div>
     </aside>
   );
@@ -72,7 +72,7 @@ function Topbar() {
   const loc = useLocation();
   const seg = loc.pathname.split('/').filter(Boolean);
   const crumbs = [{ to: '/', label: 'reference' }];
-  const LABELS = { s: 'section', e: 'entry', notebook: 'substation notebook', tools: 'tools & simulator', saved: 'my list', admin: 'plant data', search: 'search' };
+  const LABELS = { s: 'section', e: 'entry', 'controls-notebook': 'controls notebook', notebook: 'substation notebook', tools: 'tools & simulator', saved: 'my list', admin: 'plant data', search: 'search' };
   if (seg[0] && seg[0] !== '') crumbs.push({ to: `/${seg[0]}${seg[1] ? '' : ''}`, label: LABELS[seg[0]] || seg[0] });
   if (seg[1]) crumbs.push({ to: null, label: decodeURIComponent(seg[1]).replace(/^.*:/, '') });
 
@@ -90,7 +90,9 @@ function Topbar() {
       <div className="search-trigger" onClick={() => setPalette(true)}>
         <span aria-hidden>⌕</span> Search the reference <kbd>⌘K</kbd>
       </div>
-      <button className="icon-btn" onClick={() => window.print()} title="Print or save this page as a clean PDF">⎙</button>
+      {loc.pathname === '/controls-notebook'
+        ? <a className="icon-btn icon-link" href={notebookPdfHref(new URLSearchParams(loc.search).get('page'))} target="_blank" rel="noreferrer" title="Open the original PDF to print" aria-label="Open the original PDF to print">⎙</a>
+        : <button className="icon-btn" onClick={() => window.print()} title="Print or save this page as a clean PDF" aria-label="Print or save this page">⎙</button>}
     </header>
   );
 }

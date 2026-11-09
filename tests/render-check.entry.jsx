@@ -6,6 +6,7 @@ import { Fields, RelatedLinks, ORDER_KEYS } from '../web/src/components/Fields.j
 import { RungStatic, RungSimulator, subRungs, describeRung } from '../web/src/components/RungDiagram.jsx';
 import { AppProvider } from '../web/src/lib/store.jsx';
 import ProjectNotebook from '../web/src/pages/ProjectNotebook.jsx';
+import ControlsNotebook from '../web/src/pages/ControlsNotebook.jsx';
 
 const BASE = process.env.API_ORIGIN || 'http://127.0.0.1:8787';
 main().catch((e) => { console.error('FATAL', e); process.exit(1); });
@@ -58,8 +59,15 @@ renderToString(
   React.createElement(MemoryRouter, null,
     React.createElement(AppProvider, null, React.createElement(ProjectNotebook)))
 );
+const controlsNotebookHtml = renderToString(
+  React.createElement(MemoryRouter, { initialEntries: ['/controls-notebook?page=73#reader'] },
+    React.createElement(AppProvider, null, React.createElement(ControlsNotebook)))
+);
+if (!controlsNotebookHtml.includes('controls-notebook-v1.2.pdf#page=73&amp;view=FitH')) crashes.push('controls notebook: reader lost its PDF page deep link');
+if (!controlsNotebookHtml.includes('Plant documents govern')) crashes.push('controls notebook: missing source/safety warning');
+if (!controlsNotebookHtml.includes('Twelve Hands-On Labs')) crashes.push('controls notebook: contents did not render');
 
-console.log(`rendered ${rendered} entries (${rungCount} rungs, ${simCount} simulators) with ${crashes.length} failures`);
+console.log(`rendered ${rendered} entries (${rungCount} rungs, ${simCount} simulators) and both notebooks with ${crashes.length} failures`);
 if (crashes.length) console.log(crashes.slice(0, 20).join('\n'));
 const sorted = [...leftovers.entries()].sort((a, b) => b[1] - a[1]);
 console.log(`\nkeys not in the render order (auto-rendered with a humanized label): ${sorted.length} distinct`);

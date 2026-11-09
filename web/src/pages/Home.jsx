@@ -26,21 +26,28 @@ export default function Home() {
           <span className="pill"><b className="num">{sections.length}</b> sections</span>
           <span className="pill"><b className="num">{stats?.rungCount ?? 16}</b> runnable rungs</span>
           <span className="pill">search <kbd>⌘K</kbd></span>
-          <Link className="pill pill-accent" to="/notebook">new · substation project notebook →</Link>
-          <span className="pill" style={{ color: 'var(--warn)' }}>no setpoints, ever — by design</span>
+          <Link className="pill pill-accent" to="/controls-notebook">controls notebook · rev 1.2 →</Link>
+          <Link className="pill" to="/notebook">substation project notebook →</Link>
+          <span className="pill" style={{ color: 'var(--warn)' }}>plant documents govern</span>
         </div>
       </section>
+
+      <Link className="home-manual-feature" to="/controls-notebook">
+        <span className="home-manual-icon" aria-hidden="true">▤</span>
+        <span className="home-manual-copy"><small>YOUR REFERENCE MANUAL · REV 1.2</small><b>Gas plant controls &amp; automation notebook</b><span>Search all 108 pages, jump to a chapter or lab, and open the original printer-friendly PDF.</span></span>
+        <span className="home-manual-arrow" aria-hidden="true">↗</span>
+      </Link>
 
       <div className="callout callout-info" style={{ marginTop: 18 }}>
         <h4>how to trust anything on this site</h4>
         <div>
-          Every entry carries a provenance badge — <b>standard-defined</b>, <b>industry practice</b>, <b>vendor-specific</b>,{' '}
+          Every curated entry carries a provenance badge — <b>standard-defined</b>, <b>industry practice</b>, <b>vendor-specific</b>,{' '}
           <b>site-specific</b>, <b>unverified</b> or <b>authored example</b> — plus a pointer to the document it came from.
-          Numbers are limited to definitional arithmetic (a 4-20 mA mapping, <span className="mono">psia = psig + atmospheric</span>,{' '}
-          <span className="mono">Kc = 100/PB</span>, bit widths). <b>Setpoints, alarm and trip values, relief settings and
-          process conditions are deliberately not included</b>: they belong to your plant. Rung examples use invented tags
-          and placeholder presets, labelled as such. Published tuning rules are shown as classroom relations, not as design
-          values. Where ISA-5.1 leaves a letter to "user's choice", this app refuses to invent a meaning.
+          Those entries' numbers are limited to definitional arithmetic (a 4-20 mA mapping, <span className="mono">psia = psig + atmospheric</span>,{' '}
+          <span className="mono">Kc = 100/PB</span>, bit widths). <b>Curated entries deliberately omit plant setpoints, alarm and trip values, relief settings and
+          process conditions</b>: they belong to your plant. Rung examples use invented tags and placeholder presets, labelled as such.
+          The separate source notebook retains its original examples and illustrative numbers; verify them against approved site documents.
+          Published tuning rules are shown as classroom relations, not as design values. Where ISA-5.1 leaves a letter to "user's choice", this app refuses to invent a meaning.
         </div>
       </div>
 

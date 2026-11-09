@@ -5,6 +5,8 @@ import { useApp, useTitle } from '../lib/store.jsx';
 import { BookmarkToggle, ErrorBox, Loader, Provenance, StatusBadge } from '../components/Bits.jsx';
 import { Fields } from '../components/Fields.jsx';
 import { RungSimulator } from '../components/RungDiagram.jsx';
+import { RELATED_CONTROLS_READING } from '../data/controlsNotebook.js';
+import { notebookPageHref } from '../lib/controlsNotebook.js';
 
 function NoteEditor({ id, initial = '' }) {
   const [body, setBody] = useState(initial);
@@ -142,6 +144,7 @@ export default function EntryPage() {
                 {entry.section === 'isa-letters' && <Link className="pill" to="/tools">tag decoder</Link>}
                 {entry.section === 'rungs' && <Link className="pill" to="/s/instructions">ladder elements</Link>}
                 {entry.section === 'pid' && <Link className="pill" to="/tools">Kc / PB workbench</Link>}
+                {RELATED_CONTROLS_READING[entry.section] && <Link className="pill" to={notebookPageHref(RELATED_CONTROLS_READING[entry.section].page)}>related notebook reading</Link>}
                 <Link className="pill" to={`/s/search?q=${encodeURIComponent(entry.title)}`}>find mentions of this</Link>
               </div>
             </div>
