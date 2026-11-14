@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { GEO, layout, analyze, initialState, collectElements, collectRefs } from '../lib/ladder.js';
+import {
+  applyBusToBitsValues,
+  isCouplingEnabled,
+  loadTagBus,
+  publishLinkedIo,
+  publishSnapshot,
+  setBit as busSetBit,
+  setValue as busSetValue,
+  subscribeTagBus
+} from '../lib/tagBus.js';
 
 /* ------------------------------------------------------------------ text rendering of a rung */
 export function describeRung(node, depth = 0) {
@@ -174,15 +185,56 @@ export function RungSimulator({ entry, compact = false }) {
   const [auto, setAuto] = useState(false);
   const [log, setLog] = useState([]);
   const [showMap, setShowMap] = useState(true);
+  const [coupled, setCoupled] = useState(() => isCouplingEnabled());
 
   const rerender = useCallback(() => setTick((n) => n + 1), []);
 
+  const hydrateFromBus = useCallback((st) => {
+    if (!isCouplingEnabled()) return st;
+    const merged = applyBusToBitsValues(st.bits, st.values, loadTagBus());
+    st.bits = merged.bits;
+    st.values = merged.values;
+    return st;
+  }, []);
+
+  const publishSimToBus = useCallback((st) => {
+    if (!isCouplingEnabled()) return;
+    const bits = {};
+    const values = {};
+    for (const [tag, meta] of ioMap.entries()) {
+      if (['DI', 'DO', 'BIT'].includes(meta.type) && tag in st.bits) bits[tag] = st.bits[tag];
+      else if (tag in st.values) values[tag] = st.values[tag];
+    }
+    publishSnapshot({ bits, values }, 'ladder');
+  }, [ioMap]);
+
   const reset = useCallback(() => {
-    stRef.current = structuredClone(initialState([...ioMap.values()]));
+    const st = structuredClone(initialState([...ioMap.values()]));
+    stRef.current = hydrateFromBus(st);
     setScans(0); setLog([]); setAuto(false); rerender();
-  }, [ioMap, rerender]);
+    publishSimToBus(stRef.current);
+  }, [ioMap, hydrateFromBus, publishSimToBus, rerender]);
 
   useEffect(() => { reset(); }, [reset]);
+
+  useEffect(() => {
+    const allIo = [...ioMap.values()];
+    publishLinkedIo({ entryId: entry?.id, title: entry?.title, io: allIo });
+  }, [entry?.id, entry?.title, ioMap]);
+
+  useEffect(() => {
+    const unsub = subscribeTagBus((bus, source) => {
+      setCoupled(isCouplingEnabled());
+      if (!isCouplingEnabled()) return;
+      if (source === 'ladder' || source === 'pref') return;
+      const st = stRef.current;
+      const merged = applyBusToBitsValues(st.bits, st.values, bus);
+      st.bits = merged.bits;
+      st.values = merged.values;
+      rerender();
+    });
+    return unsub;
+  }, [rerender]);
 
   const doScan = useCallback(() => {
     const st = stRef.current;
@@ -194,7 +246,8 @@ export function RungSimulator({ entry, compact = false }) {
     }
     setScans((n) => n + 1);
     if (writes.length) setLog((l) => [...writes.map((w) => `${new Date().toISOString().slice(11, 19)}  ${w.rung}: ${w.kind} ${w.addr} := ${w.value ? 'TRUE' : 'FALSE'}`), ...l].slice(0, 40));
-  }, [dt, rungs]);
+    publishSimToBus(st);
+  }, [dt, rungs, publishSimToBus]);
 
   useEffect(() => {
     if (!auto) return;
@@ -215,10 +268,15 @@ export function RungSimulator({ entry, compact = false }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick, dt, rungs, showMap]);
 
-  const setBit = (tag, v) => { stRef.current.bits[tag] = v ? 1 : 0; rerender(); };
+  const setBit = (tag, v) => {
+    stRef.current.bits[tag] = v ? 1 : 0;
+    busSetBit(tag, v, 'ladder');
+    rerender();
+  };
   const setVal = (tag, v) => {
     const n = Number(v);
     stRef.current.values[tag] = Number.isNaN(n) ? 0 : n;
+    busSetValue(tag, stRef.current.values[tag], 'ladder');
     rerender();
   };
 
@@ -329,12 +387,23 @@ export function RungSimulator({ entry, compact = false }) {
           </div>
         )}
 
+        <div className="vios-couple-bar">
+          <span className={`pill ${coupled ? 'pill-accent' : ''}`}>
+            {coupled ? 'coupled to I/O sandbox' : 'sandbox coupling off'}
+          </span>
+          <Link className="btn btn-sm" to="/io-sandbox">Open I/O sandbox →</Link>
+          <span className="tiny muted">
+            Matching tags share this browser’s tag bus. Adopt this rung’s I/O on the sandbox plate to drive contacts from lamps/switches.
+          </span>
+        </div>
+
         <details className="sim-model-note">
           <summary className="tiny muted">Teaching model (not a real PLC runtime)</summary>
           <p className="tiny muted" style={{ margin: '6px 0 0' }}>
             Booleans evaluate as drawn; timers and counters advance one scan period per step;
             MOV/CPT/SEL/LIM/PID operands resolve when numeric or a named I/O tag. Real controllers also depend on
             scan overlap, I/O update points, task priority and firmware specifics.
+            Shared sandbox values are browser-local teaching state — not live field I/O.
           </p>
         </details>
       </div>

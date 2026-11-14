@@ -2,7 +2,7 @@
  * Virtual I/O sandbox — panel model, starter layout, browser persistence.
  *
  * Teaching soft-panel only: local tags in this browser. Not a PLC runtime,
- * not live field I/O. Ladder lab coupling is a later phase.
+ * not live field I/O. Shared values with Ladder lab go through tagBus.js.
  */
 
 import { TRAINER_IO } from '../data/substationProject.js';
@@ -250,9 +250,12 @@ export function normalizePanel(raw) {
       tags[k] = typeof base[k] === 'number' ? Number(v) || 0 : !!v;
     }
   }
+  const mode = raw.mode === 'trainer' || raw.mode === 'ladder' ? raw.mode : 'blank';
   return {
     version: PANEL_VERSION,
-    mode: raw.mode === 'trainer' ? 'trainer' : 'blank',
+    mode,
+    linkedEntryId: raw.linkedEntryId || null,
+    linkedTitle: raw.linkedTitle || null,
     widgets,
     tags
   };
@@ -272,6 +275,8 @@ export function savePanel(panel) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       version: PANEL_VERSION,
       mode: panel.mode || 'blank',
+      linkedEntryId: panel.linkedEntryId || null,
+      linkedTitle: panel.linkedTitle || null,
       widgets: panel.widgets,
       tags: panel.tags
     }));
@@ -393,6 +398,116 @@ export function panelToCsv(panel) {
     ].map(esc).join(','));
   }
   return `${lines.join('\r\n')}\r\n`;
+}
+
+function classifyLadderPoint(point) {
+  const type = String(point.type || '').toUpperCase();
+  const role = String(point.role || '').toLowerCase();
+  const tag = String(point.tag || '');
+  if (['AI', 'AO', 'INT', 'DINT', 'REAL', 'FLOAT'].includes(type) || /level|pct|analog|raw|current|voltage/i.test(role)) {
+    return { kind: 'pot', color: undefined };
+  }
+  if (['DO', 'BIT'].includes(type) || /^DO_|^LED_|_LAT$|_RUN$|_DONE$/i.test(tag)) {
+    const amber = /trip|alarm|lock|fault|warn|bypass/i.test(`${role} ${tag}`);
+    return { kind: 'led', color: amber ? 'amber' : 'green' };
+  }
+  if (/momentary|push.?button|\bpb\b|start request|ack|acknowledge|reset/i.test(role) || /_PB_|HMI_START|ACK_/i.test(tag)) {
+    return { kind: 'pb', color: undefined };
+  }
+  return { kind: 'switch', color: undefined };
+}
+
+/** Build a panel from a Ladder lab linked I/O list (DI/DO/AI…). */
+export function createPanelFromLadderIo(linked) {
+  const io = linked?.io || [];
+  const widgets = [];
+  let col = 0;
+  let row = 0;
+  const place = (w, span = 1) => {
+    if (col + span > 10) { col = 0; row += 1; }
+    widgets.push({ ...w, x: col, y: row });
+    col += span;
+    if (col >= 10) { col = 0; row += 1; }
+  };
+
+  const leds = [];
+  const inputs = [];
+  const pots = [];
+  for (const point of io) {
+    if (!point?.tag) continue;
+    const cls = classifyLadderPoint(point);
+    const base = {
+      id: uid(cls.kind),
+      tag: normalizeTagName(point.tag),
+      label: String(point.role || point.tag).slice(0, 64),
+      channel: point.addr || undefined,
+      studio: point.addr || undefined,
+      note: point.role || undefined,
+      color: cls.color,
+      min: cls.kind === 'pot' ? 0 : undefined,
+      max: cls.kind === 'pot' ? 100 : undefined,
+      type: cls.kind
+    };
+    if (cls.kind === 'led') leds.push(base);
+    else if (cls.kind === 'pot') pots.push(base);
+    else inputs.push(base);
+  }
+
+  for (const w of leds) place(w, 1);
+  if (leds.length) { col = 0; row += 1; }
+  for (const w of inputs) place(w, 2);
+  if (inputs.length) { col = 0; row += 1; }
+  for (const w of pots) place(w, 3);
+
+  if (!widgets.length) return createStarterPanel();
+
+  const tags = initialTags(widgets);
+  for (const point of io) {
+    const tag = normalizeTagName(point.tag);
+    if (!(tag in tags)) continue;
+    const cls = classifyLadderPoint(point);
+    if (cls.kind === 'pot') tags[tag] = Number(point.initial) || 0;
+    else tags[tag] = point.initial ? true : false;
+  }
+
+  return {
+    version: PANEL_VERSION,
+    mode: 'ladder',
+    linkedEntryId: linked?.entryId || null,
+    linkedTitle: linked?.title || 'Ladder lab',
+    widgets,
+    tags
+  };
+}
+
+/** Overlay shared bus values onto panel tags that exist on the plate. */
+export function applyBusToPanel(panel, bus) {
+  if (!panel || !bus) return panel;
+  const tags = { ...panel.tags };
+  let changed = false;
+  for (const w of panel.widgets) {
+    if (w.type === 'pot') {
+      if (w.tag in (bus.values || {})) {
+        const n = Number(bus.values[w.tag]) || 0;
+        if (tags[w.tag] !== n) { tags[w.tag] = n; changed = true; }
+      }
+    } else if (w.tag in (bus.bits || {})) {
+      const on = !!bus.bits[w.tag];
+      if (tags[w.tag] !== on) { tags[w.tag] = on; changed = true; }
+    }
+  }
+  return changed ? { ...panel, tags } : panel;
+}
+
+/** Flatten panel tags into a bus snapshot. */
+export function panelToBusSnapshot(panel) {
+  const bits = {};
+  const values = {};
+  for (const w of panel.widgets || []) {
+    if (w.type === 'pot') values[w.tag] = Number(panel.tags[w.tag]) || 0;
+    else bits[w.tag] = panel.tags[w.tag] ? 1 : 0;
+  }
+  return { bits, values };
 }
 
 export function countByType(panel) {
