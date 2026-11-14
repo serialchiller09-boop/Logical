@@ -6,19 +6,30 @@ import {
   LED_COLORS,
   LAMP_TEST_TAG,
   addWidget,
+  applyBusToPanel,
   clearPanelStorage,
   countByType,
+  createPanelFromLadderIo,
   createStarterPanel,
   createTrainerPanel,
   lampTest,
   loadPanel,
   moveWidget,
+  panelToBusSnapshot,
   panelToCsv,
   removeWidget,
   renameWidget,
   savePanel,
   setTag
 } from '../lib/ioSandbox.js';
+import {
+  isCouplingEnabled,
+  loadLinkedIo,
+  loadTagBus,
+  publishSnapshot,
+  setCouplingEnabled,
+  subscribeTagBus
+} from '../lib/tagBus.js';
 
 function WidgetShell({ widget, selected, onSelect, children }) {
   return (
@@ -133,19 +144,22 @@ function downloadText(filename, text, mime) {
 
 export default function IoSandbox() {
   useTitle('I/O sandbox');
-  const [panel, setPanel] = useState(() => loadPanel());
+  const [panel, setPanel] = useState(() => applyBusToPanel(loadPanel(), loadTagBus()));
   const [selectedId, setSelectedId] = useState(null);
   const [editLabel, setEditLabel] = useState('');
   const [editTag, setEditTag] = useState('');
   const [editColor, setEditColor] = useState('green');
   const [savedFlash, setSavedFlash] = useState(false);
+  const [coupled, setCoupled] = useState(() => isCouplingEnabled());
+  const [linked, setLinked] = useState(() => loadLinkedIo());
   const persistTimer = useRef(null);
+  const skipBusPublish = useRef(false);
 
   const counts = useMemo(() => countByType(panel), [panel]);
   const selected = panel.widgets.find((w) => w.id === selectedId) || null;
   const maxRow = panel.widgets.reduce((m, w) => Math.max(m, w.y || 0), 0);
   const gridRows = Math.max(4, maxRow + 2);
-  const modeLabel = panel.mode === 'trainer' ? 'SUB-TRAIN-01' : 'BLANK PANEL';
+  const modeLabel = panel.mode === 'trainer' ? 'SUB-TRAIN-01' : panel.mode === 'ladder' ? 'LADDER I/O' : 'BLANK PANEL';
 
   useEffect(() => {
     if (persistTimer.current) clearTimeout(persistTimer.current);
@@ -154,9 +168,25 @@ export default function IoSandbox() {
         setSavedFlash(true);
         setTimeout(() => setSavedFlash(false), 900);
       }
+      if (!skipBusPublish.current && isCouplingEnabled()) {
+        publishSnapshot(panelToBusSnapshot(panel), 'sandbox');
+      }
+      skipBusPublish.current = false;
     }, 200);
     return () => { if (persistTimer.current) clearTimeout(persistTimer.current); };
   }, [panel]);
+
+  useEffect(() => {
+    const unsub = subscribeTagBus((bus, source) => {
+      setCoupled(isCouplingEnabled());
+      setLinked(loadLinkedIo());
+      if (!isCouplingEnabled()) return;
+      if (source === 'sandbox') return;
+      skipBusPublish.current = true;
+      setPanel((p) => applyBusToPanel(p, bus));
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!selected) {
@@ -188,6 +218,14 @@ export default function IoSandbox() {
     setPanel(createTrainerPanel());
   };
 
+  const adoptLadder = () => {
+    const link = loadLinkedIo();
+    setLinked(link);
+    if (!link) return;
+    setSelectedId(null);
+    setPanel(applyBusToPanel(createPanelFromLadderIo(link), loadTagBus()));
+  };
+
   const pressPb = (tag, down) => {
     update((p) => {
       let next = setTag(p, tag, down);
@@ -196,23 +234,47 @@ export default function IoSandbox() {
     });
   };
 
+  const toggleCouple = () => {
+    const next = !isCouplingEnabled();
+    setCouplingEnabled(next);
+    setCoupled(next);
+    if (next) publishSnapshot(panelToBusSnapshot(panel), 'sandbox');
+  };
+
   return (
     <>
       <section className="hero">
         <h1>I/O sandbox</h1>
         <p className="hero-lead">
-          Soft trainer panel — blank layout or the Substation SUB-TRAIN-01 I/O map.
-          Tags live in this browser only. Ladder lab coupling comes later.
+          Soft trainer panel — blank layout, Substation SUB-TRAIN-01 map, or the last Ladder lab rung’s I/O.
+          When coupling is on, matching tags share this browser with the scan simulator.
         </p>
         <div className="hero-meta">
           <span className="pill"><b className="num">{counts.led}</b> LEDs</span>
           <span className="pill"><b className="num">{counts.switch}</b> switches</span>
           <span className="pill"><b className="num">{counts.pb}</b> PBs</span>
           <span className="pill"><b className="num">{counts.pot}</b> pots</span>
-          <span className={`pill ${panel.mode === 'trainer' ? 'pill-accent' : ''}`}>{modeLabel}</span>
+          <span className={`pill ${panel.mode !== 'blank' ? 'pill-accent' : ''}`}>{modeLabel}</span>
+          <span className={`pill ${coupled ? 'pill-accent' : ''}`}>{coupled ? 'coupled' : 'uncoupled'}</span>
           <span className={`pill ${savedFlash ? 'pill-accent' : ''}`}>{savedFlash ? 'saved' : 'localStorage'}</span>
         </div>
       </section>
+
+      <div className="vios-couple-bar">
+        <button type="button" className={`btn ${coupled ? 'btn-primary' : ''}`} onClick={toggleCouple}>
+          {coupled ? 'Coupling on' : 'Coupling off'}
+        </button>
+        <button type="button" className="btn btn-primary" onClick={adoptLadder} disabled={!linked}>
+          Adopt ladder I/O{linked ? ` (${linked.io.length})` : ''}
+        </button>
+        <Link className="btn" to="/s/rungs">Ladder lab →</Link>
+        <span className="tiny muted">
+          {linked
+            ? `Last linked rung: ${linked.title}. Adopt builds switches/PBs/LEDs/pots from that I/O list.`
+            : 'Open a rung in the ladder lab first, then adopt its I/O here.'}
+          {' '}Teaching model only — not live field wiring.
+        </span>
+      </div>
 
       <div className="vios-toolbar">
         <div className="vios-add-group" role="group" aria-label="Add widgets">
@@ -222,7 +284,7 @@ export default function IoSandbox() {
           <button type="button" className="btn" onClick={() => update((p) => addWidget(p, 'pot'))}>+ Pot</button>
         </div>
         <div className="vios-add-group">
-          <button type="button" className="btn btn-primary" onClick={loadTrainer}>Load trainer preset</button>
+          <button type="button" className="btn" onClick={loadTrainer}>Load trainer preset</button>
           <button type="button" className="btn" onClick={loadBlank}>Blank starter</button>
           <button type="button" className="btn" onClick={() => update((p) => lampTest(p, true))}>Lamp test</button>
           <button type="button" className="btn" onClick={() => update((p) => lampTest(p, false))}>Lamps off</button>
@@ -300,8 +362,9 @@ export default function IoSandbox() {
               Teaching model — not a PLC scan, not live field wiring.
               {panel.mode === 'trainer'
                 ? ' Addresses match the Substation notebook TRAINER_IO map (example Studio / RSLogix columns).'
-                : ' Load the trainer preset for the full SUB-TRAIN-01 point list.'}
-              {' '}Ladder coupling later.
+                : panel.mode === 'ladder'
+                  ? ` Panel mirrors ladder I/O${panel.linkedTitle ? ` from “${panel.linkedTitle}”` : ''}. Flip inputs here, step the scan on the rung.`
+                  : ' Load the trainer preset or adopt the last ladder lab I/O list.'}
             </p>
           </div>
         </div>
@@ -386,10 +449,10 @@ export default function IoSandbox() {
           <div className="callout callout-info">
             <h4>Where this sits</h4>
             <div>
-              Blank starter or interactive face of the{' '}
-              <Link to="/notebook">Substation notebook</Link> trainer map.
-              Ladder lab stays independent for now — open a rung in the{' '}
-              <Link to="/s/rungs">ladder lab</Link> separately.
+              Blank starter,{' '}
+              <Link to="/notebook">Substation notebook</Link> trainer map, or adopted{' '}
+              <Link to="/s/rungs">ladder lab</Link> I/O. With coupling on, the same tag names share one browser tag bus
+              between this plate and the scan simulator.
             </div>
           </div>
         </aside>

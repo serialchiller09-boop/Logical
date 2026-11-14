@@ -922,6 +922,18 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
 /* ============================================================
    Virtual I/O sandbox — soft trainer plate
    ============================================================ */
+.vios-couple-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(79, 209, 224, .06), rgba(12, 18, 26, .4));
+}
+.vios-couple-bar .tiny { flex: 1 1 220px; }
 .vios-toolbar {
   display: flex;
   flex-wrap: wrap;
