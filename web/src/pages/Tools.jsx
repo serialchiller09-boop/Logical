@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../lib/api.js';
 import { useTitle } from '../lib/store.jsx';
 import { TagDecoder, TagBatch } from '../components/TagDecoder.jsx';
@@ -15,8 +15,10 @@ const TABS = [
 ];
 
 export default function Tools() {
-  useTitle('Tools & simulator');
-  const [tab, setTab] = useState('tag');
+  useTitle('Tools');
+  const [sp] = useSearchParams();
+  const requested = sp.get('tab');
+  const [tab, setTab] = useState(TABS.some((t) => t.id === requested) ? requested : 'tag');
   const { data: instr, loading } = useAsync(() => api.entries({ section: 'instructions', limit: 100 }), []);
   const { data: rungs } = useAsync(() => api.entries({ section: 'rungs', limit: 40 }), []);
 
@@ -25,9 +27,8 @@ export default function Tools() {
       <section className="hero">
         <h1>Tools</h1>
         <p className="hero-lead">
-          The parts of this reference that do something: decode a tag against the ISA-5.1 letters, run the
-          definitional arithmetic a loop calculation needs, look up an element by either naming convention, and read
-          the worked rungs. Every number you can compute here is true by definition; nothing here is a design value.
+          Tag decode, definitional calculators, element names — and a printable rung gallery.
+          For interactive stepping, open a rung in the <Link to="/s/rungs">ladder lab</Link>.
         </p>
         <div className="hero-meta">
           {TABS.map((t) => (
@@ -108,13 +109,9 @@ export default function Tools() {
 
       {tab === 'gallery' && (
         <div className="stack" style={{ marginTop: 14, gap: 14 }}>
-          <div className="callout callout-info">
-            <h4>Printable rung sheet</h4>
-            <div>
-              Every rung below is static (no simulation state) so it prints clean. Open any one for the interactive
-              scanner. Tags and presets are invented placeholders — the point is the structure, not the numbers.
-            </div>
-          </div>
+          <p className="small muted" style={{ margin: 0 }}>
+            Static diagrams for print. Open any card to step the live simulator.
+          </p>
           {(rungs?.entries || []).map((e) => <RungPreview key={e.id} id={e.id} />)}
           {!rungs && <Loader label="loading rungs" />}
         </div>
@@ -138,7 +135,9 @@ function RungPreview({ id }) {
         </span>
       </div>
       <div className="card-bd">
-        {e.payload.purpose && <p className="small muted" style={{ marginTop: 0 }}>{e.payload.purpose}</p>}
+        {(e.payload.goal || e.subtitle) && (
+          <p className="sim-goal-line" style={{ marginTop: 0 }}>{e.payload.goal || e.subtitle}</p>
+        )}
         {rungsOnEntry.map((r) => <RungStatic key={r.key} ladder={r.ladder} title={r.title} />)}
       </div>
     </div>

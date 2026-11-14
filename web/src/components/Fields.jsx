@@ -7,6 +7,8 @@ const SKIP = new Set([
   'edited', 'created_at', 'updated_at', 'search', 'payload', '_state', '_unresolved', '_manual',
   'term', 'name', 'fullName', 'tag', 'letter', 'token', 'code', 'mnemonic', 'block', 'unit',
   'ladder', 'io',
+  // shown above the simulator — do not repeat in the detail drawer
+  'goal', 'tryThis',
   // secondary rungs: authored under arbitrary keys, picked up by subRungs() and drawn as diagrams
   'followOn', 'outputRung', 'proveRung', 'clearRung', 'resetRung', 'fuelRung', 'encodeRung',
   'swapRung', 'validRung', 'tripRung', 'overrideRung', 'blockRung', 'solenoidRung', 'timerRung'

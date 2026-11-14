@@ -4,9 +4,10 @@ import { SearchPalette } from './components/SearchPalette.jsx';
 import { notebookPdfHref } from './lib/controlsNotebook.js';
 
 const TOOL_LINKS = [
+  { to: '/s/rungs', label: 'Ladder lab', icon: '|=|' },
+  { to: '/tools', label: 'Tag & calc tools', icon: '⌗' },
   { to: '/controls-notebook', label: 'Controls notebook', icon: 'CN' },
   { to: '/notebook', label: 'Substation notebook', icon: 'SS' },
-  { to: '/tools', label: 'Tools & simulator', icon: '⌗' },
   { to: '/saved', label: 'My list', icon: '★' },
   { to: '/admin', label: 'Plant data', icon: '✎' }
 ];
@@ -31,7 +32,7 @@ function Sidebar({ onNavigate, open = false }) {
         </span>
         <div>
           <b>Logical</b>
-          <span>ladder logic &amp; plant instruments</span>
+          <span>ladder lab &amp; plant reference</span>
         </div>
       </div>
 
@@ -61,7 +62,7 @@ function Sidebar({ onNavigate, open = false }) {
 
       <div className="sidebar-foot">
         <div className="small"><span className="dot" style={{ background: 'var(--power)' }} /> plant documents govern</div>
-        <div style={{ marginTop: 5 }}>Curated reference entries omit plant setpoints. The source notebook contains illustrative values and examples; verify against your approved drawings, procedures and cause-and-effect matrix.</div>
+        <div style={{ marginTop: 5 }}>Rung tags/numbers are teaching placeholders. Setpoints live in your plant docs.</div>
       </div>
     </aside>
   );
