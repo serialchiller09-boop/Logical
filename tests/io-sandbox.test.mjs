@@ -1,12 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { TRAINER_IO } from '../web/src/data/substationProject.js';
 import {
   PANEL_VERSION,
   addWidget,
   countByType,
   createStarterPanel,
+  createTrainerPanel,
   lampTest,
   normalizePanel,
+  panelToCsv,
   removeWidget,
   setTag
 } from '../web/src/lib/ioSandbox.js';
@@ -21,6 +24,29 @@ test('starter blank panel ships at least 10 LEDs plus switches, PBs and pots', (
   assert.ok(counts.pb >= 2, 'starter should include momentary PBs');
   assert.ok(counts.pot >= 2, 'starter should include potentiometers');
   assert.equal(Object.keys(panel.tags).length, panel.widgets.length);
+});
+
+test('trainer preset mirrors SUB-TRAIN-01 TRAINER_IO counts and tags', () => {
+  const panel = createTrainerPanel();
+  assert.equal(panel.mode, 'trainer');
+  const counts = countByType(panel);
+  assert.equal(counts.led, TRAINER_IO.green.length + TRAINER_IO.amber.length);
+  assert.equal(counts.switch, TRAINER_IO.maintained.length);
+  assert.equal(counts.pb, TRAINER_IO.momentary.length);
+  assert.equal(counts.pot, TRAINER_IO.analog.length);
+  assert.equal(panel.widgets.length, 40);
+
+  const tags = new Set(panel.widgets.map((w) => w.tag));
+  for (const row of [...TRAINER_IO.green, ...TRAINER_IO.amber, ...TRAINER_IO.maintained, ...TRAINER_IO.momentary, ...TRAINER_IO.analog]) {
+    assert.ok(tags.has(row.tag), `missing ${row.tag}`);
+  }
+  const healthy = panel.widgets.find((w) => w.tag === 'DI_ControlPowerHealthy');
+  assert.equal(panel.tags.DI_ControlPowerHealthy, true, 'normal ON maintained inputs start true');
+  assert.ok(healthy?.studio && healthy?.rslogix && healthy?.channel);
+
+  const csv = panelToCsv(panel);
+  assert.match(csv, /DO_LED_ControlHealthy/);
+  assert.match(csv, /Local:4:O\.Data\.0/);
 });
 
 test('add / remove / setTag / lampTest keep the local tag table coherent', () => {

@@ -1126,6 +1126,16 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
 }
 .vios-tag-row code { color: var(--ink-2); }
 .vios-tag-row span { color: var(--power); }
+.vios-addr-block {
+  font: 500 11px/1.55 var(--mono);
+  color: var(--ink-2);
+  background: #0b1219;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 9px;
+}
+.vios-addr-block code { color: var(--power); font-size: 10.5px; }
+.vios-addr-block .muted { display: inline-block; min-width: 58px; color: var(--ink-3); font-family: var(--sans); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 @media (max-width: 960px) {
   .vios-layout { grid-template-columns: 1fr; }
 }
