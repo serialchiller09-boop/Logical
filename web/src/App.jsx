@@ -5,6 +5,7 @@ import { notebookPdfHref } from './lib/controlsNotebook.js';
 
 const TOOL_LINKS = [
   { to: '/s/rungs', label: 'Ladder lab', icon: '|=|' },
+  { to: '/io-sandbox', label: 'I/O sandbox', icon: '◈' },
   { to: '/tools', label: 'Tag & calc tools', icon: '⌗' },
   { to: '/controls-notebook', label: 'Controls notebook', icon: 'CN' },
   { to: '/notebook', label: 'Substation notebook', icon: 'SS' },
@@ -73,7 +74,7 @@ function Topbar() {
   const loc = useLocation();
   const seg = loc.pathname.split('/').filter(Boolean);
   const crumbs = [{ to: '/', label: 'reference' }];
-  const LABELS = { s: 'section', e: 'entry', 'controls-notebook': 'controls notebook', notebook: 'substation notebook', tools: 'tools & simulator', saved: 'my list', admin: 'plant data', search: 'search' };
+  const LABELS = { s: 'section', e: 'entry', 'controls-notebook': 'controls notebook', notebook: 'substation notebook', 'io-sandbox': 'I/O sandbox', tools: 'tools & simulator', saved: 'my list', admin: 'plant data', search: 'search' };
   if (seg[0] && seg[0] !== '') crumbs.push({ to: `/${seg[0]}${seg[1] ? '' : ''}`, label: LABELS[seg[0]] || seg[0] });
   if (seg[1]) crumbs.push({ to: null, label: decodeURIComponent(seg[1]).replace(/^.*:/, '') });
 
