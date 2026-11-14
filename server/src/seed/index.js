@@ -12,6 +12,7 @@ import { DATA_TYPES, TYPE_RULES } from './data/datatypes.js';
 import { LADDER_BASICS, INSTRUCTIONS } from './data/instructions.js';
 import { RUNGS } from './data/rungs.js';
 import { RUNGS2 } from './data/rungs2.js';
+import { RUNG_GOALS } from './data/rungGoals.js';
 import { FUNCTION_BLOCKS, FB_FAMILIES } from './data/functionBlocks.js';
 import { PID_TERMS, TUNING_METHODS, GAS_PLANT_LOOPS } from './data/pid.js';
 import { PROCESS_STAGES } from './data/process.js';
@@ -77,17 +78,28 @@ function toEntry(section, kind, raw, index = 0) {
   if (raw.from && raw.to) title = `${raw.from} \u2192 ${raw.to}`;
   if (!title) title = raw.id || id;
 
-  const subtitle = pickFirst(candidates(raw, SUBTITLE_KEYS, new Set([title])));
+  const lab = section === 'rungs' ? (RUNG_GOALS[raw.id] || {}) : null;
+  // Ladder-lab cards lead with the short goal, not the long oneLine/purpose prose.
+  let subtitle = lab?.goal
+    || pickFirst(candidates(raw, SUBTITLE_KEYS, new Set([title])));
   if (subtitle) used.add(subtitle);
   const body = pickFirst(candidates(raw, BODY_KEYS, used));
 
   const tags = Array.isArray(raw.tags) ? raw.tags : (raw.category ? [raw.category] : []);
   const haystack = [title, subtitle, body, kind, ...tags];
   harvest(raw, haystack);
+  if (lab?.goal) haystack.push(lab.goal);
+  if (Array.isArray(lab?.tryThis)) haystack.push(...lab.tryThis);
   const search = [...new Set(haystack.filter(Boolean).map((s) => String(s).toLowerCase()))].join(' \u2022 ');
 
   let payload = raw;
-  if (section === 'rungs') payload = { ...payload, exampleNotice: raw.exampleNotice || RUNG_NOTICE };
+  if (section === 'rungs') {
+    payload = {
+      ...payload,
+      ...(lab || {}),
+      exampleNotice: raw.exampleNotice || RUNG_NOTICE
+    };
+  }
   if (section === 'pid' && kind === 'tuning') payload = { ...payload, tableNotice: raw.tableNotice || TUNING_NOTICE };
   // ISA-5.1 leaves several letters to the user. Whatever the data says, a row that describes itself
   // that way must be flagged, so the UI can refuse to present the field habit as an assignment.

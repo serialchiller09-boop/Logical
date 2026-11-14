@@ -31,9 +31,9 @@ export const SECTIONS = [
     long: 'Preceded by the eight concepts that make a rung readable (scan cycle, power flow, series=AND, XIO is not a field NC contact, de-energize to trip). Then every instruction with its members, its use in a gas plant, and the defect it causes when misused.'
   },
   {
-    slug: 'rungs', label: 'Example rungs', group: 'Ladder logic', icon: '|=|', sort: 7,
-    blurb: 'Seventeen gas plant rungs drawn as vector diagrams - and runnable in a scan simulator.',
-    long: 'Seal-in, latch/acknowledge, 2oo3 voting, restart lockout, run-on timers, stroke counting, alarm deadbands, J-T permissives, purge-before-ignition, first-out capture, anti-surge, lead/lag, analog scaling, and a step sequencer. Each one: what it does, how to read it, and the defects it hides.'
+    slug: 'rungs', label: 'Ladder lab', group: 'Ladder logic', icon: '|=|', sort: 7,
+    blurb: 'Seventeen runnable gas-plant rungs. Each card shows the goal — open one and step the scan.',
+    long: 'Seal-in, latch/ack, voting, timers, alarms, permissives, purge, first-out, anti-surge, lead/lag, scaling, sequencer. Teaching tags and numbers — not design values.'
   },
   {
     slug: 'function-blocks', label: 'Function blocks', group: 'Ladder logic', icon: '[ ]', sort: 8,

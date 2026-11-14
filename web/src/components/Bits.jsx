@@ -94,7 +94,7 @@ export function EntryCard({ entry, bookmarked, onToggleBookmark, query }) {
         {entry.kind === 'rung' && <span className="glyph" aria title="ladder rung">▤</span>}
       </div>
       {entry.subtitle ? <div className="entry-s">{hl(entry.subtitle)}</div> : null}
-      {entry.body ? <div className="entry-b">{hl(entry.body)}</div> : null}
+      {entry.kind !== 'rung' && entry.body ? <div className="entry-b">{hl(entry.body)}</div> : null}
       <div className="entry-f">
         <StatusBadge status={entry.status} />
         {entry.edited && <span className="st st-site-specific" title="Edited from the shipped reference content">edited</span>}

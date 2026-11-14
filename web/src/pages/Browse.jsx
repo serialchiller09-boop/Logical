@@ -52,10 +52,12 @@ export default function Browse() {
         <section className="hero" style={{ marginBottom: 4 }}>
           <h1 style={{ fontSize: 30 }}>{section.icon} {section.label}</h1>
           <p className="hero-lead" style={{ maxWidth: 900 }}>{section.blurb}</p>
-          {section.long && <p className="small muted" style={{ maxWidth: 900, margin: '8px 0 0' }}>{section.long}</p>}
+          {section.slug !== 'rungs' && section.long && (
+            <p className="small muted" style={{ maxWidth: 900, margin: '8px 0 0' }}>{section.long}</p>
+          )}
           <div className="hero-meta">
-            <span className="pill pill-accent"><b className="num">{section.total}</b> entries</span>
-            {Object.entries(section.statusBreakdown || {}).map(([k, v]) => (
+            <span className="pill pill-accent"><b className="num">{section.total}</b> {section.slug === 'rungs' ? 'rungs' : 'entries'}</span>
+            {section.slug !== 'rungs' && Object.entries(section.statusBreakdown || {}).map(([k, v]) => (
               <button key={k} className="chip" aria-pressed={status === k} style={{ padding: 0, border: 0, background: 'none' }}
                 title={`show only ${k}`} onClick={() => set('status', status === k ? '' : k)}>
                 <span className={`st st-${k}`}>{k.replace('illustrative-example', 'authored example')} · {v}</span>
@@ -65,7 +67,7 @@ export default function Browse() {
         </section>
       )}
 
-      {section && relatedReading && <div className="manual-related-reading">
+      {section && section.slug !== 'rungs' && relatedReading && <div className="manual-related-reading">
         <span><b>Related notebook reading</b> · {relatedReading.label}</span>
         <Link to={notebookPageHref(relatedReading.page)}>Open source PDF · p. {relatedReading.page} ↗</Link>
       </div>}

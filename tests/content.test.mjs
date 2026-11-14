@@ -95,6 +95,21 @@ test('example rungs are badged as authored examples and say the numbers are plac
   }
 });
 
+test('every ladder-lab rung has a short goal and try-this steps for skim reading', () => {
+  const rungs = ENTRIES.filter((e) => e.section === 'rungs');
+  assert.equal(rungs.length, 17);
+  for (const e of rungs) {
+    const goal = e.payload.goal || '';
+    assert.ok(goal.length >= 24 && goal.length <= 140, `${e.id}: goal should be one short sentence (got ${goal.length} chars)`);
+    assert.equal(e.subtitle, goal, `${e.id}: card subtitle should be the short goal`);
+    const steps = e.payload.tryThis;
+    assert.ok(Array.isArray(steps) && steps.length >= 2, `${e.id}: needs at least two tryThis steps`);
+    for (const step of steps) {
+      assert.ok(typeof step === 'string' && step.length >= 12, `${e.id}: empty tryThis step`);
+    }
+  }
+});
+
 test('tuning methods are marked as published relations, not standards, and carry the warning', () => {
   const tuning = ENTRIES.filter((e) => e.section === 'pid' && e.kind === 'tuning');
   assert.ok(tuning.length >= 5);

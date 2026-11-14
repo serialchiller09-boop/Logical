@@ -19,11 +19,19 @@ export function describeRung(node, depth = 0) {
   }
 }
 
+/** Short cue under an I/O cell — first clause only, so the lab stays scannable. */
+export function ioCue(role) {
+  if (!role) return '';
+  const first = String(role).split(/[.;]/)[0].trim();
+  return first.length > 72 ? `${first.slice(0, 69)}…` : first;
+}
+
 /** All sub-rungs authored on a rung entry (followOn / proveRung / outputRung / ...). */
-export function subRungs(payload) {
+export function subRungs(payload, { includePurposeNote = true } = {}) {
   const out = [];
   const main = payload?.ladder;
-  if (main) out.push({ key: 'main', title: 'Rung 1', note: payload.purpose || '', ladder: main, io: payload.io || [] });
+  const mainNote = includePurposeNote && !payload?.goal ? (payload.purpose || '') : '';
+  if (main) out.push({ key: 'main', title: 'Rung 1', note: mainNote, ladder: main, io: payload.io || [] });
   const extraKeys = Object.keys(payload || {}).filter((k) => k !== 'ladder' && k !== 'io' && payload[k] && typeof payload[k] === 'object' && payload[k].ladder);
   extraKeys.forEach((k, i) => {
     out.push({ key: k, title: `Rung ${i + 2}`, note: payload[k].note || '', ladder: payload[k].ladder, io: payload[k].io || [] });
@@ -146,8 +154,8 @@ const SCAN_STEPS = [
   { label: '30 s', v: 30000 }
 ];
 
-export function RungSimulator({ entry }) {
-  const rungs = useMemo(() => subRungs(entry.payload), [entry]);
+export function RungSimulator({ entry, compact = false }) {
+  const rungs = useMemo(() => subRungs(entry.payload, { includePurposeNote: !compact }), [entry, compact]);
   const ioMap = useMemo(() => {
     const m = new Map();
     for (const r of rungs) for (const p of r.io) if (p?.tag) m.set(p.tag, p);
@@ -274,7 +282,7 @@ export function RungSimulator({ entry }) {
                       </div>
                       <button className="toggle" aria-pressed={on} aria-label={`Force ${t}`} onClick={() => setBit(t, !on)} />
                     </div>
-                    <div className="io-role">{meta.role}</div>
+                    <div className="io-role" title={meta.role}>{ioCue(meta.role)}</div>
                   </div>
                 );
               })}
@@ -293,7 +301,7 @@ export function RungSimulator({ entry }) {
                     <div className="num-in">
                       <input type="number" step="any" value={stRef.current.values[t] ?? 0} onChange={(e) => setVal(t, e.target.value)} />
                     </div>
-                    <div className="io-role">{ioMap.get(t).role}</div>
+                    <div className="io-role" title={ioMap.get(t).role}>{ioCue(ioMap.get(t).role)}</div>
                   </div>
                 ))}
               </div>
@@ -321,12 +329,14 @@ export function RungSimulator({ entry }) {
           </div>
         )}
 
-        <p className="tiny muted" style={{ margin: 0 }}>
-          Model boundary: booleans evaluate exactly as drawn; timers and counters advance one scan period per step;
-          MOV/CPT/SEL/LIM/PID operands resolve when they are numeric or a named tag in the I/O list. Real controller
-          behaviour additionally depends on scan overlap, I/O update points, task priorities and instruction
-          specifics in your firmware manual — this is a teaching model, not a runtime.
-        </p>
+        <details className="sim-model-note">
+          <summary className="tiny muted">Teaching model (not a real PLC runtime)</summary>
+          <p className="tiny muted" style={{ margin: '6px 0 0' }}>
+            Booleans evaluate as drawn; timers and counters advance one scan period per step;
+            MOV/CPT/SEL/LIM/PID operands resolve when numeric or a named I/O tag. Real controllers also depend on
+            scan overlap, I/O update points, task priority and firmware specifics.
+          </p>
+        </details>
       </div>
     </div>
   );

@@ -34,12 +34,12 @@ function NoteEditor({ id, initial = '' }) {
       </div>
       <div className="card-bd">
         <textarea
-          className="note-area" value={body} placeholder="What your plant actually does with this — the answer from the tag register, the spec clause, the panel you found it in. Notes stay in the local SQLite file, never in the shipped reference data."
+          className="note-area" value={body} placeholder="Plant-specific note for this entry (local SQLite only)."
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(); }}
         />
         <div className="row spread" style={{ marginTop: 8 }}>
-          <span className="tiny muted">⌘/Ctrl+Enter saves. This is your working record, not something the reference claims.</span>
+          <span className="tiny muted">⌘/Ctrl+Enter saves.</span>
           <span className="row">
             {saved && <button className="btn btn-sm btn-ghost" onClick={() => { setBody(''); }}>clear</button>}
             <button className="btn btn-sm btn-primary" onClick={save} disabled={!dirty || busy}>{busy ? '…' : 'Save note'}</button>
@@ -52,7 +52,7 @@ function NoteEditor({ id, initial = '' }) {
 
 export default function EntryPage() {
   const { id } = useParams();
-  const { isMarked, toggleBookmark, toast } = useApp();
+  const { isMarked, toggleBookmark } = useApp();
   const { data, loading, error, reload } = useAsync(() => api.entry(id), [id]);
   const entry = data?.entry;
   useTitle(entry?.title);
@@ -66,7 +66,8 @@ export default function EntryPage() {
 
   const hasRung = !!entry.payload?.ladder;
   const marked = isMarked(entry.id);
-  const extraRungs = Object.keys(entry.payload || {}).filter((k) => entry.payload[k]?.ladder && k !== 'ladder');
+  const goal = entry.payload?.goal || (hasRung ? entry.subtitle : '');
+  const tryThis = Array.isArray(entry.payload?.tryThis) ? entry.payload.tryThis : [];
 
   return (
     <>
@@ -75,82 +76,101 @@ export default function EntryPage() {
           <div className="crumbs">
             <Link to={`/s/${entry.section}`}>{data.section?.label ?? entry.section}</Link>
             <span>/</span>
-            <span>{entry.kind}</span>
-            <span>/</span>
-            <span className="mono" style={{ color: 'var(--ink-3)' }}>{entry.id}</span>
+            <span>{hasRung ? 'lab' : entry.kind}</span>
           </div>
           <div className="row" style={{ gap: 7 }}>
             <BookmarkToggle id={entry.id} marked={marked} onToggle={toggleBookmark} />
             <button className="btn btn-sm btn-ghost" onClick={() => window.print()}>⎙ print</button>
-            <Link className="btn btn-sm btn-ghost" to={`/admin?entry=${encodeURIComponent(entry.id)}`}>✎ record plant answer</Link>
+            {!hasRung && (
+              <Link className="btn btn-sm btn-ghost" to={`/admin?entry=${encodeURIComponent(entry.id)}`}>✎ record plant answer</Link>
+            )}
           </div>
         </div>
 
         <h1 className="detail-title">{entry.title}</h1>
-        {entry.subtitle && <p className="detail-sub">{entry.subtitle}</p>}
-        <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 7 }}>
-          <StatusBadge status={entry.status} />
-          {entry.edited && <span className="st st-site-specific" title="This entry has been changed from the shipped reference content — the diff is in plant data.">edited from reference</span>}
-          {(entry.tags || []).map((t) => (
-            <Link key={t} className="pill" to={`/s/search?q=${encodeURIComponent(t)}`}>{t}</Link>
-          ))}
-        </div>
+        {hasRung ? (
+          goal && <p className="sim-goal-line">{goal}</p>
+        ) : (
+          entry.subtitle && <p className="detail-sub">{entry.subtitle}</p>
+        )}
+        {!hasRung && (
+          <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 7 }}>
+            <StatusBadge status={entry.status} />
+            {entry.edited && <span className="st st-site-specific" title="This entry has been changed from the shipped reference content — the diff is in plant data.">edited from reference</span>}
+            {(entry.tags || []).map((t) => (
+              <Link key={t} className="pill" to={`/s/search?q=${encodeURIComponent(t)}`}>{t}</Link>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="detail-grid">
+      {hasRung ? (
         <div className="stack" style={{ gap: 14, minWidth: 0 }}>
-          {entry.body && (
-            <div className="card">
-              <div className="card-bd">
-                <div className="prose" style={{ marginTop: 0 }}>
-                  {String(entry.body).split('\n').map((l, i) => <p key={i}>{l}</p>)}
-                </div>
-              </div>
-            </div>
+          {tryThis.length > 0 && (
+            <ol className="try-steps">
+              {tryThis.map((step, i) => <li key={i}>{step}</li>)}
+            </ol>
           )}
 
-          {hasRung && (
-            <>
-              <RungSimulator entry={entry} />
-              {entry.payload.gotchas && (
-                <div className="callout callout-warn">
-                  <h4>What this pattern hides</h4>
-                  <ul>{[].concat(entry.payload.gotchas).map((g, i) => <li key={i}>{g}</li>)}</ul>
+          <RungSimulator entry={entry} compact />
+
+          <details className="more-detail">
+            <summary>More detail (how to read it, gotchas, provenance)</summary>
+            <div className="stack" style={{ gap: 14, marginTop: 12 }}>
+              {entry.body && (
+                <div className="card">
+                  <div className="card-bd">
+                    <div className="prose" style={{ marginTop: 0 }}>
+                      {String(entry.body).split('\n').map((l, i) => <p key={i}>{l}</p>)}
+                    </div>
+                  </div>
                 </div>
               )}
-            </>
-          )}
-
-          <Fields entry={entry} />
-
-          {hasRung && extraRungs.length > 0 && (
-            <div className="callout callout-info">
-              <h4>Second rung{extraRungs.length > 1 ? 's' : ''} in this example</h4>
-              <div className="small">{extraRungs.map((k) => entry.payload[k]?.note || k).join(' · ')}</div>
-              <div className="tiny muted" style={{ marginTop: 6 }}>The simulator steps the rungs in order, sharing one I/O image, exactly as a real program would across consecutive rungs.</div>
-            </div>
-          )}
-        </div>
-
-        <aside className="stack" style={{ gap: 14 }}>
-          <Provenance sources={entry.sources} status={entry.status} />
-          <NoteEditor id={entry.id} initial={data.note?.body || ''} />
-
-          <div className="card">
-            <div className="card-hd"><h3>Jump to</h3></div>
-            <div className="card-bd">
+              <Fields entry={entry} />
+              <Provenance sources={entry.sources} status={entry.status} />
+              <NoteEditor id={entry.id} initial={data.note?.body || ''} />
               <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
-                <Link className="pill" to={`/s/${entry.section}`}>all {data.section?.label ?? entry.section}</Link>
-                {entry.section === 'isa-letters' && <Link className="pill" to="/tools">tag decoder</Link>}
-                {entry.section === 'rungs' && <Link className="pill" to="/s/instructions">ladder elements</Link>}
-                {entry.section === 'pid' && <Link className="pill" to="/tools">Kc / PB workbench</Link>}
-                {RELATED_CONTROLS_READING[entry.section] && <Link className="pill" to={notebookPageHref(RELATED_CONTROLS_READING[entry.section].page)}>related notebook reading</Link>}
-                <Link className="pill" to={`/s/search?q=${encodeURIComponent(entry.title)}`}>find mentions of this</Link>
+                <Link className="pill" to="/s/rungs">all ladder lab</Link>
+                <Link className="pill" to="/s/instructions">ladder elements</Link>
+                <Link className="pill" to={`/admin?entry=${encodeURIComponent(entry.id)}`}>plant answer</Link>
               </div>
             </div>
+          </details>
+        </div>
+      ) : (
+        <div className="detail-grid">
+          <div className="stack" style={{ gap: 14, minWidth: 0 }}>
+            {entry.body && (
+              <div className="card">
+                <div className="card-bd">
+                  <div className="prose" style={{ marginTop: 0 }}>
+                    {String(entry.body).split('\n').map((l, i) => <p key={i}>{l}</p>)}
+                  </div>
+                </div>
+              </div>
+            )}
+            <Fields entry={entry} />
           </div>
-        </aside>
-      </div>
+
+          <aside className="stack" style={{ gap: 14 }}>
+            <Provenance sources={entry.sources} status={entry.status} />
+            <NoteEditor id={entry.id} initial={data.note?.body || ''} />
+
+            <div className="card">
+              <div className="card-hd"><h3>Jump to</h3></div>
+              <div className="card-bd">
+                <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                  <Link className="pill" to={`/s/${entry.section}`}>all {data.section?.label ?? entry.section}</Link>
+                  {entry.section === 'isa-letters' && <Link className="pill" to="/tools">tag decoder</Link>}
+                  {entry.section === 'pid' && <Link className="pill" to="/tools">Kc / PB workbench</Link>}
+                  {RELATED_CONTROLS_READING[entry.section] && <Link className="pill" to={notebookPageHref(RELATED_CONTROLS_READING[entry.section].page)}>related notebook reading</Link>}
+                  <Link className="pill" to={`/s/search?q=${encodeURIComponent(entry.title)}`}>find mentions of this</Link>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
 
       <div className="pager">
         {data.prev ? <Link to={`/e/${encodeURIComponent(data.prev.id)}`}>← {data.prev.title}</Link> : <span />}
