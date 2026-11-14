@@ -1,7 +1,10 @@
+import { useCallback, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AppProvider, groupSections, useApp } from './lib/store.jsx';
 import { SearchPalette } from './components/SearchPalette.jsx';
 import { notebookPdfHref } from './lib/controlsNotebook.js';
+
+const SIDEBAR_COLLAPSED_KEY = 'logical.sidebar-collapsed.v1';
 
 const TOOL_LINKS = [
   { to: '/s/rungs', label: 'Ladder lab', icon: '|=|' },
@@ -13,13 +16,27 @@ const TOOL_LINKS = [
   { to: '/admin', label: 'Plant data', icon: '✎' }
 ];
 
-function Sidebar({ onNavigate, open = false }) {
+function loadSidebarCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveSidebarCollapsed(collapsed) {
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+  } catch { /* browser storage can be unavailable */ }
+}
+
+function Sidebar({ onNavigate, open = false, collapsed = false, onToggleCollapse }) {
   const { sections, bookmarks } = useApp();
   const groups = groupSections(sections);
   return (
-    <aside className={`sidebar ${open ? 'open' : ''}`}>
+    <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       <div className="brand">
-        <span className="brand-mark" aria-hidden>
+        <span className="brand-mark" aria-hidden title="Logical">
           <svg viewBox="0 0 100 60" width="42" height="25">
             <line x1="10" y1="6" x2="10" y2="54" stroke="currentColor" strokeWidth="3" />
             <line x1="90" y1="6" x2="90" y2="54" stroke="currentColor" strokeWidth="3" />
@@ -31,17 +48,33 @@ function Sidebar({ onNavigate, open = false }) {
             <line x1="10" y1="42" x2="90" y2="42" stroke="currentColor" strokeWidth="2" strokeOpacity=".45" />
           </svg>
         </span>
-        <div>
+        <div className="brand-copy">
           <b>Logical</b>
           <span>ladder lab &amp; plant reference</span>
         </div>
+        <button
+          type="button"
+          className="sidebar-collapse"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+        >
+          {collapsed ? '»' : '«'}
+        </button>
       </div>
 
       {groups.map((g) => (
         <div className="nav-group" key={g.group}>
           <div className="nav-label">{g.group}</div>
           {g.sections.map((s) => (
-            <NavLink key={s.slug} to={`/s/${s.slug}`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={onNavigate}>
+            <NavLink
+              key={s.slug}
+              to={`/s/${s.slug}`}
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              onClick={onNavigate}
+              title={collapsed ? s.label : undefined}
+            >
               <span className="nav-icon">{s.icon}</span>
               <span className="nav-text">{s.label}</span>
               <span className="nav-count">{s.total}</span>
@@ -53,7 +86,13 @@ function Sidebar({ onNavigate, open = false }) {
       <div className="nav-group">
         <div className="nav-label">Workspace</div>
         {TOOL_LINKS.map((t) => (
-          <NavLink key={t.to} to={t.to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={onNavigate}>
+          <NavLink
+            key={t.to}
+            to={t.to}
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            onClick={onNavigate}
+            title={collapsed ? t.label : undefined}
+          >
             <span className="nav-icon">{t.icon}</span>
             <span className="nav-text">{t.label}</span>
             {t.to === '/saved' && bookmarks.length > 0 && <span className="nav-count">{bookmarks.length}</span>}
@@ -102,10 +141,24 @@ function Topbar() {
 function Shell() {
   const { drawer, setDrawer, palette, setPalette } = useApp();
   const loc = useLocation();
+  const [collapsed, setCollapsed] = useState(loadSidebarCollapsed);
+  const toggleCollapse = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      saveSidebarCollapsed(next);
+      return next;
+    });
+  }, []);
+
   return (
-    <div className="shell">
+    <div className={`shell ${collapsed ? 'nav-collapsed' : ''}`}>
       <div className={`scrim-nav ${drawer ? 'show' : ''}`} onClick={() => setDrawer(false)} />
-      <Sidebar open={drawer} onNavigate={() => setDrawer(false)} />
+      <Sidebar
+        open={drawer}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
+        onNavigate={() => setDrawer(false)}
+      />
       <div className="main">
         <Topbar />
         <div className="canvas" key={loc.pathname}>
