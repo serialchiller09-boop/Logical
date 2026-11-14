@@ -918,3 +918,225 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
 @media (max-width: 640px) {
   .rung-lab-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Virtual I/O sandbox — soft trainer plate
+   ============================================================ */
+.vios-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0 14px;
+}
+.vios-add-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.vios-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 14px;
+  align-items: start;
+}
+.vios-plate {
+  border-radius: 14px;
+  padding: 10px;
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(120, 140, 160, .12), transparent 55%),
+    linear-gradient(160deg, #1a222c 0%, #0c1016 48%, #121820 100%);
+  border: 1px solid #2a3644;
+  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, .9), inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+.vios-plate-bezel {
+  border-radius: 10px;
+  border: 1px solid #3a4554;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.015) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, #171e27, #0e141b);
+  padding: 12px 12px 10px;
+  min-height: 420px;
+}
+.vios-plate-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid #2c3848;
+  font: 600 11px/1.2 var(--mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #8fa3b8;
+}
+.vios-plate-mode { color: var(--power); letter-spacing: .1em; }
+.vios-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 8px 6px;
+  min-height: 280px;
+}
+.vios-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 8px 4px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(8, 12, 18, .35);
+  cursor: pointer;
+  min-width: 0;
+}
+.vios-widget:hover { border-color: #334455; background: rgba(12, 18, 26, .55); }
+.vios-widget.is-selected {
+  border-color: rgba(240, 169, 46, .55);
+  box-shadow: 0 0 0 1px rgba(240, 169, 46, .2);
+  background: rgba(240, 169, 46, .06);
+}
+.vios-caption {
+  font: 600 10px/1.2 var(--sans);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #c5d2e0;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vios-tag {
+  font: 500 9px/1 var(--mono);
+  color: #6f8296;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vios-led {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #3a4a5c;
+  background: radial-gradient(circle at 35% 30%, #3a4a5a, #1a2430 70%);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.6), 0 0 0 1px #0a0e14;
+  cursor: pointer;
+  padding: 0;
+}
+.vios-led.is-on.vios-led-green {
+  background: radial-gradient(circle at 35% 30%, #9dffb0, #1f9a45 55%, #0d3a1c);
+  border-color: #43c96b;
+  box-shadow: 0 0 14px rgba(67, 201, 107, .75), inset 0 1px 2px rgba(255,255,255,.25);
+}
+.vios-led.is-on.vios-led-amber {
+  background: radial-gradient(circle at 35% 30%, #ffe29a, #d09120 55%, #5a3a08);
+  border-color: var(--power);
+  box-shadow: 0 0 14px rgba(240, 169, 46, .8), inset 0 1px 2px rgba(255,255,255,.25);
+}
+.vios-led.is-on.vios-led-red {
+  background: radial-gradient(circle at 35% 30%, #ffb0ab, #d23a34 55%, #5a1210);
+  border-color: var(--bad);
+  box-shadow: 0 0 14px rgba(255, 93, 85, .8), inset 0 1px 2px rgba(255,255,255,.25);
+}
+.vios-toggle {
+  position: relative;
+  width: 46px;
+  height: 24px;
+  border-radius: 14px;
+  border: 1px solid #3a4a5c;
+  background: #1a2430;
+  padding: 0;
+  cursor: pointer;
+}
+.vios-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6a7e92;
+  transition: left .14s ease, background .14s ease;
+}
+.vios-toggle.is-on {
+  background: rgba(240, 169, 46, .22);
+  border-color: var(--power);
+}
+.vios-toggle.is-on .vios-toggle-knob {
+  left: 24px;
+  background: var(--power);
+  box-shadow: 0 0 8px rgba(240, 169, 46, .7);
+}
+.vios-pb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #4a5a6c;
+  background: radial-gradient(circle at 40% 30%, #4a5a6c, #1c2632 70%);
+  box-shadow: inset 0 2px 3px rgba(255,255,255,.08), 0 2px 0 #0a0e14;
+  cursor: pointer;
+  padding: 0;
+}
+.vios-pb.is-on {
+  background: radial-gradient(circle at 40% 30%, #7ad4e0, #2a8a98 65%);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(79, 209, 224, .55), inset 0 2px 4px rgba(0,0,0,.35);
+  transform: translateY(1px);
+}
+.vios-pot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0 4px;
+}
+.vios-pot input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.vios-pot-val {
+  font: 600 11px/1 var(--mono);
+  color: var(--accent);
+}
+.vios-plate-foot {
+  margin: 12px 4px 2px;
+  font-size: 11px;
+  color: #6f8296;
+  line-height: 1.45;
+}
+.vios-side { display: flex; flex-direction: column; gap: 12px; }
+.vios-tag-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow: auto;
+}
+.vios-tag-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font: 500 11px/1.4 var(--mono);
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #0b1219;
+  border: 1px solid var(--line);
+}
+.vios-tag-row code { color: var(--ink-2); }
+.vios-tag-row span { color: var(--power); }
+@media (max-width: 960px) {
+  .vios-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .vios-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .vios-widget {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+}
+@media print {
+  .vios-toolbar { display: none; }
+  .vios-side { break-inside: avoid; }
+}
