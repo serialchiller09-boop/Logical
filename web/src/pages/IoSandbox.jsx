@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTitle } from '../lib/store.jsx';
+import { api } from '../lib/api.js';
 import {
   WIDGET_TYPES,
   LED_COLORS,
@@ -8,6 +9,7 @@ import {
   addWidget,
   applyBusToPanel,
   clearPanelStorage,
+  collectIoFromPayload,
   countByType,
   createPanelFromLadderIo,
   createStarterPanel,
@@ -26,6 +28,7 @@ import {
   isCouplingEnabled,
   loadLinkedIo,
   loadTagBus,
+  publishLinkedIo,
   publishSnapshot,
   setCouplingEnabled,
   subscribeTagBus
@@ -144,6 +147,7 @@ function downloadText(filename, text, mime) {
 
 export default function IoSandbox() {
   useTitle('I/O sandbox');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [panel, setPanel] = useState(() => applyBusToPanel(loadPanel(), loadTagBus()));
   const [selectedId, setSelectedId] = useState(null);
   const [editLabel, setEditLabel] = useState('');
@@ -154,6 +158,7 @@ export default function IoSandbox() {
   const [linked, setLinked] = useState(() => loadLinkedIo());
   const persistTimer = useRef(null);
   const skipBusPublish = useRef(false);
+  const deepLinkDone = useRef(false);
 
   const counts = useMemo(() => countByType(panel), [panel]);
   const selected = panel.widgets.find((w) => w.id === selectedId) || null;
@@ -187,6 +192,40 @@ export default function IoSandbox() {
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (deepLinkDone.current) return;
+    const wantAdopt = searchParams.get('adopt') === '1' || searchParams.has('entry');
+    if (!wantAdopt) return;
+    deepLinkDone.current = true;
+    const entryId = searchParams.get('entry');
+
+    const finish = (link) => {
+      if (!link?.io?.length) return;
+      setLinked(link);
+      setSelectedId(null);
+      setPanel(applyBusToPanel(createPanelFromLadderIo(link), loadTagBus()));
+      const next = new URLSearchParams(searchParams);
+      next.delete('adopt');
+      next.delete('entry');
+      setSearchParams(next, { replace: true });
+    };
+
+    if (entryId) {
+      api.entry(entryId).then((data) => {
+        const entry = data?.entry;
+        if (!entry?.payload) {
+          finish(loadLinkedIo());
+          return;
+        }
+        const io = collectIoFromPayload(entry.payload);
+        const link = publishLinkedIo({ entryId: entry.id, title: entry.title, io });
+        finish(link);
+      }).catch(() => finish(loadLinkedIo()));
+    } else {
+      finish(loadLinkedIo());
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!selected) {

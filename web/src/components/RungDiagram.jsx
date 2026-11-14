@@ -11,6 +11,7 @@ import {
   setValue as busSetValue,
   subscribeTagBus
 } from '../lib/tagBus.js';
+import { IoLabDock, loadDockLayout, saveDockLayout } from './IoLabDock.jsx';
 
 /* ------------------------------------------------------------------ text rendering of a rung */
 export function describeRung(node, depth = 0) {
@@ -186,8 +187,14 @@ export function RungSimulator({ entry, compact = false }) {
   const [log, setLog] = useState([]);
   const [showMap, setShowMap] = useState(true);
   const [coupled, setCoupled] = useState(() => isCouplingEnabled());
+  const [dockLayout, setDockLayout] = useState(() => loadDockLayout());
 
   const rerender = useCallback(() => setTick((n) => n + 1), []);
+
+  const changeDockLayout = useCallback((next) => {
+    setDockLayout(next);
+    saveDockLayout(next);
+  }, []);
 
   const hydrateFromBus = useCallback((st) => {
     if (!isCouplingEnabled()) return st;
@@ -285,9 +292,12 @@ export function RungSimulator({ entry, compact = false }) {
   const analog = tags.filter((t) => !['DI', 'DO', 'BIT', 'TIMER', 'COUNTER'].includes(ioMap.get(t).type));
   const timers = Object.entries(stRef.current.timers).filter(([, v]) => v && (v.pre || v.acc || v.dn));
   const counters = Object.entries(stRef.current.counters);
+  const allIo = useMemo(() => [...ioMap.values()], [ioMap]);
+  const dockVisible = dockLayout !== 'hidden';
+  const sandboxHref = `/io-sandbox?adopt=1&entry=${encodeURIComponent(entry?.id || '')}`;
 
-  return (
-    <div className="card">
+  const simCard = (
+    <div className="card lab-dock-sim">
       <div className="sim-bar">
         <span className={`led ${conds.every(Boolean) ? 'on' : conds.some(Boolean) ? 'warn' : ''}`} title="Rung conduction" />
         <b className="small" style={{ letterSpacing: '.04em' }}>SCAN SIMULATOR</b>
@@ -324,48 +334,51 @@ export function RungSimulator({ entry, compact = false }) {
           </div>
         ))}
 
-        <div className="grid-2">
-          <div>
-            <h4 className="mini">Discrete I/O — click to force</h4>
-            <div className="sim-grid">
-              {discrete.map((t) => {
-                const meta = ioMap.get(t);
-                const on = !!stRef.current.bits[t];
-                return (
-                  <div className="io-cell" key={t}>
-                    <div className="io-top">
-                      <div>
-                        <div className="io-tag">{t}</div>
-                        <div className="io-addr">{meta.type} · {meta.addr}</div>
-                      </div>
-                      <button className="toggle" aria-pressed={on} aria-label={`Force ${t}`} onClick={() => setBit(t, !on)} />
-                    </div>
-                    <div className="io-role" title={meta.role}>{ioCue(meta.role)}</div>
-                  </div>
-                );
-              })}
-              {!discrete.length && <div className="small muted">No discrete points declared on this rung.</div>}
-            </div>
-          </div>
-
-          {analog.length > 0 && (
+        <details className="more-detail" open={!dockVisible}>
+          <summary>{dockVisible ? 'Classic force grid' : 'Discrete / analog force'}</summary>
+          <div className="grid-2" style={{ marginTop: 10 }}>
             <div>
-              <h4 className="mini">Analog values — edit and step</h4>
+              <h4 className="mini">Discrete I/O — click to force</h4>
               <div className="sim-grid">
-                {analog.map((t) => (
-                  <div className="io-cell" key={t}>
-                    <div className="io-tag">{t}</div>
-                    <div className="io-addr">{ioMap.get(t).type} · {ioMap.get(t).addr}</div>
-                    <div className="num-in">
-                      <input type="number" step="any" value={stRef.current.values[t] ?? 0} onChange={(e) => setVal(t, e.target.value)} />
+                {discrete.map((t) => {
+                  const meta = ioMap.get(t);
+                  const on = !!stRef.current.bits[t];
+                  return (
+                    <div className="io-cell" key={t}>
+                      <div className="io-top">
+                        <div>
+                          <div className="io-tag">{t}</div>
+                          <div className="io-addr">{meta.type} · {meta.addr}</div>
+                        </div>
+                        <button className="toggle" aria-pressed={on} aria-label={`Force ${t}`} onClick={() => setBit(t, !on)} />
+                      </div>
+                      <div className="io-role" title={meta.role}>{ioCue(meta.role)}</div>
                     </div>
-                    <div className="io-role" title={ioMap.get(t).role}>{ioCue(ioMap.get(t).role)}</div>
-                  </div>
-                ))}
+                  );
+                })}
+                {!discrete.length && <div className="small muted">No discrete points declared on this rung.</div>}
               </div>
             </div>
-          )}
-        </div>
+
+            {analog.length > 0 && (
+              <div>
+                <h4 className="mini">Analog values — edit and step</h4>
+                <div className="sim-grid">
+                  {analog.map((t) => (
+                    <div className="io-cell" key={t}>
+                      <div className="io-tag">{t}</div>
+                      <div className="io-addr">{ioMap.get(t).type} · {ioMap.get(t).addr}</div>
+                      <div className="num-in">
+                        <input type="number" step="any" value={stRef.current.values[t] ?? 0} onChange={(e) => setVal(t, e.target.value)} />
+                      </div>
+                      <div className="io-role" title={ioMap.get(t).role}>{ioCue(ioMap.get(t).role)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
 
         {(timers.length > 0 || counters.length > 0) && (
           <div className="row" style={{ gap: 14 }}>
@@ -391,9 +404,12 @@ export function RungSimulator({ entry, compact = false }) {
           <span className={`pill ${coupled ? 'pill-accent' : ''}`}>
             {coupled ? 'coupled to I/O sandbox' : 'sandbox coupling off'}
           </span>
-          <Link className="btn btn-sm" to="/io-sandbox">Open I/O sandbox →</Link>
+          <Link className="btn btn-sm" to={sandboxHref}>Open full I/O sandbox →</Link>
+          {!dockVisible && (
+            <button type="button" className="btn btn-sm" onClick={() => changeDockLayout('side')}>Show soft panel</button>
+          )}
           <span className="tiny muted">
-            Matching tags share this browser’s tag bus. Adopt this rung’s I/O on the sandbox plate to drive contacts from lamps/switches.
+            Soft panel shares this browser’s tag bus with the scan sim. Teaching model only — not live field I/O.
           </span>
         </div>
 
@@ -407,6 +423,20 @@ export function RungSimulator({ entry, compact = false }) {
           </p>
         </details>
       </div>
+    </div>
+  );
+
+  return (
+    <div className={`lab-dock-layout lab-dock-layout-${dockLayout}`}>
+      {simCard}
+      {dockVisible && (
+        <IoLabDock
+          entry={entry}
+          io={allIo}
+          layout={dockLayout}
+          onLayoutChange={changeDockLayout}
+        />
+      )}
     </div>
   );
 }

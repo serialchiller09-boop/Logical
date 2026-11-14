@@ -1162,3 +1162,150 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   .vios-toolbar { display: none; }
   .vios-side { break-inside: avoid; }
 }
+
+/* ============================================================
+   Lab dock — soft panel beside / below rung simulator (Phase D)
+   ============================================================ */
+.lab-dock-layout {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+}
+.lab-dock-layout-side {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+}
+.lab-dock-layout-below,
+.lab-dock-layout-hidden {
+  grid-template-columns: 1fr;
+}
+.lab-dock-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+}
+.lab-dock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.lab-dock-cell,
+.lab-dock-led {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0b1219;
+  min-width: 0;
+}
+button.lab-dock-led {
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.lab-dock-led-disc {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #3a4a5c;
+  background: radial-gradient(circle at 35% 30%, #3a4a5a, #1a2430 70%);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.6);
+}
+.lab-dock-led.is-on.vios-led-green .lab-dock-led-disc {
+  background: radial-gradient(circle at 35% 30%, #9dffb0, #1f9a45 55%, #0d3a1c);
+  border-color: #43c96b;
+  box-shadow: 0 0 12px rgba(67, 201, 107, .75);
+}
+.lab-dock-led.is-on.vios-led-amber .lab-dock-led-disc {
+  background: radial-gradient(circle at 35% 30%, #ffe29a, #d09120 55%, #5a3a08);
+  border-color: var(--power);
+  box-shadow: 0 0 12px rgba(240, 169, 46, .8);
+}
+.lab-dock-led.is-on.vios-led-red .lab-dock-led-disc {
+  background: radial-gradient(circle at 35% 30%, #ffb0ab, #d23a34 55%, #5a1210);
+  border-color: var(--bad);
+  box-shadow: 0 0 12px rgba(255, 93, 85, .8);
+}
+.lab-dock-led-label {
+  font: 600 10px/1.2 var(--sans);
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lab-dock-led-tag {
+  font: 500 9px/1 var(--mono);
+  color: var(--ink-3);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-dock-toggle {
+  position: relative;
+  width: 42px;
+  height: 22px;
+  border-radius: 12px;
+  border: 1px solid #3a4a5c;
+  background: #1a2430;
+  padding: 0;
+  cursor: pointer;
+}
+.lab-dock-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #6a7e92;
+  transition: left .14s ease, background .14s ease;
+}
+.lab-dock-toggle.is-on {
+  background: rgba(240, 169, 46, .22);
+  border-color: var(--power);
+}
+.lab-dock-toggle.is-on .lab-dock-toggle-knob {
+  left: 22px;
+  background: var(--power);
+  box-shadow: 0 0 8px rgba(240, 169, 46, .7);
+}
+.lab-dock-pb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #4a5a6c;
+  background: radial-gradient(circle at 40% 30%, #4a5a6c, #1c2632 70%);
+  cursor: pointer;
+  padding: 0;
+}
+.lab-dock-pb.is-on {
+  background: radial-gradient(circle at 40% 30%, #7ad4e0, #2a8a98 65%);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(79, 209, 224, .55);
+}
+.lab-dock-pot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lab-dock-pot input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+@media (max-width: 960px) {
+  .lab-dock-layout-side {
+    grid-template-columns: 1fr;
+  }
+}
+@media print {
+  .lab-dock { break-inside: avoid; }
+}

@@ -400,7 +400,26 @@ export function panelToCsv(panel) {
   return `${lines.join('\r\n')}\r\n`;
 }
 
-function classifyLadderPoint(point) {
+/** Flatten main + follow-on rung I/O lists (unique by tag). */
+export function collectIoFromPayload(payload) {
+  const io = [];
+  const seen = new Set();
+  const add = (list) => {
+    for (const p of list || []) {
+      if (!p?.tag || seen.has(p.tag)) continue;
+      seen.add(p.tag);
+      io.push(p);
+    }
+  };
+  add(payload?.io);
+  for (const [k, v] of Object.entries(payload || {})) {
+    if (k === 'ladder' || k === 'io' || !v || typeof v !== 'object') continue;
+    if (v.ladder) add(v.io);
+  }
+  return io;
+}
+
+export function classifyLadderPoint(point) {
   const type = String(point.type || '').toUpperCase();
   const role = String(point.role || '').toLowerCase();
   const tag = String(point.tag || '');
