@@ -4,13 +4,16 @@ import { useTitle } from '../lib/store.jsx';
 import {
   WIDGET_TYPES,
   LED_COLORS,
+  LAMP_TEST_TAG,
   addWidget,
   clearPanelStorage,
   countByType,
   createStarterPanel,
+  createTrainerPanel,
   lampTest,
   loadPanel,
   moveWidget,
+  panelToCsv,
   removeWidget,
   renameWidget,
   savePanel,
@@ -26,6 +29,7 @@ function WidgetShell({ widget, selected, onSelect, children }) {
         gridRow: (widget.y || 0) + 1
       }}
       data-widget-id={widget.id}
+      title={widget.channel ? `${widget.channel} · ${widget.studio || ''}` : undefined}
       onClick={(e) => { e.stopPropagation(); onSelect(widget.id); }}
     >
       {children}
@@ -46,7 +50,7 @@ function LedWidget({ widget, on, onToggle, selected, onSelect }) {
         title="Force lamp (panel-only)"
       />
       <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.tag}</span>
+      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
     </WidgetShell>
   );
 }
@@ -64,7 +68,7 @@ function SwitchWidget({ widget, on, onToggle, selected, onSelect }) {
         <span className="vios-toggle-knob" />
       </button>
       <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.tag}</span>
+      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
     </WidgetShell>
   );
 }
@@ -88,7 +92,7 @@ function PbWidget({ widget, on, onDown, onUp, selected, onSelect }) {
         }}
       />
       <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.tag}</span>
+      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
     </WidgetShell>
   );
 }
@@ -112,9 +116,19 @@ function PotWidget({ widget, value, onChange, selected, onSelect }) {
         <span className="vios-pot-val">{Math.round(value)}%</span>
       </div>
       <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.tag}</span>
+      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
     </WidgetShell>
   );
+}
+
+function downloadText(filename, text, mime) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function IoSandbox() {
@@ -131,6 +145,7 @@ export default function IoSandbox() {
   const selected = panel.widgets.find((w) => w.id === selectedId) || null;
   const maxRow = panel.widgets.reduce((m, w) => Math.max(m, w.y || 0), 0);
   const gridRows = Math.max(4, maxRow + 2);
+  const modeLabel = panel.mode === 'trainer' ? 'SUB-TRAIN-01' : 'BLANK PANEL';
 
   useEffect(() => {
     if (persistTimer.current) clearTimeout(persistTimer.current);
@@ -162,19 +177,39 @@ export default function IoSandbox() {
     update((p) => renameWidget(p, selected.id, { label: editLabel, tag: editTag, color: editColor }));
   };
 
+  const loadBlank = () => {
+    clearPanelStorage();
+    setSelectedId(null);
+    setPanel(createStarterPanel());
+  };
+
+  const loadTrainer = () => {
+    setSelectedId(null);
+    setPanel(createTrainerPanel());
+  };
+
+  const pressPb = (tag, down) => {
+    update((p) => {
+      let next = setTag(p, tag, down);
+      if (tag === LAMP_TEST_TAG) next = lampTest(next, down);
+      return next;
+    });
+  };
+
   return (
     <>
       <section className="hero">
         <h1>I/O sandbox</h1>
         <p className="hero-lead">
-          Soft trainer panel — place lamps, switches, pushbuttons and pots. Tags live in this browser only.
-          Ladder lab coupling comes later; the Substation trainer preset is next.
+          Soft trainer panel — blank layout or the Substation SUB-TRAIN-01 I/O map.
+          Tags live in this browser only. Ladder lab coupling comes later.
         </p>
         <div className="hero-meta">
           <span className="pill"><b className="num">{counts.led}</b> LEDs</span>
           <span className="pill"><b className="num">{counts.switch}</b> switches</span>
           <span className="pill"><b className="num">{counts.pb}</b> PBs</span>
           <span className="pill"><b className="num">{counts.pot}</b> pots</span>
+          <span className={`pill ${panel.mode === 'trainer' ? 'pill-accent' : ''}`}>{modeLabel}</span>
           <span className={`pill ${savedFlash ? 'pill-accent' : ''}`}>{savedFlash ? 'saved' : 'localStorage'}</span>
         </div>
       </section>
@@ -187,18 +222,16 @@ export default function IoSandbox() {
           <button type="button" className="btn" onClick={() => update((p) => addWidget(p, 'pot'))}>+ Pot</button>
         </div>
         <div className="vios-add-group">
+          <button type="button" className="btn btn-primary" onClick={loadTrainer}>Load trainer preset</button>
+          <button type="button" className="btn" onClick={loadBlank}>Blank starter</button>
           <button type="button" className="btn" onClick={() => update((p) => lampTest(p, true))}>Lamp test</button>
           <button type="button" className="btn" onClick={() => update((p) => lampTest(p, false))}>Lamps off</button>
           <button
             type="button"
             className="btn"
-            onClick={() => {
-              clearPanelStorage();
-              setSelectedId(null);
-              setPanel(createStarterPanel());
-            }}
+            onClick={() => downloadText('logical-io-sandbox.csv', panelToCsv(panel), 'text/csv;charset=utf-8')}
           >
-            Reset starter
+            Export CSV
           </button>
         </div>
       </div>
@@ -208,7 +241,7 @@ export default function IoSandbox() {
           <div className="vios-plate-bezel">
             <div className="vios-plate-title">
               <span>LOGICAL · VIRTUAL I/O</span>
-              <span className="vios-plate-mode">BLANK PANEL</span>
+              <span className="vios-plate-mode">{modeLabel}</span>
             </div>
             <div
               className="vios-grid"
@@ -248,8 +281,8 @@ export default function IoSandbox() {
                       key={w.id}
                       {...common}
                       on={!!val}
-                      onDown={() => update((p) => setTag(p, w.tag, true))}
-                      onUp={() => update((p) => setTag(p, w.tag, false))}
+                      onDown={() => pressPb(w.tag, true)}
+                      onUp={() => pressPb(w.tag, false)}
                     />
                   );
                 }
@@ -265,7 +298,10 @@ export default function IoSandbox() {
             </div>
             <p className="vios-plate-foot">
               Teaching model — not a PLC scan, not live field wiring.
-              Full SUB-TRAIN-01 map lands with the trainer preset; ladder coupling later.
+              {panel.mode === 'trainer'
+                ? ' Addresses match the Substation notebook TRAINER_IO map (example Studio / RSLogix columns).'
+                : ' Load the trainer preset for the full SUB-TRAIN-01 point list.'}
+              {' '}Ladder coupling later.
             </p>
           </div>
         </div>
@@ -299,6 +335,15 @@ export default function IoSandbox() {
                         {LED_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </label>
+                  )}
+                  {(selected.channel || selected.studio || selected.rslogix) && (
+                    <div className="vios-addr-block">
+                      {selected.channel && <div><span className="muted">Channel</span> <code>{selected.channel}</code></div>}
+                      {selected.studio && <div><span className="muted">Studio</span> <code>{selected.studio}</code></div>}
+                      {selected.rslogix && <div><span className="muted">RSLogix</span> <code>{selected.rslogix}</code></div>}
+                      {selected.engineering && <div><span className="muted">Eng</span> <code>{selected.engineering}</code></div>}
+                      {selected.note && <p className="tiny muted" style={{ margin: '6px 0 0' }}>{selected.note}</p>}
+                    </div>
                   )}
                   <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                     <button type="button" className="btn" onClick={() => update((p) => moveWidget(p, selected.id, -1, 0))} aria-label="Move left">←</button>
@@ -341,9 +386,10 @@ export default function IoSandbox() {
           <div className="callout callout-info">
             <h4>Where this sits</h4>
             <div>
-              Phase A blank panel. Next: load the Substation notebook’s trainer I/O map.
+              Blank starter or interactive face of the{' '}
+              <Link to="/notebook">Substation notebook</Link> trainer map.
               Ladder lab stays independent for now — open a rung in the{' '}
-              <Link to="/s/rungs">ladder lab</Link> to step scan logic separately.
+              <Link to="/s/rungs">ladder lab</Link> separately.
             </div>
           </div>
         </aside>

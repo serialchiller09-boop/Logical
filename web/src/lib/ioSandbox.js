@@ -5,8 +5,11 @@
  * not live field I/O. Ladder lab coupling is a later phase.
  */
 
+import { TRAINER_IO } from '../data/substationProject.js';
+
 export const STORAGE_KEY = 'logical.io-sandbox.v1';
 export const PANEL_VERSION = 1;
+export const LAMP_TEST_TAG = 'DI_PB_LampTest';
 
 export const WIDGET_TYPES = {
   led: { label: 'LED', kind: 'output' },
@@ -19,6 +22,10 @@ export const LED_COLORS = ['green', 'amber', 'red'];
 
 function uid(prefix = 'w') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function normalizeTagName(tag) {
+  return String(tag || '').trim().replace(/\s+/g, '_');
 }
 
 /** Default blank starter: 10 LEDs, 4 toggles, 2 PBs, 2 pots. */
@@ -85,6 +92,119 @@ export function createStarterPanel() {
   };
 }
 
+/** SUB-TRAIN-01 map from the Substation notebook — full maintained/momentary/AI/LED set. */
+export function createTrainerPanel() {
+  const widgets = [];
+  let col = 0;
+  let row = 0;
+  const place = (w, span = 1) => {
+    widgets.push({ ...w, x: col, y: row });
+    col += span;
+    if (col >= 10) {
+      col = 0;
+      row += 1;
+    }
+  };
+  const startRow = () => {
+    if (col !== 0) {
+      col = 0;
+      row += 1;
+    }
+  };
+
+  for (const rowDef of TRAINER_IO.green) {
+    place({
+      id: uid('led'),
+      type: 'led',
+      tag: rowDef.tag,
+      label: rowDef.device,
+      color: 'green',
+      channel: rowDef.channel,
+      studio: rowDef.studio,
+      rslogix: rowDef.rslogix
+    });
+  }
+  for (const rowDef of TRAINER_IO.amber) {
+    place({
+      id: uid('led'),
+      type: 'led',
+      tag: rowDef.tag,
+      label: rowDef.device,
+      color: 'amber',
+      channel: rowDef.channel,
+      studio: rowDef.studio,
+      rslogix: rowDef.rslogix
+    });
+  }
+
+  startRow();
+  row += 1;
+  col = 0;
+  for (const rowDef of TRAINER_IO.maintained) {
+    if (col + 2 > 10) { col = 0; row += 1; }
+    place({
+      id: uid('sw'),
+      type: 'switch',
+      tag: rowDef.tag,
+      label: rowDef.device,
+      channel: rowDef.channel,
+      studio: rowDef.studio,
+      rslogix: rowDef.rslogix,
+      note: rowDef.note,
+      normal: rowDef.normal
+    }, 2);
+  }
+
+  startRow();
+  row += 1;
+  col = 0;
+  for (const rowDef of TRAINER_IO.momentary) {
+    if (col + 2 > 10) { col = 0; row += 1; }
+    place({
+      id: uid('pb'),
+      type: 'pb',
+      tag: rowDef.tag,
+      label: rowDef.device,
+      channel: rowDef.channel,
+      studio: rowDef.studio,
+      rslogix: rowDef.rslogix,
+      note: rowDef.action
+    }, 2);
+  }
+
+  startRow();
+  row += 1;
+  col = 0;
+  for (const rowDef of TRAINER_IO.analog) {
+    if (col + 3 > 10) { col = 0; row += 1; }
+    place({
+      id: uid('pot'),
+      type: 'pot',
+      tag: rowDef.tag,
+      label: rowDef.device,
+      channel: rowDef.channel,
+      studio: rowDef.studio,
+      rslogix: rowDef.rslogix,
+      note: rowDef.note,
+      engineering: rowDef.engineering,
+      min: 0,
+      max: 100
+    }, 3);
+  }
+
+  const tags = initialTags(widgets);
+  for (const rowDef of TRAINER_IO.maintained) {
+    if (String(rowDef.normal).toUpperCase() === 'ON') tags[rowDef.tag] = true;
+  }
+
+  return {
+    version: PANEL_VERSION,
+    mode: 'trainer',
+    widgets,
+    tags
+  };
+}
+
 export function initialTags(widgets = []) {
   const tags = {};
   for (const w of widgets) {
@@ -95,6 +215,14 @@ export function initialTags(widgets = []) {
   return tags;
 }
 
+function pickMeta(w) {
+  const out = {};
+  for (const key of ['channel', 'studio', 'rslogix', 'note', 'engineering', 'normal']) {
+    if (w[key] != null && w[key] !== '') out[key] = w[key];
+  }
+  return out;
+}
+
 export function normalizePanel(raw) {
   if (!raw || typeof raw !== 'object') return createStarterPanel();
   const widgets = Array.isArray(raw.widgets)
@@ -103,13 +231,14 @@ export function normalizePanel(raw) {
       .map((w) => ({
         id: w.id || uid(w.type),
         type: w.type,
-        tag: String(w.tag).trim().toUpperCase().replace(/\s+/g, '_'),
-        label: String(w.label || w.tag).slice(0, 48),
+        tag: normalizeTagName(w.tag),
+        label: String(w.label || w.tag).slice(0, 64),
         color: LED_COLORS.includes(w.color) ? w.color : 'green',
         x: Number.isFinite(w.x) ? w.x : 0,
         y: Number.isFinite(w.y) ? w.y : 0,
         min: w.type === 'pot' ? Number(w.min) || 0 : undefined,
-        max: w.type === 'pot' ? (Number(w.max) || 100) : undefined
+        max: w.type === 'pot' ? (Number(w.max) || 100) : undefined,
+        ...pickMeta(w)
       }))
     : [];
   if (!widgets.length) return createStarterPanel();
@@ -178,17 +307,18 @@ export function addWidget(panel, type, overrides = {}) {
   const tag = overrides.tag || `${prefix}_${String(counts).padStart(2, '0')}`;
   const span = type === 'pot' ? 3 : type === 'led' ? 1 : 2;
   const slot = nextFreeSlot(panel.widgets, span);
-  const resolvedTag = String(overrides.tag || tag).trim().toUpperCase().replace(/\s+/g, '_');
+  const resolvedTag = normalizeTagName(overrides.tag || tag);
   const widget = {
     id: uid(type),
     type,
     tag: resolvedTag,
-    label: String(overrides.label || `${prefix} ${counts}`).slice(0, 48),
+    label: String(overrides.label || `${prefix} ${counts}`).slice(0, 64),
     color: type === 'led' ? (LED_COLORS.includes(overrides.color) ? overrides.color : 'green') : undefined,
     min: type === 'pot' ? 0 : undefined,
     max: type === 'pot' ? 100 : undefined,
     x: Number.isFinite(overrides.x) ? overrides.x : slot.x,
-    y: Number.isFinite(overrides.y) ? overrides.y : slot.y
+    y: Number.isFinite(overrides.y) ? overrides.y : slot.y,
+    ...pickMeta(overrides)
   };
   const widgets = [...panel.widgets, widget];
   const tags = { ...panel.tags };
@@ -240,8 +370,8 @@ export function renameWidget(panel, id, { label, tag, color } = {}) {
   const widgets = panel.widgets.map((w) => {
     if (w.id !== id) return w;
     const next = { ...w };
-    if (label != null) next.label = String(label).slice(0, 48);
-    if (tag != null && String(tag).trim()) next.tag = String(tag).trim().toUpperCase().replace(/\s+/g, '_');
+    if (label != null) next.label = String(label).slice(0, 64);
+    if (tag != null && String(tag).trim()) next.tag = normalizeTagName(tag);
     if (color && LED_COLORS.includes(color)) next.color = color;
     return next;
   });
@@ -250,6 +380,19 @@ export function renameWidget(panel, id, { label, tag, color } = {}) {
     if (!(w.tag in tags)) tags[w.tag] = w.type === 'pot' ? 0 : false;
   }
   return { ...panel, widgets, tags };
+}
+
+/** Export panel map as CSV (channel, tag, addresses, device). */
+export function panelToCsv(panel) {
+  const columns = ['type', 'channel', 'tag', 'studio', 'rslogix', 'label', 'color', 'normal', 'note'];
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [columns.join(',')];
+  for (const w of panel.widgets) {
+    lines.push([
+      w.type, w.channel, w.tag, w.studio, w.rslogix, w.label, w.color || '', w.normal || '', w.note || ''
+    ].map(esc).join(','));
+  }
+  return `${lines.join('\r\n')}\r\n`;
 }
 
 export function countByType(panel) {
