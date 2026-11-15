@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useApp, useTitle } from '../lib/store.jsx';
 import { useAsync, api } from '../lib/api.js';
 import { Loader } from '../components/Bits.jsx';
+import { PANEL_SCENARIOS, panelScenarioHref } from '../data/panelScenarios.js';
 
 export default function Home() {
   useTitle(null);
@@ -10,6 +11,12 @@ export default function Home() {
   const { data: rungs, loading: rungsLoading } = useAsync(() => api.entries({ section: 'rungs', limit: 40 }), []);
   const lab = sections.find((s) => s.slug === 'rungs');
   const reference = sections.filter((s) => s.slug !== 'rungs');
+  const rungById = new Map((rungs?.entries || []).map((e) => [e.id, e]));
+  const panelScenarios = PANEL_SCENARIOS
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((s) => ({ ...s, entry: rungById.get(s.entryId) }))
+    .filter((s) => s.entry);
 
   return (
     <>
@@ -27,6 +34,29 @@ export default function Home() {
           <Link className="pill" to="/tools?tab=gallery">printable gallery</Link>
         </div>
       </section>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <div className="card-hd">
+          <h3>Try with panel</h3>
+          <span className="hd-note">guided labs · soft panel dock</span>
+        </div>
+        <div className="card-bd">
+          <p className="tiny muted" style={{ margin: '0 0 10px' }}>
+            Teaching model only — shared browser tags with the scan sim, not live field I/O.
+          </p>
+          {rungsLoading && <Loader label="loading panel labs" />}
+          <div className="rung-lab-grid">
+            {panelScenarios.map((s) => (
+              <Link key={s.entryId} to={panelScenarioHref(s.entryId)} className="rung-lab-card rung-lab-card-panel">
+                <span className="rung-lab-kicker">{s.cardTitle}</span>
+                <span className="rung-lab-title">{s.entry.title}</span>
+                <span className="rung-lab-goal">{s.entry.subtitle}</span>
+                <span className="rung-lab-go">open with dock →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-hd">

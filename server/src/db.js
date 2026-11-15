@@ -122,7 +122,9 @@ export async function seed({ force = false } = {}) {
   const d = getDb();
   const existing = d.prepare('SELECT COUNT(*) AS n FROM entries').get().n;
   const meta = d.prepare("SELECT v FROM seed_meta WHERE k = 'version'").get();
-  const version = '1';
+  // Bump when reference payload shape changes so persistent deploys re-apply seed
+  // (edited plant rows stay preserved). Phase E1: guided panel scenario meta.
+  const version = '2';
 
   if (!force && existing > 0 && meta?.v === version) {
     return { skipped: true, entries: existing };

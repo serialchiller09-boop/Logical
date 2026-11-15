@@ -13,6 +13,7 @@ import { LADDER_BASICS, INSTRUCTIONS } from './data/instructions.js';
 import { RUNGS } from './data/rungs.js';
 import { RUNGS2 } from './data/rungs2.js';
 import { RUNG_GOALS } from './data/rungGoals.js';
+export { GUIDED_PANEL_SCENARIOS, SCENARIO_BY_RUNG } from './data/scenarioPacks.js';
 import { FUNCTION_BLOCKS, FB_FAMILIES } from './data/functionBlocks.js';
 import { PID_TERMS, TUNING_METHODS, GAS_PLANT_LOOPS } from './data/pid.js';
 import { PROCESS_STAGES } from './data/process.js';
@@ -90,6 +91,9 @@ function toEntry(section, kind, raw, index = 0) {
   harvest(raw, haystack);
   if (lab?.goal) haystack.push(lab.goal);
   if (Array.isArray(lab?.tryThis)) haystack.push(...lab.tryThis);
+  if (lab?.scanHint) haystack.push(lab.scanHint);
+  if (lab?.scenarioCard) haystack.push(lab.scenarioCard);
+  if (Array.isArray(lab?.dockTags)) haystack.push(...lab.dockTags);
   const search = [...new Set(haystack.filter(Boolean).map((s) => String(s).toLowerCase()))].join(' \u2022 ');
 
   let payload = raw;

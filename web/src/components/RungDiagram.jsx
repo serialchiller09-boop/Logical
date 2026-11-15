@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { GEO, layout, analyze, initialState, collectElements, collectRefs } from '../lib/ladder.js';
 import {
   applyBusToBitsValues,
@@ -12,6 +12,13 @@ import {
   subscribeTagBus
 } from '../lib/tagBus.js';
 import { IoLabDock, loadDockLayout, saveDockLayout } from './IoLabDock.jsx';
+
+function dockLayoutFromSearch(searchParams) {
+  const raw = searchParams.get('dock');
+  if (raw === 'side' || raw === 'below' || raw === '1' || raw === 'panel') return raw === 'below' ? 'below' : 'side';
+  if (raw === 'hidden' || raw === '0') return 'hidden';
+  return null;
+}
 
 /* ------------------------------------------------------------------ text rendering of a rung */
 export function describeRung(node, depth = 0) {
@@ -167,12 +174,17 @@ const SCAN_STEPS = [
 ];
 
 export function RungSimulator({ entry, compact = false }) {
+  const [searchParams] = useSearchParams();
   const rungs = useMemo(() => subRungs(entry.payload, { includePurposeNote: !compact }), [entry, compact]);
   const ioMap = useMemo(() => {
     const m = new Map();
     for (const r of rungs) for (const p of r.io) if (p?.tag) m.set(p.tag, p);
     return m;
   }, [rungs]);
+  const emphasizeTags = useMemo(
+    () => (Array.isArray(entry?.payload?.dockTags) ? entry.payload.dockTags : []),
+    [entry]
+  );
 
   const baseState = useMemo(() => {
     const all = [...ioMap.values()];
@@ -187,7 +199,14 @@ export function RungSimulator({ entry, compact = false }) {
   const [log, setLog] = useState([]);
   const [showMap, setShowMap] = useState(true);
   const [coupled, setCoupled] = useState(() => isCouplingEnabled());
-  const [dockLayout, setDockLayout] = useState(() => loadDockLayout());
+  const [dockLayout, setDockLayout] = useState(() => dockLayoutFromSearch(searchParams) || loadDockLayout());
+
+  useEffect(() => {
+    const fromQuery = dockLayoutFromSearch(searchParams);
+    if (!fromQuery) return;
+    setDockLayout(fromQuery);
+    saveDockLayout(fromQuery);
+  }, [searchParams, entry?.id]);
 
   const rerender = useCallback(() => setTick((n) => n + 1), []);
 
@@ -435,6 +454,7 @@ export function RungSimulator({ entry, compact = false }) {
           io={allIo}
           layout={dockLayout}
           onLayoutChange={changeDockLayout}
+          emphasizeTags={emphasizeTags}
         />
       )}
     </div>
