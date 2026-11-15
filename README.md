@@ -7,7 +7,7 @@ and a standards index. Plus a rung simulator you can actually step, bookmarks, n
 plant-specific answers, a searchable **Gas Plant Controls & Automation Reference Manual**, and a printable
 **substation PLC project notebook** for taking a software emulator through an isolated physical trainer.
 
-734 entries across 14 sections. Everything is one codebase: an Express + SQLite API whose content is
+735 entries across 14 sections. Everything is one codebase: an Express + SQLite API whose content is
 version-controlled data modules, and a React front end that renders them.
 
 ```bash
@@ -157,7 +157,7 @@ docs/ADMIN.md                the admin token, what an edit does, how reseeding p
 | `npm run seed:reset` | delete the database and rebuild it (this does clear bookmarks/notes — export first) |
 | `npm test` | Ladder semantics, geometry integrity, controls notebook search/source integrity, drawing-driven four-bank/L18ER trainer allocations, safety boundaries, and the content policy below |
 | `npm run verify` | production build plus the test suite; useful as a hosting build check |
-| `npm run check:render` | render all 734 entries (cards, detail bodies, rung diagrams and simulators) into strings and fail on any throw - needs the API up; uses the esbuild that ships with vite |
+| `npm run check:render` | render all 735 entries (cards, detail bodies, rung diagrams and simulators) into strings and fail on any throw - needs the API up; uses the esbuild that ships with vite |
 
 Environment: `PORT`, `HOST`, `LOGICAL_DB`, `LOGICAL_DATA_DIR`, `ADMIN_TOKEN` (see `docs/ADMIN.md`), and
 `API_ORIGIN` for the Vite proxy when the API lives elsewhere.
@@ -202,9 +202,12 @@ edge bits and output writes). Force the inputs, step the scan, watch `.ACC`/`.DN
 
 Modelled: boolean conduction, TON/TOF/RTO accumulation by scan period, CTU/CTD with rising-edge detection,
 ONS, RES, comparators with tag or arithmetic operands, MOV/CPT/SEL/LIM/PID, timer/counter member references
-(`T_LOCK.DN`, `C5:0/DN`). Not modelled, and the UI says so: I/O update points, task priorities and scan
-overlap, comm faults, retentive behaviour on your specific platform, and any instruction quirk in a firmware
-revision. It is a teaching model, not a runtime.
+(`T_LOCK.DN`, `T_LOCK.EN`, `C5:0/DN`, `C5:0/CU`). Logix-shaped teaching model: TON/TOF/RTO/CTU/CTD set
+rung-condition-out = rung-condition-in (status in `.EN`/`.TT`/`.DN`/`.CU`/`.CD`); CTD `.DN` is `ACC >= PRE`
+like CTU; TOF power-up matches Logix prescan (`ACC = PRE`). Not modelled, and the UI says so: I/O update
+points, task priorities and scan overlap, comm faults, retentive behaviour on your specific platform, and any
+instruction quirk in a firmware revision. It is a teaching model, not a runtime. Cite Studio 5000 Logix
+Designer instruction help for TON/TOF/RTO/CTU/CTD and publication 1756-RM003 for controller reference detail.
 
 Comparators that cannot resolve an operand fall back to a manual toggle and are drawn with a warning ring, so
 the app never pretends a rung is doing something it could not read.

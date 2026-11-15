@@ -226,9 +226,15 @@ export const INSTRUCTIONS = [
     id: 'in-ctd', mnemonic: 'CTD / CTUD', name: 'Count Down / Up-Down', category: 'Counter',
     symbol: '-[CTD]-', ascii: '-[CTD .CD .ACC .DN]',
     iec: 'CTD (CD, LD, PV, Q, CV) / CTUD', siemens: 'CTD / CTUD',
-    function: 'CTD decrements per false-to-true transition and is done when .ACC <= 0. CTUD is one block with separate count-up and count-down inputs into a single accumulator.',
-    usage: 'Remaining-strokes-to-go, parts remaining in a batch, inventory in/out on one accumulator.',
-    gotcha: 'Sharing one address between a CTU and a CTD (legacy idiom) works, but it is unreadable to the next person. Prefer CTUD where the platform has it.',
+    function: 'Logix CTD decrements .ACC on each false-to-true transition. .DN is true when .ACC >= .PRE — the same rule as CTU (Studio 5000 CTD help; 1756-RM003). Pair CTU+CTD on one COUNTER so .ACC is live inventory and .DN means "at or above preset". IEC 61131-3 CTD is different: Q is true when CV <= 0. CTUD is one block with separate up and down inputs into a single accumulator.',
+    members: [
+      { name: '.ACC / CV', desc: 'accumulated count (shared with a paired CTU on Logix)' },
+      { name: '.PRE / PV', desc: 'preset used for the .DN comparison' },
+      { name: '.DN', desc: 'Logix: ACC >= PRE (not "reached zero")' },
+      { name: '.CD', desc: 'count-down enable — holds rung-condition-in from the last scan' }
+    ],
+    usage: 'Buffer zone in/out on one accumulator (CTU on entry, CTD on exit), remaining-strokes patterns that compare ACC explicitly, inventory tracking.',
+    gotcha: 'Do not wait on CTD.DN to mean empty — in Logix that bit is ACC >= PRE. To detect empty, compare .ACC to 0 with LEQ/EQU. Sharing one COUNTER between CTU and CTD is the intended Logix idiom (and what .DN is built for); label both rungs clearly. IEC CTD Q-at-zero is a different rule on a different platform.',
     status: 'standard'
   },
 

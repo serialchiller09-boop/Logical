@@ -17,8 +17,16 @@ export function fitPinText(raw, maxChars = 16) {
   return `${s.slice(0, Math.max(1, maxChars - 1))}…`;
 }
 
-/** Blocks whose output is a retained state bit rather than the instantaneous rung power. */
-const STATE_BLOCKS = new Set(['TON', 'TOF', 'TP', 'RTO', 'CTU', 'CTD', 'CTUD', 'HPA', 'LINT']);
+/**
+ * Blocks that publish a state bit (.DN / .Q) as their *local* evaluation result for drawing,
+ * but must NOT redefine Logix rung-condition-out. Logix TON/TOF/RTO/CTU/CTD set
+ * rung-condition-out = rung-condition-in (Studio 5000 Logix Designer instruction help;
+ * also summarized in publication 1756-RM003). Only non-Logix / IEC-style blocks (TP, CTUD)
+ * and custom helpers keep "state bit as conduction" semantics here.
+ */
+const STATE_BLOCKS = new Set(['TP', 'CTUD', 'HPA', 'LINT']);
+/** Logix timer/counter instructions: RCO mirrors RCI; status lives in .EN/.TT/.DN/.CU/.CD. */
+const LOGIX_PASS_THROUGH = new Set(['TON', 'TOF', 'RTO', 'CTU', 'CTD']);
 
 export function collectElements(node, acc = []) {
   if (!node || typeof node !== 'object') return acc;
@@ -129,7 +137,7 @@ function evalLeaf(node, ctx) {
 
 /** Members of a timer/counter, written either Logix style (T4:0/DN) or dotted (T_LOCK.DN). */
 export function memberRef(addr) {
-  const m = /^([A-Za-z][A-Za-z0-9_.:]*)\s*[./]\s*(DN|Q|TT|ACC|PRE|CU|CD|CV|V)$/.exec(String(addr ?? '').trim());
+  const m = /^([A-Za-z][A-Za-z0-9_.:]*)\s*[./]\s*(DN|Q|TT|EN|ACC|PRE|CU|CD|CV|V)$/.exec(String(addr ?? '').trim());
   return m ? { base: m[1], member: m[2].toUpperCase() } : null;
 }
 
@@ -139,6 +147,9 @@ function memberValue(st, ref) {
   switch (ref.member) {
     case 'DN': case 'Q': return t.dn ? 1 : 0;
     case 'TT': return t.running ? 1 : 0;
+    case 'EN': return t.en ? 1 : 0;
+    case 'CU': return t.cu ? 1 : 0;
+    case 'CD': return t.cd ? 1 : 0;
     case 'ACC': case 'CV': return num(t.acc);
     case 'PRE': case 'V': return num(t.pre ?? t.pv);
     default: return undefined;
@@ -169,50 +180,81 @@ function evalBlock(node, ctx, live) {
     const b = operandValue(param(node, 'Src B') ?? param(node, 'B'), st);
     node._unresolved = a == null || b == null;
     if (node._unresolved) return !!node._manual;
-    if (k === 'GEQ') return a >= b; if (k === 'GRT') return a > b;
-    if (k === 'LES' || k === 'LT') return a < b; if (k === 'LEQ') return a <= b;
-    if (k === 'EQU') return a === b; return a !== b;
+    if (k === 'GEQ') return a >= b;
+    if (k === 'GRT' || k === 'GT') return a > b;
+    if (k === 'LES' || k === 'LT') return a < b;
+    if (k === 'LEQ') return a <= b;
+    if (k === 'EQU') return a === b;
+    if (k === 'NEQ') return a !== b;
+    return false;
   }
 
   if (['TON', 'TOF', 'RTO'].includes(k)) {
     const key = node.a || node.l;
-    const t = (st.timers[key] ??= { acc: 0, dn: false, prevEn: false });
+    const t = (st.timers[key] ??= { acc: 0, dn: false, running: false, en: false, prevEn: false });
     const preMs = presetMs(node, st.values);
     t.pre = preMs;
     if (live) {
-      if (k === 'TON') { t.acc = enabled ? Math.min(preMs || Infinity, t.acc + st.dt) : 0; }
-      else if (k === 'TOF') { if (enabled) t.acc = 0; else t.acc = Math.min(preMs || Infinity, t.acc + st.dt); }
-      else { if (enabled) t.acc = Math.min(preMs || Infinity, t.acc + st.dt); }
+      // TOF Logix prescan (Studio 5000 TOF help): ACC=PRE, DN=0, TT=0, EN=0 — once, before first scan work.
+      if (k === 'TOF' && !t._tofPrescanDone) {
+        t.acc = preMs;
+        t.dn = false;
+        t.running = false;
+        t.en = false;
+        t._tofPrescanDone = true;
+      }
+      if (k === 'TON') {
+        // PRE=0 → ACC stays 0 and DN is true as soon as enabled (ACC >= PRE).
+        t.acc = enabled ? Math.min(preMs, t.acc + st.dt) : 0;
+      } else if (k === 'TOF') {
+        if (enabled) t.acc = 0;
+        else t.acc = Math.min(preMs, t.acc + st.dt);
+      } else if (enabled) {
+        t.acc = Math.min(preMs, t.acc + st.dt);
+      }
+      t.en = !!enabled;
     }
-    if (k === 'TON') t.dn = !!enabled && preMs > 0 && t.acc >= preMs;
-    else if (k === 'TOF') t.dn = !!enabled || (preMs > 0 && t.acc < preMs);
-    else t.dn = preMs > 0 && t.acc >= preMs;
-    // TON/RTO count up while enabled; TOF counts up only while the input is FALSE (that is
-    // what an off-delay is), and Q is held true for the delay after each falling edge.
-    t.running = (k === 'TOF' ? !enabled : enabled) && preMs > 0 && t.acc < preMs;
+    if (k === 'TON') t.dn = !!enabled && t.acc >= preMs;
+    else if (k === 'TOF') t.dn = !!enabled || t.acc < preMs;
+    else t.dn = t.acc >= preMs;
+    // TON/RTO time while enabled and not yet done; TOF times only while input is FALSE.
+    t.running = (k === 'TOF' ? !enabled : !!enabled) && t.acc < preMs;
     node._state = t;
-    return t.dn;
+    // Logix: Set Rung-condition-out to Rung-condition-in (status is .EN/.TT/.DN, not RCO).
+    return !!enabled;
   }
 
   if (k === 'RES') {
     const target = node.a;
     if (live && enabled && target) {
-      if (st.timers[target]) Object.assign(st.timers[target], { acc: 0, dn: false, running: false });
-      if (st.counters[target]) Object.assign(st.counters[target], { acc: 0, dn: false });
+      if (st.timers[target]) Object.assign(st.timers[target], { acc: 0, dn: false, running: false, en: false });
+      if (st.counters[target]) Object.assign(st.counters[target], { acc: 0, dn: false, cu: false, cd: false, prevIn: false });
     }
     return !!enabled;
   }
 
   if (['CTU', 'CTD'].includes(k)) {
-    const c = (st.counters[node.a] ??= { acc: 0, dn: false, prevIn: false });
+    const c = (st.counters[node.a] ??= { acc: 0, dn: false, cu: false, cd: false, prevIn: false });
     const pre = num(operandValue(param(node, 'Target') ?? param(node, 'PRE'), st));
+    c.pre = pre;
     if (live) {
-      if (enabled && !c.prevIn) c.acc += k === 'CTU' ? 1 : -1;
-      c.prevIn = enabled;
-      c.dn = pre > 0 ? (k === 'CTU' ? c.acc >= pre : c.acc <= 0) : false;
+      // Edge against the prior enable bit (.CU / .CD), matching Studio 5000 CTU/CTD help.
+      if (k === 'CTU') {
+        if (enabled && !c.cu) c.acc += 1;
+        c.cu = !!enabled;
+        c.prevIn = !!enabled;
+      } else {
+        if (enabled && !c.cd) c.acc -= 1;
+        c.cd = !!enabled;
+        c.prevIn = !!enabled;
+      }
+      // Logix: .DN is true when ACC >= PRE for BOTH CTU and CTD (same COUNTER member).
+      // IEC CTD Q is CV <= 0 — different rule; this engine follows Logix.
+      c.dn = c.acc >= pre;
     }
     node._state = c;
-    return c.dn;
+    // Logix: Set Rung-condition-out to Rung-condition-in.
+    return !!enabled;
   }
 
   if (k === 'ONS') {
@@ -271,6 +313,8 @@ function annotatePins(node, st) {
       out = store ? (store.dn ? 'TRUE' : 'false') : resolveOperand(p.v, st.values) ?? p.v;
     } else if (key === 'TT' || key === 'RUN') {
       out = store ? (store.running ? 'TRUE' : 'false') : p.v;
+    } else if (key === 'EN') {
+      out = store ? (store.en ? 'TRUE' : 'false') : p.v;
     } else if (key === 'BASE' || key === 'PV') {
       out = store?.pre ?? resolveOperand(p.v, st.values) ?? p.v;
     } else {
@@ -331,14 +375,14 @@ export function analyze(rung, state, opts = {}) {
     ctx.powered = powered;
     ctx.path = path;
     // A leaf only passes power if the power arriving at it is there to pass. Comparators,
-    // timer DN bits and ONS are evaluated locally first (they must update every scan in a
-    // real controller), then gated by the incoming rung power.
+    // Logix timers/counters (RCO=RCI), and ONS are evaluated locally first (they must update
+    // every scan in a real controller), then gated by the incoming rung power.
     const local = evalLeaf(node, ctx);
-    // Timers and counters publish a state bit (.DN/.Q) that outlives the power that set it, so
-    // their right-hand conduction is that bit, not the power arriving now. Everything else
-    // (contacts, comparators, ONS, data moves) only passes power it was actually given.
+    // Logix TON/TOF/RTO/CTU/CTD: rung-condition-out = rung-condition-in (local already
+    // returned RCI). Coils and IEC-style state blocks may publish a retained bit as conduction.
+    const logixPass = node.t === 'blk' && LOGIX_PASS_THROUGH.has(node.k);
     const publishesState = node.t === 'coil' || (node.t === 'blk' && STATE_BLOCKS.has(node.k));
-    const out = publishesState ? local : (powered && local);
+    const out = logixPass ? local : (publishesState ? local : (powered && local));
     if (node.t === 'coil' && ctx.live) {
       if (node.k === 'OTE') { state.bits[node.a] = out ? 1 : 0; ctx.writes.push({ addr: node.a, value: out, kind: 'OTE' }); }
       else if (node.k === 'OTL' && out) { state.bits[node.a] = 1; ctx.writes.push({ addr: node.a, value: true, kind: 'OTL' }); }
@@ -429,9 +473,24 @@ export function initialState(io = []) {
     if (!p?.tag) continue;
     const init = p.initial ?? 0;
     if (['DI', 'DO', 'BIT'].includes(p.type)) bits[p.tag] = init ? 1 : 0;
-    else if (p.type === 'TIMER') { timers[p.tag] = { acc: 0, dn: false }; }
-    else if (p.type === 'COUNTER') { counters[p.tag] = { acc: Number(init) || 0, dn: false, prevIn: false }; }
-    else values[p.tag] = Number(init) || 0;
+    else if (p.type === 'TIMER') {
+      // TON/RTO power-up: ACC=0, DN=0, TT=0, EN=0. TOF Logix prescan sets ACC=PRE (applied on
+      // first live TOF evaluation once PRE is known from the instruction). Optional
+      // instruction:'TOF' + preMs on the I/O row can pre-load ACC=PRE for tests.
+      const instr = String(p.instruction || p.kind || '').toUpperCase();
+      const preMs = Number(p.preMs ?? p.pre ?? 0) || 0;
+      const isTof = instr === 'TOF';
+      timers[p.tag] = {
+        acc: isTof ? preMs : 0,
+        dn: false,
+        running: false,
+        en: false,
+        pre: preMs || undefined,
+        _tofPrescanDone: isTof && preMs > 0
+      };
+    } else if (p.type === 'COUNTER') {
+      counters[p.tag] = { acc: Number(init) || 0, dn: false, cu: false, cd: false, prevIn: false };
+    } else values[p.tag] = Number(init) || 0;
   }
   return { bits, values, timers, counters, prevEdges, dt: 1000 };
 }
