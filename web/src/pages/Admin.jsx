@@ -11,7 +11,9 @@ export default function Admin() {
   const { sections, toast } = useApp();
   const [sp, setSp] = useSearchParams();
   const [token, setToken] = useState(getAdminToken());
-  const [denied, setDenied] = useState(false);
+  /** Fetch only after a successful Unlock — avoid treating first-visit empty token as a failed auth. */
+  const [unlocked, setUnlocked] = useState(false);
+  const [unlockTried, setUnlockTried] = useState(false);
   const [section, setSection] = useState('');
   const [onlyEdited, setOnlyEdited] = useState(false);
   const [text, setText] = useState('');
@@ -19,7 +21,10 @@ export default function Admin() {
   const [diff, setDiff] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const { data, loading, error, reload } = useAsync(() => api.admin.list(), [token]);
+  const { data, loading, error, reload } = useAsync(
+    () => (unlocked ? api.admin.list() : Promise.resolve({ entries: [] })),
+    [unlocked]
+  );
   const entries = data?.entries || [];
 
   const filtered = useMemo(() => entries.filter((e) => {
@@ -33,15 +38,22 @@ export default function Admin() {
   }), [entries, section, onlyEdited, text]);
 
   useEffect(() => {
-    if (error?.status === 401) setDenied(true);
-    else setDenied(false);
-  }, [error]);
+    if (unlocked && error?.status === 401) setUnlocked(false);
+  }, [error, unlocked]);
+
+  const locked = !unlocked;
 
   const saveToken = async () => {
     setAdminToken(token.trim());
-    setDenied(false);
-    const ok = await api.admin.list().then(() => true).catch((e) => { if (e.status === 401) setDenied(true); return false; });
-    if (ok) toast('admin token accepted', 'ok');
+    setUnlockTried(true);
+    try {
+      await api.admin.list();
+      setUnlocked(true);
+      toast('admin token accepted', 'ok');
+    } catch (e) {
+      setUnlocked(false);
+      if (e.status !== 401) toast(`unlock failed: ${e.message}`, 'bad');
+    }
   };
 
   const reseed = async () => {
@@ -67,10 +79,10 @@ export default function Admin() {
     } catch (e) { toast(`export failed: ${e.message}`, 'bad'); }
   };
 
-  if (denied) {
+  if (locked) {
     return (
-      <div className="card" style={{ maxWidth: 620, margin: '30px auto' }}>
-        <div className="card-hd"><h3>Plant-data access</h3></div>
+      <section className="card" style={{ maxWidth: 620, margin: '30px auto' }}>
+        <div className="card-hd"><h1 style={{ margin: 0, fontSize: 18 }}>Plant-data access</h1></div>
         <div className="card-bd stack">
           <p className="small muted" style={{ margin: 0 }}>
             Editing is behind a token so that a shared install cannot be rewritten by whoever opens the browser.
@@ -78,12 +90,17 @@ export default function Admin() {
             It is stored only in this browser (localStorage) and sent as <span className="mono">x-admin-token</span>.
           </p>
           <input className="search-input" value={token} onChange={(e) => setToken(e.target.value)}
-            placeholder="ADMIN_TOKEN value" type="password" onKeyDown={(e) => e.key === 'Enter' && saveToken()} />
-          {error && !loading && <div className="tiny" style={{ color: 'var(--bad)' }}>{error.message}{denied ? ' — that token was rejected.' : ''}</div>}
-          <div className="row"><button className="btn btn-primary" onClick={saveToken}>Unlock</button>
-            <span className="tiny muted">If the server has no ADMIN_TOKEN set, the default is documented in docs/ADMIN.md.</span></div>
+            placeholder="ADMIN_TOKEN value" type="password" onKeyDown={(e) => e.key === 'Enter' && saveToken()}
+            aria-label="Admin token" />
+          {unlockTried && (
+            <div className="tiny" style={{ color: 'var(--ink-2)' }}>
+              Still locked — check the token and try Unlock again.
+            </div>
+          )}
+          <div className="row"><button type="button" className="btn btn-primary" onClick={saveToken}>Unlock</button>
+            <span className="tiny muted">ADMIN_TOKEN must be set on the server. The dev-only default is documented in docs/ADMIN.md.</span></div>
         </div>
-      </div>
+      </section>
     );
   }
 

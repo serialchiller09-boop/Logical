@@ -49,8 +49,8 @@ function Sidebar({ onNavigate, open = false, collapsed = false, onToggleCollapse
           </svg>
         </span>
         <div className="brand-copy">
-          <b>Logical</b>
-          <span>ladder lab &amp; plant reference</span>
+          <div className="brand-name">Logical</div>
+          <div className="brand-sub">ladder lab &amp; plant reference</div>
         </div>
         <button
           type="button"
@@ -119,7 +119,7 @@ function Topbar() {
 
   return (
     <header className="topbar">
-      <button className="burger" onClick={() => setDrawer(!drawer)} aria-label="toggle navigation">≡</button>
+      <button type="button" className="burger" onClick={() => setDrawer(!drawer)} aria-label="toggle navigation">≡</button>
       <nav className="crumbs" aria-label="breadcrumb">
         {crumbs.map((c, i) => (
           <span key={i} style={{ display: 'contents' }}>
@@ -128,12 +128,14 @@ function Topbar() {
           </span>
         ))}
       </nav>
-      <div className="search-trigger" onClick={() => setPalette(true)}>
-        <span aria-hidden>⌕</span> Search the reference <kbd>⌘K</kbd>
-      </div>
+      <button type="button" className="search-trigger" onClick={() => setPalette(true)} aria-label="Search the reference">
+        <span aria-hidden>⌕</span>
+        <span className="lbl">Search the reference</span>
+        <kbd className="search-kbd">⌘K</kbd>
+      </button>
       {loc.pathname === '/controls-notebook'
         ? <a className="icon-btn icon-link" href={notebookPdfHref(new URLSearchParams(loc.search).get('page'))} target="_blank" rel="noreferrer" title="Open the original PDF to print" aria-label="Open the original PDF to print">⎙</a>
-        : <button className="icon-btn" onClick={() => window.print()} title="Print or save this page as a clean PDF" aria-label="Print or save this page">⎙</button>}
+        : <button type="button" className="icon-btn" onClick={() => window.print()} title="Print or save this page as a clean PDF" aria-label="Print or save this page">⎙</button>}
     </header>
   );
 }

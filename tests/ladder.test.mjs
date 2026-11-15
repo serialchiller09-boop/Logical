@@ -454,7 +454,7 @@ test('GT compares greater-than (same as GRT), not not-equal', () => {
   ), st, { live: true });
   assert.equal(st.bits.HI, 0);
 
-  // Equal operands: GT false, NEQ true — proves GT is not the old !== fall-through.
+  // Equal operands: GT false, NEQ false — proves GT is not the old !== fall-through.
   st.values.A = 4;
   st.values.B = 4;
   analyze(series(

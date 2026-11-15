@@ -202,7 +202,7 @@ export const INSTRUCTIONS = [
     iec: 'R input on the timer/counter', siemens: 'reset input',
     function: 'Clears a timer or counter: .ACC to 0 and status bits cleared.',
     usage: 'End of batch, shift change, after an acknowledged trip, at the start of a new initiate sequence.',
-    gotcha: 'Order matters: a RES executed after the timer in the same scan (or in a later file) resets the accumulation you just made. Put resets before the timed element, or in a clearly-later rung, and label why.',
+    gotcha: 'Order matters: a RES executed after the timer or counter in the same scan (or in a later file) resets the accumulation you just made. Put resets before the timed or counted element, or in a clearly-later rung, and label why. On a CTU, RES clears that COUNTER .ACC and status bits (.CU, .DN, .OV) — it does not rewrite .PRE (Studio 5000 Logix Designer RES and CTU instruction help). If the CTU rung is still true after RES, the next scan counts 1, because RES cleared .CU and the instruction sees a fresh rising edge.',
     status: 'standard'
   },
 
@@ -219,7 +219,7 @@ export const INSTRUCTIONS = [
       { name: '.CU / .CD / .OV / .UN', desc: 'count-up / count-down / overflow / underflow status bits (Logix and legacy)' }
     ],
     usage: 'Chemical injection pump strokes vs. target, filter-backwash cycle count, starts-per-day on a reciprocator, batch stages, cycles-for-maintenance.',
-    gotcha: 'The count happens on the EDGE, so a bouncing contact double-counts: put an ONS in front of it. And a counter whose reset never fires just saturates and stops being a process variable.',
+    gotcha: 'The count happens on the EDGE, so a bouncing contact double-counts: put an ONS in front of it. And a counter whose reset never fires just saturates and stops being a process variable. Clear the count with RES on that COUNTER tag (Studio 5000 CTU / RES help) — usually on a separate, labeled reset rung. If the CTU rung is still true after RES, the next scan counts 1, because RES cleared .CU and the instruction sees a fresh rising edge.',
     status: 'standard'
   },
   {
