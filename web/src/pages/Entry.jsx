@@ -79,7 +79,7 @@ export default function EntryPage() {
           <div className="crumbs">
             <Link to={`/s/${entry.section}`}>{data.section?.label ?? entry.section}</Link>
             <span>/</span>
-            <span>{hasRung ? (panelScenario ? 'panel lab' : 'lab') : entry.kind}</span>
+            <span>{hasRung ? (panelScenario ? 'guided lab' : 'lab') : entry.kind}</span>
           </div>
           <div className="row" style={{ gap: 7 }}>
             <BookmarkToggle id={entry.id} marked={marked} onToggle={toggleBookmark} />
@@ -98,7 +98,8 @@ export default function EntryPage() {
         )}
         {hasRung && panelScenario && (
           <p className="tiny muted" style={{ margin: '8px 0 0', maxWidth: '62ch' }}>
-            Guided panel scenario — use the soft panel with the scan sim. Teaching model only; not live field I/O.
+            This lab opens a practice panel next to the ladder. Flip the switches, then press Step.
+            Practice only — not real plant I/O.
           </p>
         )}
         {!hasRung && (
@@ -117,9 +118,9 @@ export default function EntryPage() {
           {tryThis.length > 0 && (
             <div className="try-block">
               <div className="row spread" style={{ marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
-                <b className="small" style={{ letterSpacing: '.04em', color: 'var(--ink-2)' }}>TRY THIS</b>
+                <b className="small" style={{ letterSpacing: '.04em', color: 'var(--ink-2)' }}>Try this</b>
                 {dockTags.length > 0 && (
-                  <span className="tiny muted">dock focus: {dockTags.join(' · ')}</span>
+                  <span className="tiny muted">Watch these on the panel: {dockTags.join(' · ')}</span>
                 )}
               </div>
               <ol className="try-steps">
@@ -127,9 +128,9 @@ export default function EntryPage() {
               </ol>
               {scanHint && (
                 <p className="scan-hint" role="note">
-                  <span className="scan-hint-label">Scan hint</span>
+                  <span className="scan-hint-label">What you should see</span>
                   {scanHint}
-                  <span className="tiny muted"> — teaching placeholder, not a grade.</span>
+                  <span className="tiny muted"> — a tip for practice, not a grade.</span>
                 </p>
               )}
             </div>

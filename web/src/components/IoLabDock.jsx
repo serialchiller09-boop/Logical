@@ -92,8 +92,8 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTag
   if (!panel.widgets.length) {
     return (
       <aside className="lab-dock card">
-        <div className="card-hd"><h3>Soft panel</h3><span className="hd-note">no I/O on this rung</span></div>
-        <div className="card-bd"><p className="small muted" style={{ margin: 0 }}>This entry has no declared I/O points for the dock.</p></div>
+        <div className="card-hd"><h3>Practice panel</h3><span className="hd-note">no switches on this rung</span></div>
+        <div className="card-bd"><p className="small muted" style={{ margin: 0 }}>This rung has no switches or lamps to show on the panel.</p></div>
       </aside>
     );
   }
@@ -104,10 +104,10 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTag
   const sandboxHref = `/io-sandbox?adopt=1&entry=${encodeURIComponent(entry?.id || '')}`;
 
   return (
-    <aside className="lab-dock card" aria-label="Soft I/O panel for this rung">
+    <aside className="lab-dock card" aria-label="Practice panel for this rung">
       <div className="card-hd">
-        <h3>Soft panel</h3>
-        <span className="hd-note">this rung’s I/O</span>
+        <h3>Practice panel</h3>
+        <span className="hd-note">this rung’s switches and lamps</span>
       </div>
       <div className="card-bd stack" style={{ gap: 10 }}>
         <div className="lab-dock-toolbar">

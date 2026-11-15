@@ -425,10 +425,10 @@ export function RungSimulator({ entry, compact = false }) {
           </span>
           <Link className="btn btn-sm" to={sandboxHref}>Open full I/O sandbox →</Link>
           {!dockVisible && (
-            <button type="button" className="btn btn-sm" onClick={() => changeDockLayout('side')}>Show soft panel</button>
+            <button type="button" className="btn btn-sm" onClick={() => changeDockLayout('side')}>Show practice panel</button>
           )}
           <span className="tiny muted">
-            Soft panel shares this browser’s tag bus with the scan sim. Teaching model only — not live field I/O.
+            The practice panel shares tags with the ladder in this browser. Practice only — not real plant I/O.
           </span>
         </div>
 
