@@ -189,7 +189,12 @@ const SCAN_STEPS = [
   { label: '30 s', v: 30000 }
 ];
 
-export function RungSimulator({ entry, compact = false }) {
+export function RungSimulator({
+  entry,
+  compact = false,
+  emphasizeTags: emphasizeTagsProp,
+  focusDockOnly = false
+}) {
   const [searchParams] = useSearchParams();
   const rungs = useMemo(() => subRungs(entry.payload, { includePurposeNote: !compact }), [entry, compact]);
   const ioMap = useMemo(() => {
@@ -197,10 +202,10 @@ export function RungSimulator({ entry, compact = false }) {
     for (const r of rungs) for (const p of r.io) if (p?.tag) m.set(p.tag, p);
     return m;
   }, [rungs]);
-  const emphasizeTags = useMemo(
-    () => (Array.isArray(entry?.payload?.dockTags) ? entry.payload.dockTags : []),
-    [entry]
-  );
+  const emphasizeTags = useMemo(() => {
+    if (Array.isArray(emphasizeTagsProp) && emphasizeTagsProp.length) return emphasizeTagsProp;
+    return Array.isArray(entry?.payload?.dockTags) ? entry.payload.dockTags : [];
+  }, [emphasizeTagsProp, entry]);
 
   const baseState = useMemo(() => {
     const all = [...ioMap.values()];
@@ -471,6 +476,7 @@ export function RungSimulator({ entry, compact = false }) {
           layout={dockLayout}
           onLayoutChange={changeDockLayout}
           emphasizeTags={emphasizeTags}
+          focusOnly={focusDockOnly}
         />
       )}
     </div>

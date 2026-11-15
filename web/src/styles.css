@@ -864,6 +864,14 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
 .controller-basis-card { margin-top: 12px !important; }
 
 /* ladder lab focus */
+.path-level-line {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
 .sim-goal-line {
   color: var(--accent);
   font-size: 16px;
@@ -873,6 +881,17 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   line-height: 1.35;
 }
 .try-block { margin: 0; }
+.try-step-current {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0c141d;
+  color: var(--ink);
+  font-size: 15.5px;
+  line-height: 1.45;
+  font-weight: 550;
+}
 .try-steps {
   margin: 0;
   padding: 12px 12px 12px 32px;

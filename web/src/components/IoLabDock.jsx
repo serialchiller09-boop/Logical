@@ -31,8 +31,9 @@ function tagsFromBus(panel, bus) {
 /**
  * Compact soft panel for a rung entry — generated from payload I/O, driven by the shared tag bus.
  * `emphasizeTags` (from scenario dockTags) highlights the inputs/lamps the try-this steps use.
+ * `focusOnly` keeps only those tags on the panel (path levels); full plate stays via sandbox link.
  */
-export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTags = [] }) {
+export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTags = [], focusOnly = false }) {
   const focus = useMemo(() => new Set(emphasizeTags.filter(Boolean)), [emphasizeTags]);
   const linked = useMemo(() => ({
     entryId: entry?.id,
@@ -98,16 +99,18 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTag
     );
   }
 
-  const inputs = panel.widgets.filter((w) => w.type === 'switch' || w.type === 'pb');
-  const leds = panel.widgets.filter((w) => w.type === 'led');
-  const pots = panel.widgets.filter((w) => w.type === 'pot');
+  const visible = (w) => !focusOnly || focus.size === 0 || focus.has(w.tag);
+  const inputs = panel.widgets.filter((w) => (w.type === 'switch' || w.type === 'pb') && visible(w));
+  const leds = panel.widgets.filter((w) => w.type === 'led' && visible(w));
+  const pots = panel.widgets.filter((w) => w.type === 'pot' && visible(w));
   const sandboxHref = `/io-sandbox?adopt=1&entry=${encodeURIComponent(entry?.id || '')}`;
+  const filtered = focusOnly && focus.size > 0;
 
   return (
     <aside className="lab-dock card" aria-label="Practice panel for this rung">
       <div className="card-hd">
         <h3>Practice panel</h3>
-        <span className="hd-note">this rung’s switches and lamps</span>
+        <span className="hd-note">{filtered ? 'tags for this step' : 'this rung’s switches and lamps'}</span>
       </div>
       <div className="card-bd stack" style={{ gap: 10 }}>
         <div className="lab-dock-toolbar">
