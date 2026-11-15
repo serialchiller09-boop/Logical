@@ -38,7 +38,7 @@ export default function Home() {
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-hd">
           <h3>Practice labs</h3>
-          <span className="hd-note">four starters · panel opens beside the ladder</span>
+          <span className="hd-note">guided labs · panel opens beside the ladder</span>
         </div>
         <div className="card-bd">
           <p className="tiny muted" style={{ margin: '0 0 10px' }}>
@@ -49,7 +49,7 @@ export default function Home() {
           <div className="rung-lab-grid">
             {panelScenarios.map((s) => (
               <Link key={s.entryId} to={panelScenarioHref(s.entryId)} className="rung-lab-card rung-lab-card-panel">
-                <span className="rung-lab-kicker">{s.cardTitle}</span>
+                <span className="rung-lab-kicker">{s.levelTitle || s.cardTitle}</span>
                 <span className="rung-lab-title">{s.entry.title}</span>
                 <span className="rung-lab-goal">{s.entry.subtitle}</span>
                 <span className="rung-lab-go">open with panel →</span>
