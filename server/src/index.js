@@ -5,16 +5,38 @@ import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDb, seed, DB_PATH } from './db.js';
 import { router as referenceRouter } from './routes/reference.js';
-import { stateRouter, adminRouter } from './routes/userState.js';
+import { stateRouter, adminRouter, resolveAdminAuth } from './routes/userState.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '0.0.0.0';
 const WEB_DIST = resolve(__dirname, '..', '..', 'web', 'dist');
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const app = express();
 app.disable('x-powered-by');
-app.use(cors());
+
+/* Same-origin by default. Cross-origin callers must be listed in CORS_ORIGINS
+ * (comma-separated). credentials:true so an allowlisted UI can send the session cookie. */
+const corsAllowlist = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Non-browser / same-origin proxied calls often omit Origin.
+    if (!origin) return callback(null, true);
+    if (corsAllowlist.includes('*') || corsAllowlist.includes(origin)) {
+      return callback(null, true);
+    }
+    // No Access-Control-Allow-Origin → browser blocks cross-origin reads.
+    // Same-origin SPA traffic does not need the header.
+    return callback(null, false);
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: '2mb' }));
 
 getDb();
@@ -25,8 +47,6 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     service: 'logical-reference-api',
     version: '1.0.0',
-    db: DB_PATH,
-    node: process.version,
     time: new Date().toISOString()
   });
 });
@@ -34,6 +54,13 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', referenceRouter);
 app.use('/api', stateRouter);
 app.use('/api', adminRouter);
+
+/* Test-only route to exercise the 500 handler without polluting product APIs. */
+if (process.env.LOGICAL_TEST_ROUTES === '1') {
+  app.get('/api/__test/boom', () => {
+    throw new Error('secret-leak-should-not-reach-client');
+  });
+}
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route' }));
 
@@ -84,11 +111,23 @@ app.use((req, res, next) => {
 
 app.use((err, _req, res, _next) => {
   console.error('[api]', err);
-  res.status(500).json({ error: 'Internal error', detail: String(err?.message ?? err) });
+  const body = { error: 'Internal error' };
+  if (!IS_PROD) {
+    body.detail = String(err?.message ?? err);
+  }
+  res.status(500).json(body);
 });
 
+const adminAuth = resolveAdminAuth();
 app.listen(PORT, HOST, () => {
   console.log(`\n  Logical API  ->  http://${HOST}:${PORT}`);
   console.log(`  sqlite       ->  ${DB_PATH}`);
-  console.log(`  admin token  ->  ${process.env.ADMIN_TOKEN ? 'from ADMIN_TOKEN env' : 'ADMIN_TOKEN not set (using default "logical-admin")'}\n`);
+  if (adminAuth.source === 'env') {
+    console.log('  admin token  ->  from ADMIN_TOKEN env');
+  } else if (adminAuth.source === 'dev-default') {
+    console.log('  admin token  ->  ADMIN_TOKEN not set (using development default "logical-admin")');
+  } else {
+    console.log('  admin        ->  DISABLED in production until ADMIN_TOKEN is set');
+  }
+  console.log('');
 });

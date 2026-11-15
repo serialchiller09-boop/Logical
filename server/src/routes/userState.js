@@ -1,32 +1,44 @@
 import { Router } from 'express';
 import { all, get, run, hydrate } from '../db.js';
+import { attachSession } from '../lib/session.js';
 
-/* ------------------------------------------------- personal state: bookmarks, notes, recents */
+/* ------------------------------------------------- personal state: bookmarks, notes, recents
+ * Scoped per anonymous browser session (httpOnly cookie). See server/src/lib/session.js. */
 export const stateRouter = Router();
 
-stateRouter.get('/state', (_req, res) => {
+stateRouter.use((req, res, next) => {
+  attachSession(req, res);
+  next();
+});
+
+stateRouter.get('/state', (req, res) => {
+  const sid = req.sessionId;
   res.json({
-    bookmarks: all('SELECT entry_id, created_at FROM bookmarks ORDER BY created_at DESC').map(hydrate),
-    notes: all('SELECT entry_id, body, updated_at FROM notes ORDER BY updated_at DESC').map(hydrate),
-    recents: all('SELECT entry_id, viewed_at, views FROM recents ORDER BY viewed_at DESC LIMIT 20').map(hydrate)
+    bookmarks: all('SELECT entry_id, created_at FROM bookmarks WHERE session_id = ? ORDER BY created_at DESC', [sid]).map(hydrate),
+    notes: all('SELECT entry_id, body, updated_at FROM notes WHERE session_id = ? ORDER BY updated_at DESC', [sid]).map(hydrate),
+    recents: all('SELECT entry_id, viewed_at, views FROM recents WHERE session_id = ? ORDER BY viewed_at DESC LIMIT 20', [sid]).map(hydrate)
   });
 });
 
-const bookmarkIds = () => all('SELECT entry_id FROM bookmarks ORDER BY created_at DESC').map((r) => r.entry_id);
+const bookmarkIds = (sid) => all('SELECT entry_id FROM bookmarks WHERE session_id = ? ORDER BY created_at DESC', [sid]).map((r) => r.entry_id);
 
-stateRouter.get('/bookmarks', (_req, res) => {
+stateRouter.get('/bookmarks', (req, res) => {
+  const sid = req.sessionId;
   const rows = all(`
     SELECT e.id, e.section, e.kind, e.title, e.subtitle, e.status, e.tags, e.edited, b.created_at AS saved_at
     FROM bookmarks b JOIN entries e ON e.id = b.entry_id
-    ORDER BY b.created_at DESC`);
-  res.json({ entries: rows.map(hydrate), ids: bookmarkIds() });
+    WHERE b.session_id = ?
+    ORDER BY b.created_at DESC`, [sid]);
+  res.json({ entries: rows.map(hydrate), ids: bookmarkIds(sid) });
 });
 
-stateRouter.get('/recents', (_req, res) => {
+stateRouter.get('/recents', (req, res) => {
+  const sid = req.sessionId;
   const rows = all(`
     SELECT e.id, e.section, e.kind, e.title, e.subtitle, e.status, r.viewed_at, r.views
     FROM recents r JOIN entries e ON e.id = r.entry_id
-    ORDER BY r.viewed_at DESC LIMIT 24`);
+    WHERE r.session_id = ?
+    ORDER BY r.viewed_at DESC LIMIT 24`, [sid]);
   res.json({ entries: rows.map(hydrate) });
 });
 
@@ -34,17 +46,18 @@ stateRouter.put('/bookmarks/:id', (req, res) => {
   if (!get('SELECT id FROM entries WHERE id = ?', [req.params.id])) {
     return res.status(404).json({ error: 'Unknown entry' });
   }
-  run('INSERT OR IGNORE INTO bookmarks (entry_id) VALUES (?)', [req.params.id]);
-  res.json({ ok: true, bookmarked: true, id: req.params.id, ids: bookmarkIds() });
+  run('INSERT OR IGNORE INTO bookmarks (session_id, entry_id) VALUES (?, ?)', [req.sessionId, req.params.id]);
+  res.json({ ok: true, bookmarked: true, id: req.params.id, ids: bookmarkIds(req.sessionId) });
 });
 
 stateRouter.delete('/bookmarks/:id', (req, res) => {
-  run('DELETE FROM bookmarks WHERE entry_id = ?', [req.params.id]);
-  res.json({ ok: true, bookmarked: false, id: req.params.id, ids: bookmarkIds() });
+  run('DELETE FROM bookmarks WHERE session_id = ? AND entry_id = ?', [req.sessionId, req.params.id]);
+  res.json({ ok: true, bookmarked: false, id: req.params.id, ids: bookmarkIds(req.sessionId) });
 });
 
 stateRouter.get('/notes/:id', (req, res) => {
-  res.json(get('SELECT entry_id, body, updated_at FROM notes WHERE entry_id = ?', [req.params.id]) ?? { entry_id: req.params.id, body: '' });
+  res.json(get('SELECT entry_id, body, updated_at FROM notes WHERE session_id = ? AND entry_id = ?', [req.sessionId, req.params.id])
+    ?? { entry_id: req.params.id, body: '' });
 });
 
 stateRouter.put('/notes/:id', (req, res) => {
@@ -53,27 +66,32 @@ stateRouter.put('/notes/:id', (req, res) => {
     return res.status(404).json({ error: 'Unknown entry' });
   }
   if (!body.trim()) {
-    run('DELETE FROM notes WHERE entry_id = ?', [req.params.id]);
+    run('DELETE FROM notes WHERE session_id = ? AND entry_id = ?', [req.sessionId, req.params.id]);
     return res.json({ ok: true, cleared: true });
   }
-  run(`INSERT INTO notes (entry_id, body, updated_at) VALUES (?, ?, datetime('now'))
-       ON CONFLICT(entry_id) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`,
-    [req.params.id, body]);
-  res.json({ ok: true, entry_id: req.params.id, body, updated_at: get('SELECT updated_at FROM notes WHERE entry_id = ?', [req.params.id]).updated_at });
+  run(`INSERT INTO notes (session_id, entry_id, body, updated_at) VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(session_id, entry_id) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`,
+    [req.sessionId, req.params.id, body]);
+  res.json({
+    ok: true,
+    entry_id: req.params.id,
+    body,
+    updated_at: get('SELECT updated_at FROM notes WHERE session_id = ? AND entry_id = ?', [req.sessionId, req.params.id]).updated_at
+  });
 });
 
 stateRouter.post('/recents/:id', (req, res) => {
   if (!get('SELECT id FROM entries WHERE id = ?', [req.params.id])) {
     return res.status(404).json({ error: 'Unknown entry' });
   }
-  run(`INSERT INTO recents (entry_id, viewed_at, views) VALUES (?, datetime('now'), 1)
-       ON CONFLICT(entry_id) DO UPDATE SET viewed_at = datetime('now'), views = views + 1`,
-    [req.params.id]);
+  run(`INSERT INTO recents (session_id, entry_id, viewed_at, views) VALUES (?, ?, datetime('now'), 1)
+       ON CONFLICT(session_id, entry_id) DO UPDATE SET viewed_at = datetime('now'), views = views + 1`,
+    [req.sessionId, req.params.id]);
   res.json({ ok: true });
 });
 
-stateRouter.delete('/recents', (_req, res) => {
-  run('DELETE FROM recents');
+stateRouter.delete('/recents', (req, res) => {
+  run('DELETE FROM recents WHERE session_id = ?', [req.sessionId]);
   res.json({ ok: true });
 });
 
@@ -82,10 +100,29 @@ export const adminRouter = Router();
 
 const EDITABLE = ['title', 'subtitle', 'body', 'status', 'kind', 'section'];
 
+/** Production refuses the development default. Dev keeps `logical-admin` when unset. */
+export function resolveAdminAuth() {
+  const configured = process.env.ADMIN_TOKEN;
+  const isProd = process.env.NODE_ENV === 'production';
+  if (configured) {
+    return { enabled: true, token: configured, source: 'env' };
+  }
+  if (isProd) {
+    return { enabled: false, token: null, source: 'disabled' };
+  }
+  return { enabled: true, token: 'logical-admin', source: 'dev-default' };
+}
+
 function requireAdmin(req, res, next) {
-  const expected = process.env.ADMIN_TOKEN || 'logical-admin';
+  const auth = resolveAdminAuth();
+  if (!auth.enabled) {
+    return res.status(503).json({
+      error: 'Admin disabled',
+      hint: 'Set ADMIN_TOKEN in the server environment to enable plant-data admin routes in production. See docs/ADMIN.md.'
+    });
+  }
   const given = req.header('x-admin-token');
-  if (!given || given !== expected) {
+  if (!given || given !== auth.token) {
     return res.status(401).json({
       error: 'Admin token required',
       hint: "Set ADMIN_TOKEN for the server process and send it as the 'x-admin-token' header. See docs/ADMIN.md."

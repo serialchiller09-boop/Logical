@@ -12,7 +12,8 @@ export default defineConfig({
     allowedHosts: true,
     hmr: { host: '0.0.0.0' },
     proxy: {
-      '/api': { target: API, changeOrigin: true, ws: false }
+      // Forward Set-Cookie from the API so the anonymous session cookie sticks in dev.
+      '/api': { target: API, changeOrigin: true, ws: false, cookieDomainRewrite: '' }
     }
   },
   build: { outDir: 'dist', sourcemap: false, target: 'es2022' },

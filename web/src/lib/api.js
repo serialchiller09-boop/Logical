@@ -3,7 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const BASE = import.meta.env.DEV ? '' : '';
 
 async function req(path, opts = {}) {
-  const res = await fetch(BASE + path, { headers: { 'content-type': 'application/json', ...(opts.headers || {}) }, ...opts });
+  // include so a CORS_ORIGINS allowlisted UI can send the httpOnly session cookie;
+  // same-origin (Express SPA / Vite proxy) already stores the cookie either way.
+  const res = await fetch(BASE + path, {
+    ...opts,
+    credentials: opts.credentials ?? 'include',
+    headers: { 'content-type': 'application/json', ...(opts.headers || {}) }
+  });
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }

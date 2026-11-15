@@ -54,6 +54,26 @@ async function stopServer(child) {
   await exited;
 }
 
+/** Keep logical_sid across Node fetch calls (browsers do this automatically). */
+function jar() {
+  let cookie = '';
+  return {
+    async fetch(url, opts = {}) {
+      const headers = { ...(opts.headers || {}) };
+      if (cookie) headers.cookie = cookie;
+      const res = await fetch(url, { ...opts, headers });
+      const setCookies = typeof res.headers.getSetCookie === 'function'
+        ? res.headers.getSetCookie()
+        : (res.headers.get('set-cookie') ? [res.headers.get('set-cookie')] : []);
+      for (const raw of setCookies) {
+        const pair = String(raw).split(';')[0];
+        if (pair.toLowerCase().startsWith('logical_sid=')) cookie = pair;
+      }
+      return res;
+    }
+  };
+}
+
 test('production serves the PDF correctly and a restart preserves existing saved data', {
   skip: !existsSync(builtPdf) && 'Build the web app first to exercise production assets.',
   timeout: 30000
@@ -88,16 +108,17 @@ test('production serves the PDF correctly and a restart preserves existing saved
     const entry = (await (await fetch(base + '/api/entries?limit=1')).json()).entries[0];
     assert.ok(entry?.id);
     const encodedId = encodeURIComponent(entry.id);
-    assert.equal((await fetch(`${base}/api/bookmarks/${encodedId}`, { method: 'PUT' })).status, 200);
+    const session = jar();
+    assert.equal((await session.fetch(`${base}/api/bookmarks/${encodedId}`, { method: 'PUT' })).status, 200);
     const note = 'Notebook deployment regression check';
-    assert.equal((await fetch(`${base}/api/notes/${encodedId}`, {
+    assert.equal((await session.fetch(`${base}/api/notes/${encodedId}`, {
       method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: note })
     })).status, 200);
 
     await stopServer(server);
     server = await startServer(port, dataDir);
-    assert.ok((await (await fetch(base + '/api/bookmarks')).json()).ids.includes(entry.id));
-    assert.equal((await (await fetch(`${base}/api/notes/${encodedId}`)).json()).body, note);
+    assert.ok((await (await session.fetch(base + '/api/bookmarks')).json()).ids.includes(entry.id));
+    assert.equal((await (await session.fetch(`${base}/api/notes/${encodedId}`)).json()).body, note);
   } finally {
     await stopServer(server);
     rmSync(dataDir, { recursive: true, force: true });
