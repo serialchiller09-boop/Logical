@@ -46,7 +46,8 @@ async function startServer(env = {}) {
       const timeout = setTimeout(() => reject(new Error(`Server startup timed out: ${log}`)), 20000);
       child.stdout.on('data', (chunk) => {
         log += chunk;
-        if (log.includes('Logical API')) {
+        // Wait for the admin boot line too — "Logical API" can arrive in an earlier chunk.
+        if (/admin/i.test(log) && log.includes('Logical API')) {
           clearTimeout(timeout);
           resolve();
         }
@@ -189,7 +190,7 @@ describe('3. ADMIN_TOKEN production guard', () => {
         const timeout = setTimeout(() => reject(new Error(`startup: ${log}`)), 20000);
         child.stdout.on('data', (chunk) => {
           log += chunk;
-          if (log.includes('Logical API')) {
+          if (/DISABLED/i.test(log)) {
             clearTimeout(timeout);
             resolve();
           }
@@ -239,7 +240,7 @@ describe('3. ADMIN_TOKEN production guard', () => {
         const timeout = setTimeout(() => reject(new Error(`startup: ${log}`)), 20000);
         child.stdout.on('data', (chunk) => {
           log += chunk;
-          if (log.includes('Logical API')) {
+          if (/admin/i.test(log) && log.includes('Logical API')) {
             clearTimeout(timeout);
             resolve();
           }
