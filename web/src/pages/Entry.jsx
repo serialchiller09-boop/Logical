@@ -84,9 +84,9 @@ export default function EntryPage() {
           <div className="row" style={{ gap: 7 }}>
             <BookmarkToggle id={entry.id} marked={marked} onToggle={toggleBookmark} />
             <button className="btn btn-sm btn-ghost" onClick={() => window.print()}>⎙ print</button>
-            {!hasRung && (
-              <Link className="btn btn-sm btn-ghost" to={`/admin?entry=${encodeURIComponent(entry.id)}`}>✎ record plant answer</Link>
-            )}
+            <Link className="btn btn-sm btn-ghost" to={`/admin?entry=${encodeURIComponent(entry.id)}`}>
+              {hasRung ? '✎ edit lab wording' : '✎ record plant answer'}
+            </Link>
           </div>
         </div>
 
@@ -119,9 +119,12 @@ export default function EntryPage() {
             <div className="try-block">
               <div className="row spread" style={{ marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
                 <b className="small" style={{ letterSpacing: '.04em', color: 'var(--ink-2)' }}>Try this</b>
-                {dockTags.length > 0 && (
-                  <span className="tiny muted">Watch these on the panel: {dockTags.join(' · ')}</span>
-                )}
+                <span className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                  {dockTags.length > 0 && (
+                    <span className="tiny muted">Watch these on the panel: {dockTags.join(' · ')}</span>
+                  )}
+                  <Link className="tiny" to={`/admin?entry=${encodeURIComponent(entry.id)}`}>edit wording</Link>
+                </span>
               </div>
               <ol className="try-steps">
                 {tryThis.map((step, i) => <li key={i}>{step}</li>)}

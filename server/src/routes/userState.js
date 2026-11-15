@@ -122,10 +122,31 @@ adminRouter.put('/admin/entries/:id', (req, res) => {
   fields.push('edited = 1', "updated_at = datetime('now')");
   run(`UPDATE entries SET ${fields.join(', ')} WHERE id = ?`, [...params, req.params.id]);
 
-  // a note in the payload marks WHY the plant differs from the generic reference
+  // Merge teaching / plant fields into payload without wiping ladder/io.
+  const payload = safeJson(
+    get('SELECT payload FROM entries WHERE id = ?', [req.params.id])?.payload ?? existing.payload,
+    {}
+  );
+  let payloadTouched = false;
   if (typeof patch.plantNote === 'string') {
-    const payload = safeJson(existing.payload, {});
     payload.plantNote = patch.plantNote;
+    payloadTouched = true;
+  }
+  if (typeof patch.goal === 'string') {
+    payload.goal = patch.goal;
+    payloadTouched = true;
+  }
+  if ('tryThis' in patch) {
+    payload.tryThis = Array.isArray(patch.tryThis)
+      ? patch.tryThis.map((s) => String(s)).filter((s) => s.trim())
+      : String(patch.tryThis || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    payloadTouched = true;
+  }
+  if (typeof patch.scanHint === 'string') {
+    payload.scanHint = patch.scanHint;
+    payloadTouched = true;
+  }
+  if (payloadTouched) {
     run('UPDATE entries SET payload = ? WHERE id = ?', [JSON.stringify(payload), req.params.id]);
   }
   res.json({ ok: true, entry: hydrate(get('SELECT * FROM entries WHERE id = ?', [req.params.id])) });

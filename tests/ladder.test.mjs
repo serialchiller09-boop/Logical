@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  analyze, layout, initialState, collectElements, presetMs, resolveOperand, evalExpr
+  analyze, layout, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText
 } from '../web/src/lib/ladder.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
 import { RUNGS2 } from '../server/src/seed/data/rungs2.js';
@@ -262,4 +262,18 @@ test('diagram dry-run does not mutate the scan state', () => {
   assert.deepEqual(st, before, 'live:false must be a pure read');
   assert.equal(res.writes.length, 0);
   assert.equal(res.map.size >= collectElements(r.ladder).length, true);
+});
+
+test('block pin values stay short enough to fit inside the TON box', () => {
+  assert.equal(fitPinText('site PRE'), 'site PRE');
+  assert.equal(fitPinText('PLACEHOLDER - manufacturer / approved procedure', 16).endsWith('…'), true);
+  assert.ok(fitPinText('PLACEHOLDER - manufacturer / approved procedure', 16).length <= 16);
+
+  const cap = byId['rung-cap-close'];
+  const pins = collectElements(cap.dischargeRung.ladder)
+    .filter((el) => el.t === 'blk')
+    .flatMap((el) => el.p || []);
+  for (const p of pins) {
+    assert.ok(String(p.v).length <= 18, `cap-bank pin ${p.k}=${p.v} is too long for the box`);
+  }
 });

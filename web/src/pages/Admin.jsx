@@ -173,13 +173,23 @@ function Editor({ id, sections, onDone, setDiff, diff }) {
 
   useEffect(() => {
     if (isNew) {
-      setForm({ title: '', subtitle: '', body: '', status: 'site-specific', kind: 'plant-entry', section: sections[0]?.slug || '', tags: '', plantNote: '' });
+      setForm({
+        title: '', subtitle: '', body: '', status: 'site-specific', kind: 'plant-entry',
+        section: sections[0]?.slug || '', tags: '', plantNote: '',
+        goal: '', tryThis: '', scanHint: '', hasLabCopy: false
+      });
     } else if (data?.entry) {
       const e = data.entry;
+      const p = e.payload || {};
+      const hasLabCopy = !!(p.ladder || p.tryThis || p.goal || p.scanHint);
       setForm({
         title: e.title || '', subtitle: e.subtitle || '', body: e.body || '', status: e.status || 'practice',
         kind: e.kind || '', section: e.section || '', tags: (e.tags || []).join(', '),
-        plantNote: e.payload?.plantNote || ''
+        plantNote: p.plantNote || '',
+        goal: typeof p.goal === 'string' ? p.goal : '',
+        tryThis: Array.isArray(p.tryThis) ? p.tryThis.join('\n') : '',
+        scanHint: typeof p.scanHint === 'string' ? p.scanHint : '',
+        hasLabCopy
       });
     }
   }, [data, isNew, sections]);
@@ -203,6 +213,11 @@ function Editor({ id, sections, onDone, setDiff, diff }) {
       tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
       plantNote: form.plantNote
     };
+    if (form.hasLabCopy || form.goal || form.tryThis || form.scanHint) {
+      patch.goal = form.goal;
+      patch.tryThis = form.tryThis;
+      patch.scanHint = form.scanHint;
+    }
     try {
       if (isNew) await api.admin.create(patch);
       else await api.admin.update(id, patch);
@@ -261,6 +276,25 @@ function Editor({ id, sections, onDone, setDiff, diff }) {
         <label className="field"><span className="label">Plant note (stored on the entry, shown under a warning box)</span>
           <textarea className="note-area" style={{ minHeight: 70 }} value={form.plantNote ?? ''} onChange={set('plantNote')}
             placeholder="Deviation from the generic reference, with the document and revision it comes from." /></label>
+
+        {(form.hasLabCopy || form.goal || form.tryThis || form.scanHint) && (
+          <div className="stack" style={{ gap: 10, padding: 12, border: '1px solid var(--line)', borderRadius: 8, background: 'var(--panel-2)' }}>
+            <div className="mini" style={{ margin: 0 }}>Ladder lab wording (edit without an agent)</div>
+            <p className="tiny muted" style={{ margin: 0 }}>
+              Changes save on this entry in plant data. Shipped defaults also live in{' '}
+              <span className="mono">server/src/seed/data/rungGoals.js</span> if you prefer editing in git.
+            </p>
+            <label className="field"><span className="label">Goal (one line above the ladder)</span>
+              <input className="search-input" value={form.goal ?? ''} onChange={set('goal')}
+                placeholder="What the student should accomplish" /></label>
+            <label className="field"><span className="label">Try this (one step per line)</span>
+              <textarea className="note-area" style={{ minHeight: 110 }} value={form.tryThis ?? ''} onChange={set('tryThis')}
+                placeholder={"Flip the start switch\nPress Step once\nWatch the run lamp"} /></label>
+            <label className="field"><span className="label">What you should see (optional tip)</span>
+              <textarea className="note-area" style={{ minHeight: 70 }} value={form.scanHint ?? ''} onChange={set('scanHint')}
+                placeholder="Short tip after they try the steps" /></label>
+          </div>
+        )}
 
         <div className="row spread" style={{ flexWrap: 'wrap', gap: 8 }}>
           <div className="row">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { GEO, layout, analyze, initialState, collectElements, collectRefs } from '../lib/ladder.js';
+import { GEO, layout, analyze, initialState, collectElements, collectRefs, fitPinText } from '../lib/ladder.js';
 import {
   applyBusToBitsValues,
   isCouplingEnabled,
@@ -108,20 +108,36 @@ function Block({ it, hot }) {
   const boxY = y + (GEO.rowH - bh) / 2;
   const mid = y + GEO.rowH / 2;
   const rowLimit = 6;
+  const innerX = x + 6;
+  const innerW = w - 12;
+  const valueMax = Math.max(8, Math.floor((innerW - 48) / 7));
+  const clipId = `ld-blk-${Math.round(x)}-${Math.round(y)}-${it.node.a || it.node.k || 'x'}`;
   return (
     <g>
+      <defs>
+        <clipPath id={clipId}>
+          <rect x={innerX} y={boxY} width={innerW} height={bh} rx={5} />
+        </clipPath>
+      </defs>
       <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={x} y1={mid} x2={x + 6} y2={mid} />
       <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={x + w - 6} y1={mid} x2={x + w} y2={mid} />
-      <rect className={`ld-box ${hot ? 'hot' : ''} ${it.node._unresolved ? 'unresolved' : ''}`} x={x + 6} y={boxY} width={w - 12} height={bh} rx={5} />
+      <rect className={`ld-box ${hot ? 'hot' : ''} ${it.node._unresolved ? 'unresolved' : ''}`} x={innerX} y={boxY} width={innerW} height={bh} rx={5} />
       <text className="ld-title" x={x + w / 2} y={boxY + 15} textAnchor="middle">{it.node.k}{it.node.a ? ` ${it.node.a}` : ''}</text>
-      {rows.slice(0, rowLimit).map((p, i) => (
-        <g key={i}>
-          <text className="ld-pin" x={x + 13} y={boxY + 32 + i * 19}>{p.k}</text>
-          <text className="ld-pin-v" x={x + w - 13} y={boxY + 32 + i * 19} textAnchor="end">
-            {p._live != null ? p._live : String(p.v ?? '')}
-          </text>
-        </g>
-      ))}
+      <g clipPath={`url(#${clipId})`}>
+        {rows.slice(0, rowLimit).map((p, i) => {
+          const shown = p._live != null ? p._live : fitPinText(p.v, valueMax);
+          const full = p._live != null ? String(p._live) : String(p.v ?? '');
+          return (
+            <g key={i}>
+              <text className="ld-pin" x={x + 13} y={boxY + 32 + i * 19}>{p.k}</text>
+              <text className="ld-pin-v" x={x + w - 13} y={boxY + 32 + i * 19} textAnchor="end">
+                <title>{full}</title>
+                {shown}
+              </text>
+            </g>
+          );
+        })}
+      </g>
       {rows.length > rowLimit && <text className="ld-legend" x={x + w / 2} y={boxY + bh - 5} textAnchor="middle">+{rows.length - rowLimit} more</text>}
       {it.node.l && <text className="ld-label" x={x + w / 2} y={boxY + bh + 13} textAnchor="middle">{it.node.l}</text>}
     </g>

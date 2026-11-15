@@ -123,8 +123,8 @@ export async function seed({ force = false } = {}) {
   const existing = d.prepare('SELECT COUNT(*) AS n FROM entries').get().n;
   const meta = d.prepare("SELECT v FROM seed_meta WHERE k = 'version'").get();
   // Bump when reference payload shape changes so persistent deploys re-apply seed
-  // (edited plant rows stay preserved). v3: plain-language try-this / panel lab copy.
-  const version = '3';
+  // (edited plant rows stay preserved). v4: short TON PRE labels (no overflow copy).
+  const version = '4';
 
   if (!force && existing > 0 && meta?.v === version) {
     return { skipped: true, entries: existing };
