@@ -1,7 +1,7 @@
 /**
- * Guided “Try with panel” scenario pack (Phase E1).
+ * Guided practice-panel labs (Phase E1).
  *
- * Pins the classroom labs that deep-link into rung entries with the soft-panel dock.
+ * Pins the classroom labs that deep-link into rung entries with the practice-panel dock.
  * Checklist / goal / scan hints live on RUNG_GOALS for the same rung ids — one source for
  * Entry chrome and Home cards (no second tutorial system).
  */
@@ -11,28 +11,28 @@ export const GUIDED_PANEL_SCENARIOS = [
     cardTitle: 'Seal-in',
     order: 1,
     dockTags: ['HMI_START', 'HMI_STOP', 'COMMON_TRIP', 'LOP_RUN'],
-    scanHint: 'After Start goes off, one more Step should still leave LOP_RUN on — that hold is the seal.'
+    scanHint: 'After you turn Start off, press Step once more. LOP_RUN should still be on — that hold path is the seal-in.'
   },
   {
     rungId: 'rung-latch-ack',
-    cardTitle: 'Latch / ack',
+    cardTitle: 'Latch and acknowledge',
     order: 2,
     dockTags: ['LSP_PSL', 'ACK_BTN', 'TRIP_LAT'],
-    scanHint: 'Clearing the cause alone is not enough — TRIP_LAT should stay set until Ack with cause clear.'
+    scanHint: 'Turning the cause off by itself is not enough. TRIP_LAT stays on until you press Ack while the cause is already clear.'
   },
   {
     rungId: 'rung-2oo3',
-    cardTitle: '2oo3 voting',
+    cardTitle: 'Two-out-of-three voting',
     order: 3,
     dockTags: ['LSHH_A', 'LSHH_B', 'LSHH_C', 'TRIP_VOTE'],
-    scanHint: 'One high transmitter alone should not trip; any second high should set TRIP_VOTE after Step.'
+    scanHint: 'With only one high-level switch on, TRIP_VOTE should stay off. After a second switch is on, press Step and TRIP_VOTE should turn on.'
   },
   {
     rungId: 'rung-ton-lockout',
     cardTitle: 'Timer lockout',
     order: 4,
     dockTags: ['TRIP_LAT', 'RESTART_BLOCK'],
-    scanHint: 'With the trip held, Auto-scan until the lockout finishes — RESTART_BLOCK should release when .DN is true.'
+    scanHint: 'Leave the trip on and use Auto-scan until the lockout timer finishes. When the timer DN is true, RESTART_BLOCK should turn off.'
   }
 ];
 

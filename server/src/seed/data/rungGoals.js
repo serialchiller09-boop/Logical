@@ -23,31 +23,31 @@ function withScenario(rungId, lab) {
 
 export const RUNG_GOALS = {
   'rung-seal-in': withScenario('rung-seal-in', {
-    goal: 'Start the pump, release Start — it should keep running until you stop it.',
+    goal: 'Start the pump, then turn Start off. The pump should keep running until you stop it.',
     tryThis: [
-      'Turn HMI_START on → Step scan → turn Start off → Step again (pump stays on).',
-      'Flip HMI_STOP or COMMON_TRIP → Step (pump drops out).'
+      'Turn on HMI_START. Press Step. Turn HMI_START off. Press Step again. The pump lamp (LOP_RUN) should stay on.',
+      'Turn on HMI_STOP or COMMON_TRIP. Press Step. The pump should turn off.'
     ]
   }),
   'rung-latch-ack': withScenario('rung-latch-ack', {
-    goal: 'Trip sticks after the cause clears — only Ack + clear cause resets it.',
+    goal: 'When something trips, the trip stays on even after the cause clears. Clear the cause and press Ack to reset it.',
     tryThis: [
-      'Set LSP_PSL to trip → Step (TRIP_LAT latches).',
-      'Clear the cause, press ACK_BTN → Step (latch clears only then).'
+      'Turn on LSP_PSL (the trip cause). Press Step. TRIP_LAT should turn on and stay on.',
+      'Turn LSP_PSL off, then turn on ACK_BTN. Press Step. TRIP_LAT should clear only after both of those.'
     ]
   }),
   'rung-2oo3': withScenario('rung-2oo3', {
-    goal: 'Need any two transmitters high before the trip — one alone is not enough.',
+    goal: 'Two of the three high-level switches must be on before the trip turns on. One alone is not enough.',
     tryThis: [
-      'Force only one LSHH_* on → Step (no trip).',
-      'Force a second one on → Step (vote trips).'
+      'Turn on only one high-level switch (LSHH_A, LSHH_B, or LSHH_C). Press Step. The trip should stay off.',
+      'Turn on a second high-level switch. Press Step. Now the trip should turn on (two out of three).'
     ]
   }),
   'rung-ton-lockout': withScenario('rung-ton-lockout', {
-    goal: 'After a trip, wait out the lockout before restart is allowed.',
+    goal: 'After a trip, wait for the lockout timer to finish before a restart is allowed.',
     tryThis: [
-      'Assert TRIP_LAT → Auto-scan until the timer DN lights.',
-      'Clear the trip mid-wait → lockout should drop.'
+      'Turn on TRIP_LAT. Press Auto-scan and wait until the timer finishes (DN lights). RESTART_BLOCK should then clear.',
+      'While the timer is still running, turn TRIP_LAT off. The lockout should drop right away.'
     ]
   }),
   'rung-tof-cooldown': {
