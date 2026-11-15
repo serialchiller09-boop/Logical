@@ -2,36 +2,54 @@
  * Short, action-first copy for the ladder lab.
  * Kept separate from the long teaching prose on each rung so the UI can
  * lead with a goal without rewriting every purpose paragraph.
+ *
+ * Guided panel scenarios (Phase E1) add panelScenario / dockTags / scanHint via
+ * scenarioPacks.js — merged in seed/index.js so Entry and Home share one payload.
  */
+import { SCENARIO_BY_RUNG } from './scenarioPacks.js';
+
+function withScenario(rungId, lab) {
+  const s = SCENARIO_BY_RUNG[rungId];
+  if (!s) return lab;
+  return {
+    ...lab,
+    panelScenario: true,
+    scenarioOrder: s.order,
+    scenarioCard: s.cardTitle,
+    dockTags: s.dockTags,
+    scanHint: s.scanHint
+  };
+}
+
 export const RUNG_GOALS = {
-  'rung-seal-in': {
+  'rung-seal-in': withScenario('rung-seal-in', {
     goal: 'Start the pump, release Start — it should keep running until you stop it.',
     tryThis: [
       'Turn HMI_START on → Step scan → turn Start off → Step again (pump stays on).',
       'Flip HMI_STOP or COMMON_TRIP → Step (pump drops out).'
     ]
-  },
-  'rung-latch-ack': {
+  }),
+  'rung-latch-ack': withScenario('rung-latch-ack', {
     goal: 'Trip sticks after the cause clears — only Ack + clear cause resets it.',
     tryThis: [
       'Set LSP_PSL to trip → Step (TRIP_LAT latches).',
       'Clear the cause, press ACK_BTN → Step (latch clears only then).'
     ]
-  },
-  'rung-2oo3': {
+  }),
+  'rung-2oo3': withScenario('rung-2oo3', {
     goal: 'Need any two transmitters high before the trip — one alone is not enough.',
     tryThis: [
       'Force only one LSHH_* on → Step (no trip).',
       'Force a second one on → Step (vote trips).'
     ]
-  },
-  'rung-ton-lockout': {
+  }),
+  'rung-ton-lockout': withScenario('rung-ton-lockout', {
     goal: 'After a trip, wait out the lockout before restart is allowed.',
     tryThis: [
       'Assert TRIP_LAT → Auto-scan until the timer DN lights.',
       'Clear the trip mid-wait → lockout should drop.'
     ]
-  },
+  }),
   'rung-tof-cooldown': {
     goal: 'Fan keeps running a while after the machine stops, then dies on its own.',
     tryThis: [

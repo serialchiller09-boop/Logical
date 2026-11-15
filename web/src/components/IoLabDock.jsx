@@ -30,8 +30,10 @@ function tagsFromBus(panel, bus) {
 
 /**
  * Compact soft panel for a rung entry — generated from payload I/O, driven by the shared tag bus.
+ * `emphasizeTags` (from scenario dockTags) highlights the inputs/lamps the try-this steps use.
  */
-export function IoLabDock({ entry, io = [], layout, onLayoutChange }) {
+export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTags = [] }) {
+  const focus = useMemo(() => new Set(emphasizeTags.filter(Boolean)), [emphasizeTags]);
   const linked = useMemo(() => ({
     entryId: entry?.id,
     title: entry?.title,
@@ -134,11 +136,12 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange }) {
             <div className="lab-dock-grid">
               {leds.map((w) => {
                 const on = !!tags[w.tag];
+                const hot = focus.has(w.tag);
                 return (
                   <button
                     key={w.id}
                     type="button"
-                    className={`lab-dock-led vios-led-${w.color || 'green'} ${on ? 'is-on' : ''}`}
+                    className={`lab-dock-led vios-led-${w.color || 'green'} ${on ? 'is-on' : ''} ${hot ? 'is-focus' : ''}`}
                     aria-pressed={on}
                     title={`${w.label} (${w.tag}) — force`}
                     onClick={() => setBool(w.tag, !on)}
@@ -159,9 +162,10 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange }) {
             <div className="lab-dock-grid">
               {inputs.map((w) => {
                 const on = !!tags[w.tag];
+                const hot = focus.has(w.tag);
                 if (w.type === 'pb') {
                   return (
-                    <div key={w.id} className="lab-dock-cell">
+                    <div key={w.id} className={`lab-dock-cell ${hot ? 'is-focus' : ''}`}>
                       <button
                         type="button"
                         className={`lab-dock-pb ${on ? 'is-on' : ''}`}
@@ -177,7 +181,7 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange }) {
                   );
                 }
                 return (
-                  <div key={w.id} className="lab-dock-cell">
+                  <div key={w.id} className={`lab-dock-cell ${hot ? 'is-focus' : ''}`}>
                     <button
                       type="button"
                       className={`lab-dock-toggle ${on ? 'is-on' : ''}`}

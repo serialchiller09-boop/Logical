@@ -68,6 +68,9 @@ export default function EntryPage() {
   const marked = isMarked(entry.id);
   const goal = entry.payload?.goal || (hasRung ? entry.subtitle : '');
   const tryThis = Array.isArray(entry.payload?.tryThis) ? entry.payload.tryThis : [];
+  const panelScenario = !!entry.payload?.panelScenario;
+  const scanHint = typeof entry.payload?.scanHint === 'string' ? entry.payload.scanHint : '';
+  const dockTags = Array.isArray(entry.payload?.dockTags) ? entry.payload.dockTags : [];
 
   return (
     <>
@@ -76,7 +79,7 @@ export default function EntryPage() {
           <div className="crumbs">
             <Link to={`/s/${entry.section}`}>{data.section?.label ?? entry.section}</Link>
             <span>/</span>
-            <span>{hasRung ? 'lab' : entry.kind}</span>
+            <span>{hasRung ? (panelScenario ? 'panel lab' : 'lab') : entry.kind}</span>
           </div>
           <div className="row" style={{ gap: 7 }}>
             <BookmarkToggle id={entry.id} marked={marked} onToggle={toggleBookmark} />
@@ -93,6 +96,11 @@ export default function EntryPage() {
         ) : (
           entry.subtitle && <p className="detail-sub">{entry.subtitle}</p>
         )}
+        {hasRung && panelScenario && (
+          <p className="tiny muted" style={{ margin: '8px 0 0', maxWidth: '62ch' }}>
+            Guided panel scenario — use the soft panel with the scan sim. Teaching model only; not live field I/O.
+          </p>
+        )}
         {!hasRung && (
           <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 7 }}>
             <StatusBadge status={entry.status} />
@@ -107,9 +115,24 @@ export default function EntryPage() {
       {hasRung ? (
         <div className="stack" style={{ gap: 14, minWidth: 0 }}>
           {tryThis.length > 0 && (
-            <ol className="try-steps">
-              {tryThis.map((step, i) => <li key={i}>{step}</li>)}
-            </ol>
+            <div className="try-block">
+              <div className="row spread" style={{ marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                <b className="small" style={{ letterSpacing: '.04em', color: 'var(--ink-2)' }}>TRY THIS</b>
+                {dockTags.length > 0 && (
+                  <span className="tiny muted">dock focus: {dockTags.join(' · ')}</span>
+                )}
+              </div>
+              <ol className="try-steps">
+                {tryThis.map((step, i) => <li key={i}>{step}</li>)}
+              </ol>
+              {scanHint && (
+                <p className="scan-hint" role="note">
+                  <span className="scan-hint-label">Scan hint</span>
+                  {scanHint}
+                  <span className="tiny muted"> — teaching placeholder, not a grade.</span>
+                </p>
+              )}
+            </div>
           )}
 
           <RungSimulator entry={entry} compact />

@@ -872,6 +872,7 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   max-width: 62ch;
   line-height: 1.35;
 }
+.try-block { margin: 0; }
 .try-steps {
   margin: 0;
   padding: 12px 12px 12px 32px;
@@ -883,6 +884,34 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   line-height: 1.5;
 }
 .try-steps li + li { margin-top: 6px; }
+.scan-hint {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: #0c141d;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.scan-hint-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.rung-lab-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.rung-lab-card-panel {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
 .more-detail {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1231,6 +1260,11 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   border: 1px solid var(--line);
   background: #0b1219;
   min-width: 0;
+}
+.lab-dock-cell.is-focus,
+.lab-dock-led.is-focus {
+  outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, #0b1219);
 }
 button.lab-dock-led {
   cursor: pointer;
