@@ -60,29 +60,29 @@ export const RUNG_GOALS = {
   'rung-tof-cooldown': {
     goal: 'Fan keeps running a while after the machine stops, then dies on its own.',
     tryThis: [
-      'Set MOTOR_RUNNING on, then off → watch the TOF hold the fan.',
-      'Auto-scan until the run-on times out.'
+      'Turn MOTOR_RUNNING on, press Step, then turn it off. FAN_RUN stays on while T_COOL.DN is true on the following rung.',
+      'Press Auto-scan until the run-on times out and T_COOL.DN drops — FAN_RUN should go off on that same follow-on rung.'
     ]
   },
   'rung-ctu-strokes': {
     goal: 'Each stroke edge adds one count until the batch target is hit.',
     tryThis: [
-      'Pulse the stroke input several times → Step each rising edge.',
-      'Hit reset / new batch → count returns to zero.'
+      'Pulse PUMP_SS on and off, pressing Step on each rising edge. When the count hits the target, C5:0.DN lights and the following rung sets BATCH_DONE.',
+      'Turn on BATCH_START and press Step to RES the counter — ACC returns to zero and BATCH_DONE clears.'
     ]
   },
   'rung-alarm-deadbnd': {
     goal: 'Cross high once to alarm; it should not chatter near the limit.',
     tryThis: [
-      'Raise LEVEL_PV above the high limit → Auto-scan until alarm sets.',
-      'Nudge it just below high (still above deadband) → alarm stays; drop further to clear.'
+      'Raise LEVEL_PV above the high limit. Press Auto-scan until T_ALARM.DN lights — the following rung latches LSHH_ALM from that .DN bit.',
+      'Nudge LEVEL_PV just below high (still above the deadband) — alarm stays. Drop further below the clear limit to unlatch.'
     ]
   },
   'rung-jt-permissive': {
     goal: 'Open the J-T path only when every permissive is true — then prove it opened.',
     tryThis: [
-      'Clear one permissive → open command must stay blocked.',
-      'Satisfy all, command open, then set proved-open feedback.'
+      'Clear one permissive and press Step — JT_OPEN_CMD must stay off.',
+      'Satisfy every permissive so the valve commands open, leave JT_ZSO off, and Auto-scan until T_JTTIME.DN — the following rung latches JT_FAIL_OPEN from that .DN bit.'
     ]
   },
   'rung-cap-close': withScenario('rung-cap-close', {
@@ -102,8 +102,8 @@ export const RUNG_GOALS = {
   'rung-purge': {
     goal: 'Fuel stays locked out until purge time finishes; flame fail forces a re-purge.',
     tryThis: [
-      'Healthy permissives + Auto-scan until purge DN → fuel path enables.',
-      'Assert FLAME_FAIL → fuel drops and purge must run again.'
+      'Keep permissives healthy and press Auto-scan until T_PURGE.DN lights — the following rung then sets PURGE_OK from that .DN bit.',
+      'Turn on FLAME_FAIL and press Step — fuel drops and the purge timer must run again before PURGE_OK returns.'
     ]
   },
   'rung-firstout': {
@@ -123,8 +123,8 @@ export const RUNG_GOALS = {
   'rung-esd-fg': {
     goal: 'Gas alarm (after delay) de-energizes the ESD solenoid — loss of power fails safe.',
     tryThis: [
-      'Assert a gas detector → Auto-scan through the confirm delay → ESD drops.',
-      'Try bypass — see how it changes the path (and why that is dangerous).'
+      'Turn on a gas detector and press Auto-scan through the confirm delay until T_FG.DN lights — the following rung then sets GAS_TRIP and the ESD path drops.',
+      'Try the bypass path — see how it changes the trip, and why that is dangerous in a real plant.'
     ]
   },
   'rung-leadlag': {
@@ -144,8 +144,8 @@ export const RUNG_GOALS = {
   'rung-seq-step': {
     goal: 'Advance only when the step condition + dwell are done; any interlock holds the sequence.',
     tryThis: [
-      'Meet the step condition → Auto-scan through dwell → step advances.',
-      'Drop an interlock mid-step → sequence holds / faults.'
+      'Meet the step condition and press Auto-scan through the dwell until T_DWELL.DN lights — the following rung then advances the step from that .DN bit.',
+      'Drop an interlock mid-step and press Step — the sequence holds or faults instead of advancing.'
     ]
   }
 };

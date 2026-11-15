@@ -428,7 +428,13 @@ export function RungSimulator({
                       <div className="io-tag">{t}</div>
                       <div className="io-addr">{ioMap.get(t).type} · {ioMap.get(t).addr}</div>
                       <div className="num-in">
-                        <input type="number" step="any" value={stRef.current.values[t] ?? 0} onChange={(e) => setVal(t, e.target.value)} />
+                        <input
+                          type="number"
+                          step="any"
+                          value={stRef.current.values[t] ?? 0}
+                          onChange={(e) => setVal(t, e.target.value)}
+                          aria-label={`Set value for ${t}`}
+                        />
                       </div>
                       <div className="io-role" title={ioMap.get(t).role}>{ioCue(ioMap.get(t).role)}</div>
                     </div>

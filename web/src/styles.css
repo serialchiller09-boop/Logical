@@ -84,6 +84,9 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
   display: inline-grid; place-items: center;
 }
 .sidebar-collapse:hover { color: var(--ink); border-color: var(--line-2); background: #131f2b; }
+.sidebar-collapse:focus-visible {
+  outline: 2px solid rgba(79, 209, 224, .6); outline-offset: 2px;
+}
 
 .nav-group { margin-top: 12px; }
 .nav-label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); padding: 8px 10px 5px; }
@@ -131,14 +134,23 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
   padding: 11px clamp(14px, 3vw, 40px); border-bottom: 1px solid var(--line);
   background: rgba(10, 14, 19, .82); backdrop-filter: blur(12px) saturate(120%);
 }
-.crumbs { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); min-width: 0; }
+.crumbs {
+  display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3);
+  min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
 .crumbs b { color: var(--ink-2); font-weight: 600; }
 .search-trigger {
-  margin-left: auto; display: flex; align-items: center; gap: 9px; min-width: 210px;
+  margin-left: auto; display: inline-flex; align-items: center; gap: 9px; min-width: 210px;
   padding: 7px 10px; border-radius: var(--r-sm); border: 1px solid var(--line-2);
-  background: var(--panel-2); color: var(--ink-3); font-size: 13px; cursor: text;
+  background: var(--panel-2); color: var(--ink-3); font: inherit; font-size: 13px; cursor: pointer;
+  flex: 0 0 auto;
 }
 .search-trigger:hover { border-color: #33485e; color: var(--ink-2); }
+.search-trigger:focus-visible {
+  outline: 2px solid rgba(79, 209, 224, .6); outline-offset: 2px;
+}
+.search-trigger .lbl { white-space: nowrap; }
+.search-trigger .search-kbd { margin-left: 2px; }
 .burger { display: none; }
 
 /* ------------------------- cards / chrome ------------------------- */
@@ -325,7 +337,9 @@ label.field { display: block; font-size: 11.5px; color: var(--ink-3); letter-spa
 .palette { width: min(760px, 100%); border-radius: 14px; border: 1px solid var(--line-2); background: #0d151d; box-shadow: 0 40px 90px -30px #000; overflow: hidden; }
 .palette-in { display: flex; align-items: center; gap: 9px; padding: 13px 15px; border-bottom: 1px solid var(--line); }
 .palette-in input { border: 0; background: transparent; padding: 0; font-size: 16px; }
-.palette-in input:focus-visible { outline: none; }
+.palette-in input:focus-visible {
+  outline: 2px solid rgba(79, 209, 224, .6); outline-offset: 2px; border-radius: 4px;
+}
 .palette-body { max-height: 58vh; overflow: auto; padding: 6px; }
 .pal-sec { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); padding: 10px 10px 5px; }
 .pal-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
@@ -386,8 +400,13 @@ table.tbl td.mono, table.tbl th.mono { font-family: var(--mono); font-size: 12px
   .entry-grid { grid-template-columns: minmax(0, 1fr); }
   .kv { grid-template-columns: minmax(0, 1fr); }
   .kv > dd { border-top: 0; }
-  .search-trigger { min-width: 0; }
-  .search-trigger .lbl { display: none; }
+  .topbar { gap: 8px; }
+  .crumbs { flex: 1 1 0; min-width: 0; }
+  .search-trigger {
+    min-width: 0; width: 36px; height: 36px; padding: 0; justify-content: center; gap: 0;
+  }
+  .search-trigger .lbl,
+  .search-trigger .search-kbd { display: none; }
 }
 
 @media print {
@@ -1088,8 +1107,8 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   color: #e2ebf3;
   text-align: center;
   max-width: 100%;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   white-space: normal;
 }
 .vios-tag {
@@ -1097,8 +1116,8 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   color: #a8bdd0;
   text-align: center;
   max-width: 100%;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   white-space: normal;
 }
 .vios-led {
