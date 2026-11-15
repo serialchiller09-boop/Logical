@@ -63,13 +63,16 @@ function LedWidget({ widget, on, onToggle, selected, onSelect }) {
         onClick={(e) => { e.stopPropagation(); force(); }}
         title="Force lamp (panel-only)"
       />
-      <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
+      <span className="vios-caption" title={widget.label}>{widget.label}</span>
+      <span className="vios-tag" title={widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}>
+        {widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}
+      </span>
     </WidgetShell>
   );
 }
 
 function SwitchWidget({ widget, on, onToggle, selected, onSelect }) {
+  const tagText = widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag;
   return (
     <WidgetShell widget={widget} selected={selected} onSelect={onSelect}>
       <button
@@ -81,13 +84,14 @@ function SwitchWidget({ widget, on, onToggle, selected, onSelect }) {
       >
         <span className="vios-toggle-knob" />
       </button>
-      <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
+      <span className="vios-caption" title={widget.label}>{widget.label}</span>
+      <span className="vios-tag" title={tagText}>{tagText}</span>
     </WidgetShell>
   );
 }
 
 function PbWidget({ widget, on, onDown, onUp, selected, onSelect }) {
+  const tagText = widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag;
   return (
     <WidgetShell widget={widget} selected={selected} onSelect={onSelect}>
       <button
@@ -105,8 +109,8 @@ function PbWidget({ widget, on, onDown, onUp, selected, onSelect }) {
           if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onUp(); }
         }}
       />
-      <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
+      <span className="vios-caption" title={widget.label}>{widget.label}</span>
+      <span className="vios-tag" title={tagText}>{tagText}</span>
     </WidgetShell>
   );
 }
@@ -114,6 +118,7 @@ function PbWidget({ widget, on, onDown, onUp, selected, onSelect }) {
 function PotWidget({ widget, value, onChange, selected, onSelect }) {
   const min = widget.min ?? 0;
   const max = widget.max ?? 100;
+  const tagText = widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag;
   return (
     <WidgetShell widget={widget} selected={selected} onSelect={onSelect}>
       <div className="vios-pot" onClick={(e) => e.stopPropagation()}>
@@ -129,8 +134,8 @@ function PotWidget({ widget, value, onChange, selected, onSelect }) {
         />
         <span className="vios-pot-val">{Math.round(value)}%</span>
       </div>
-      <span className="vios-caption">{widget.label}</span>
-      <span className="vios-tag">{widget.channel ? `${widget.channel} · ${widget.tag}` : widget.tag}</span>
+      <span className="vios-caption" title={widget.label}>{widget.label}</span>
+      <span className="vios-tag" title={tagText}>{tagText}</span>
     </WidgetShell>
   );
 }

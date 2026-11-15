@@ -98,7 +98,7 @@ export default function Admin() {
             </div>
           )}
           <div className="row"><button type="button" className="btn btn-primary" onClick={saveToken}>Unlock</button>
-            <span className="tiny muted">If the server has no ADMIN_TOKEN set, the default is documented in docs/ADMIN.md.</span></div>
+            <span className="tiny muted">ADMIN_TOKEN must be set on the server. The dev-only default is documented in docs/ADMIN.md.</span></div>
         </div>
       </section>
     );
