@@ -1249,11 +1249,14 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   align-items: start;
 }
 .lab-dock-layout-side {
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
 }
 .lab-dock-layout-below,
 .lab-dock-layout-hidden {
   grid-template-columns: 1fr;
+}
+.lab-dock-layout-below .lab-dock {
+  max-width: 720px;
 }
 .lab-dock-toolbar {
   display: flex;
@@ -1266,6 +1269,61 @@ table.notebook-table.compact td { padding-top: 6px; padding-bottom: 6px; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px;
+}
+.lab-dock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lab-dock-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0b1219;
+  min-width: 0;
+}
+.lab-dock-row.is-focus {
+  outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, #0b1219);
+}
+.lab-dock-row-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.lab-dock-row-control .lab-dock-led {
+  padding: 0;
+  border: none;
+  background: transparent;
+  min-width: 0;
+}
+.lab-dock-row-control input[type="range"] {
+  width: 88px;
+  accent-color: var(--accent);
+}
+.lab-dock-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lab-dock-list-mode .lab-dock-led-label,
+.lab-dock-list-mode .lab-dock-led-tag {
+  text-align: left;
+  /* Never truncate hot tags/names — wrap instead of “…” */
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-line-clamp: unset;
+  display: block;
+  max-width: none;
 }
 .lab-dock-cell,
 .lab-dock-led {
@@ -1319,15 +1377,19 @@ button.lab-dock-led {
   color: var(--ink);
   text-align: center;
   max-width: 100%;
+  overflow: visible;
+  text-overflow: unset;
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
 }
 .lab-dock-led-tag {
-  font: 500 11px/1.3 var(--mono);
+  font: 500 11.5px/1.35 var(--mono);
   color: var(--ink-2);
   text-align: center;
   max-width: 100%;
+  overflow: visible;
+  text-overflow: unset;
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
