@@ -169,7 +169,7 @@ test('Home progressive path lists all eight levels with open deep-links', () => 
   assert.equal(WEB_PATH.length, PROGRESSIVE_PATH_LEVELS.length);
   for (const l of WEB_PATH) {
     assert.ok(byId.has(`rungs:${l.rungId}`), `path level ${l.level} missing entry`);
-    assert.match(pathLevelHref(l), /dock=side/);
+    assert.match(pathLevelHref(l), /dock=(side|below)/);
     assert.match(pathLevelHref(l), new RegExp(`level=${l.level}`));
   }
 });

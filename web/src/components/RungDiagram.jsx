@@ -12,6 +12,7 @@ import {
   subscribeTagBus
 } from '../lib/tagBus.js';
 import { IoLabDock, loadDockLayout, saveDockLayout } from './IoLabDock.jsx';
+import { isBusyDock, resolveDockLayout } from '../lib/dockLayout.js';
 
 function dockLayoutFromSearch(searchParams) {
   const raw = searchParams.get('dock');
@@ -207,6 +208,12 @@ export function RungSimulator({
     return Array.isArray(entry?.payload?.dockTags) ? entry.payload.dockTags : [];
   }, [emphasizeTagsProp, entry]);
 
+  const allIoForDock = useMemo(() => [...ioMap.values()], [ioMap]);
+  const busyDock = useMemo(
+    () => isBusyDock({ dockTags: emphasizeTags, io: allIoForDock }) || focusDockOnly,
+    [emphasizeTags, allIoForDock, focusDockOnly]
+  );
+
   const baseState = useMemo(() => {
     const all = [...ioMap.values()];
     return initialState(all);
@@ -220,14 +227,26 @@ export function RungSimulator({
   const [log, setLog] = useState([]);
   const [showMap, setShowMap] = useState(true);
   const [coupled, setCoupled] = useState(() => isCouplingEnabled());
-  const [dockLayout, setDockLayout] = useState(() => dockLayoutFromSearch(searchParams) || loadDockLayout());
+  const [dockLayout, setDockLayout] = useState(() => resolveDockLayout({
+    searchLayout: dockLayoutFromSearch(searchParams),
+    savedLayout: loadDockLayout(),
+    preferBelow: isBusyDock({
+      dockTags: Array.isArray(emphasizeTagsProp) ? emphasizeTagsProp : (entry?.payload?.dockTags || []),
+      io: []
+    }) || !!focusDockOnly
+  }));
 
   useEffect(() => {
+    const next = resolveDockLayout({
+      searchLayout: dockLayoutFromSearch(searchParams),
+      savedLayout: loadDockLayout(),
+      preferBelow: busyDock
+    });
+    setDockLayout(next);
+    // Only persist explicit user/query choices (side|below|hidden from URL or toolbar).
     const fromQuery = dockLayoutFromSearch(searchParams);
-    if (!fromQuery) return;
-    setDockLayout(fromQuery);
-    saveDockLayout(fromQuery);
-  }, [searchParams, entry?.id]);
+    if (fromQuery) saveDockLayout(fromQuery);
+  }, [searchParams, entry?.id, busyDock]);
 
   const rerender = useCallback(() => setTick((n) => n + 1), []);
 

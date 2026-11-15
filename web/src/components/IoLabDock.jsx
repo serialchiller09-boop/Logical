@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { applyBusToPanel, createPanelFromLadderIo, lampTest } from '../lib/ioSandbox.js';
+import { preferDockList } from '../lib/dockLayout.js';
 import {
   isCouplingEnabled,
   loadTagBus,
@@ -17,7 +18,7 @@ export function loadDockLayout() {
     const v = localStorage.getItem(DOCK_LAYOUT_KEY);
     if (v === 'below' || v === 'side' || v === 'hidden') return v;
   } catch { /* ignore */ }
-  return 'side';
+  return null;
 }
 
 export function saveDockLayout(layout) {
@@ -28,10 +29,22 @@ function tagsFromBus(panel, bus) {
   return applyBusToPanel(panel, bus).tags;
 }
 
+function DockRow({ hot, control, label, tag }) {
+  return (
+    <div className={`lab-dock-row ${hot ? 'is-focus' : ''}`}>
+      <div className="lab-dock-row-control">{control}</div>
+      <div className="lab-dock-row-text">
+        <span className="lab-dock-led-label">{label}</span>
+        <span className="lab-dock-led-tag">{tag}</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Compact soft panel for a rung entry — generated from payload I/O, driven by the shared tag bus.
- * `emphasizeTags` (from scenario dockTags) highlights the inputs/lamps the try-this steps use.
- * `focusOnly` keeps only those tags on the panel (path levels); full plate stays via sandbox link.
+ * `emphasizeTags` (from scenario dockTags) highlights (and with focusOnly, filters) the tags in try-this.
+ * List rows show the full teaching name + full tag — no ellipsis on hot labels.
  */
 export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTags = [], focusOnly = false }) {
   const focus = useMemo(() => new Set(emphasizeTags.filter(Boolean)), [emphasizeTags]);
@@ -105,9 +118,82 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTag
   const pots = panel.widgets.filter((w) => w.type === 'pot' && visible(w));
   const sandboxHref = `/io-sandbox?adopt=1&entry=${encodeURIComponent(entry?.id || '')}`;
   const filtered = focusOnly && focus.size > 0;
+  const useList = preferDockList({
+    focusOnly,
+    dockTags: emphasizeTags,
+    io
+  }) || layout === 'below';
+
+  const renderLed = (w) => {
+    const on = !!tags[w.tag];
+    const hot = focus.has(w.tag);
+    const control = (
+      <button
+        type="button"
+        className={`lab-dock-led vios-led-${w.color || 'green'} ${on ? 'is-on' : ''} ${hot && !useList ? 'is-focus' : ''}`}
+        aria-pressed={on}
+        aria-label={`${w.label} (${w.tag})`}
+        title={`${w.label} (${w.tag}) — force`}
+        onClick={() => setBool(w.tag, !on)}
+      >
+        <span className="lab-dock-led-disc" />
+        {!useList && (
+          <>
+            <span className="lab-dock-led-label">{w.label}</span>
+            <span className="lab-dock-led-tag">{w.tag}</span>
+          </>
+        )}
+      </button>
+    );
+    if (!useList) return <div key={w.id}>{control}</div>;
+    return <DockRow key={w.id} hot={hot} control={control} label={w.label} tag={w.tag} />;
+  };
+
+  const renderInput = (w) => {
+    const on = !!tags[w.tag];
+    const hot = focus.has(w.tag);
+    let control;
+    if (w.type === 'pb') {
+      control = (
+        <button
+          type="button"
+          className={`lab-dock-pb ${on ? 'is-on' : ''}`}
+          aria-pressed={on}
+          aria-label={w.label}
+          onPointerDown={(e) => { e.preventDefault(); setBool(w.tag, true); }}
+          onPointerUp={() => setBool(w.tag, false)}
+          onPointerLeave={() => { if (on) setBool(w.tag, false); }}
+        />
+      );
+    } else {
+      control = (
+        <button
+          type="button"
+          className={`lab-dock-toggle ${on ? 'is-on' : ''}`}
+          aria-pressed={on}
+          aria-label={w.label}
+          onClick={() => setBool(w.tag, !on)}
+        >
+          <span className="lab-dock-toggle-knob" />
+        </button>
+      );
+    }
+    if (useList) {
+      return <DockRow key={w.id} hot={hot} control={control} label={w.label} tag={w.tag} />;
+    }
+    return (
+      <div key={w.id} className={`lab-dock-cell ${hot ? 'is-focus' : ''}`}>
+        {control}
+        <span className="lab-dock-led-label">{w.label}</span>
+        <span className="lab-dock-led-tag">{w.tag}</span>
+      </div>
+    );
+  };
+
+  const sectionClass = useList ? 'lab-dock-list' : 'lab-dock-grid';
 
   return (
-    <aside className="lab-dock card" aria-label="Practice panel for this rung">
+    <aside className={`lab-dock card ${useList ? 'lab-dock-list-mode' : ''}`} aria-label="Practice panel for this rung">
       <div className="card-hd">
         <h3>Practice panel</h3>
         <span className="hd-note">{filtered ? 'tags for this step' : 'this rung’s switches and lamps'}</span>
@@ -136,89 +222,52 @@ export function IoLabDock({ entry, io = [], layout, onLayoutChange, emphasizeTag
         {leds.length > 0 && (
           <div>
             <h4 className="mini">Lamps</h4>
-            <div className="lab-dock-grid">
-              {leds.map((w) => {
-                const on = !!tags[w.tag];
-                const hot = focus.has(w.tag);
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    className={`lab-dock-led vios-led-${w.color || 'green'} ${on ? 'is-on' : ''} ${hot ? 'is-focus' : ''}`}
-                    aria-pressed={on}
-                    title={`${w.label} (${w.tag}) — force`}
-                    onClick={() => setBool(w.tag, !on)}
-                  >
-                    <span className="lab-dock-led-disc" />
-                    <span className="lab-dock-led-label">{w.label}</span>
-                    <span className="lab-dock-led-tag">{w.tag}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <div className={sectionClass}>{leds.map(renderLed)}</div>
           </div>
         )}
 
         {inputs.length > 0 && (
           <div>
             <h4 className="mini">Inputs</h4>
-            <div className="lab-dock-grid">
-              {inputs.map((w) => {
-                const on = !!tags[w.tag];
-                const hot = focus.has(w.tag);
-                if (w.type === 'pb') {
-                  return (
-                    <div key={w.id} className={`lab-dock-cell ${hot ? 'is-focus' : ''}`}>
-                      <button
-                        type="button"
-                        className={`lab-dock-pb ${on ? 'is-on' : ''}`}
-                        aria-pressed={on}
-                        aria-label={w.label}
-                        onPointerDown={(e) => { e.preventDefault(); setBool(w.tag, true); }}
-                        onPointerUp={() => setBool(w.tag, false)}
-                        onPointerLeave={() => { if (on) setBool(w.tag, false); }}
-                      />
-                      <span className="lab-dock-led-label">{w.label}</span>
-                      <span className="lab-dock-led-tag">{w.tag}</span>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={w.id} className={`lab-dock-cell ${hot ? 'is-focus' : ''}`}>
-                    <button
-                      type="button"
-                      className={`lab-dock-toggle ${on ? 'is-on' : ''}`}
-                      aria-pressed={on}
-                      aria-label={w.label}
-                      onClick={() => setBool(w.tag, !on)}
-                    >
-                      <span className="lab-dock-toggle-knob" />
-                    </button>
-                    <span className="lab-dock-led-label">{w.label}</span>
-                    <span className="lab-dock-led-tag">{w.tag}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <div className={sectionClass}>{inputs.map(renderInput)}</div>
           </div>
         )}
 
         {pots.length > 0 && (
           <div>
             <h4 className="mini">Analogs</h4>
-            <div className="stack" style={{ gap: 8 }}>
+            <div className={useList ? 'lab-dock-list' : 'stack'} style={useList ? undefined : { gap: 8 }}>
               {pots.map((w) => (
-                <label key={w.id} className="lab-dock-pot">
-                  <span className="lab-dock-led-label">{w.label}</span>
-                  <input
-                    type="range"
-                    min={w.min ?? 0}
-                    max={w.max ?? 100}
-                    value={Number(tags[w.tag]) || 0}
-                    onChange={(e) => setNum(w.tag, e.target.value)}
+                useList ? (
+                  <DockRow
+                    key={w.id}
+                    hot={focus.has(w.tag)}
+                    label={w.label}
+                    tag={`${w.tag} · ${Math.round(Number(tags[w.tag]) || 0)}`}
+                    control={(
+                      <input
+                        type="range"
+                        min={w.min ?? 0}
+                        max={w.max ?? 100}
+                        value={Number(tags[w.tag]) || 0}
+                        aria-label={w.label}
+                        onChange={(e) => setNum(w.tag, e.target.value)}
+                      />
+                    )}
                   />
-                  <span className="lab-dock-led-tag">{w.tag} · {Math.round(Number(tags[w.tag]) || 0)}</span>
-                </label>
+                ) : (
+                  <label key={w.id} className="lab-dock-pot">
+                    <span className="lab-dock-led-label">{w.label}</span>
+                    <input
+                      type="range"
+                      min={w.min ?? 0}
+                      max={w.max ?? 100}
+                      value={Number(tags[w.tag]) || 0}
+                      onChange={(e) => setNum(w.tag, e.target.value)}
+                    />
+                    <span className="lab-dock-led-tag">{w.tag} · {Math.round(Number(tags[w.tag]) || 0)}</span>
+                  </label>
+                )
               ))}
             </div>
           </div>

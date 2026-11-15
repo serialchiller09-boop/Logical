@@ -28,7 +28,8 @@ test('path deep-links are open (all clickable) with dock, level, and focus', () 
   for (const l of WEB_PATH) {
     const href = pathLevelHref(l);
     assert.match(href, /^\/e\//);
-    assert.match(href, /dock=side/);
+    const busy = l.level >= 6 || l.dockTags.length >= 5;
+    assert.match(href, busy ? /dock=below/ : /dock=side/);
     assert.match(href, new RegExp(`level=${l.level}`));
     assert.match(href, new RegExp(`focus=${encodeURIComponent(l.focusId)}`));
     assert.equal(pathLevelEntryId(l), `rungs:${l.rungId}`);

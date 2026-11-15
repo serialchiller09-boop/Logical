@@ -19,10 +19,14 @@ export function pathLevelEntryId(level) {
 /**
  * Deep-link into a path level with practice panel + focus flags.
  * Open path: every level is clickable (no unlock gate).
+ * Busy docks (many tags) open panel-below so labels stay readable.
  */
 export function pathLevelHref(level) {
+  // Cap-bank family (6–8) and any dense dock open below so names/tags stay readable.
+  const busy = level.level >= 6
+    || (Array.isArray(level.dockTags) && level.dockTags.length >= 5);
   const params = new URLSearchParams({
-    dock: 'side',
+    dock: busy ? 'below' : 'side',
     level: String(level.level),
     focus: level.focusId || 'full'
   });
