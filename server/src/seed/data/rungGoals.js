@@ -3,22 +3,29 @@
  * Kept separate from the long teaching prose on each rung so the UI can
  * lead with a goal without rewriting every purpose paragraph.
  *
- * Guided panel scenarios (Phase E1) add panelScenario / dockTags / scanHint via
- * scenarioPacks.js — merged in seed/index.js so Entry and Home share one payload.
+ * Guided panel scenarios add panelScenario / dockTags / scanHint / path focus
+ * flags via scenarioPacks.js — merged in seed/index.js so Entry and Home share one payload.
  */
 import { SCENARIO_BY_RUNG } from './scenarioPacks.js';
 
 function withScenario(rungId, lab) {
   const s = SCENARIO_BY_RUNG[rungId];
   if (!s) return lab;
-  return {
+  const out = {
     ...lab,
     panelScenario: true,
+    pathLab: s.pathLab === true,
     scenarioOrder: s.order,
     scenarioCard: s.cardTitle,
+    levelTitle: s.levelTitle || s.cardTitle,
     dockTags: s.dockTags,
     scanHint: s.scanHint
   };
+  if (Array.isArray(s.pathLevels)) out.pathLevels = s.pathLevels;
+  if (Array.isArray(s.firstMinuteDockTags)) out.firstMinuteDockTags = s.firstMinuteDockTags;
+  if (s.focusStepTags && typeof s.focusStepTags === 'object') out.focusStepTags = s.focusStepTags;
+  if (Array.isArray(s.pathFocuses)) out.pathFocuses = s.pathFocuses;
+  return out;
 }
 
 export const RUNG_GOALS = {
@@ -78,13 +85,13 @@ export const RUNG_GOALS = {
       'Satisfy all, command open, then set proved-open feedback.'
     ]
   },
-  'rung-cap-close': {
-    goal: 'Close only after discharge wait + key + electrical permissives are all good.',
+  'rung-cap-close': withScenario('rung-cap-close', {
+    goal: 'Make the close command pulse once only when every permissive is true and the wait finishes. The timer is a wait, not a safety proof.',
     tryThis: [
-      'Leave the discharge timer short of DN → close stays blocked.',
-      'Satisfy key + permissives, let timer finish → close pulse appears.'
+      'Leave the discharge timer short of DN. Keep other permissives true. Press Step — CAP1_CloseCmd should stay off.',
+      'Satisfy key + electrical permissives, let the wait finish (DN), keep the breaker open, then press Step — CAP1_CloseCmd should pulse once.'
     ]
-  },
+  }),
   'rung-pid-level': {
     goal: 'See auto / manual / override fight for the valve — override wins when level runs away.',
     tryThis: [

@@ -124,7 +124,8 @@ export async function seed({ force = false } = {}) {
   const meta = d.prepare("SELECT v FROM seed_meta WHERE k = 'version'").get();
   // Bump when reference payload shape changes so persistent deploys re-apply seed
   // (edited plant rows stay preserved). v4: short TON PRE labels (no overflow copy).
-  const version = '4';
+  // v5: progressive path levels 1–8 + cap-bank panel scenario / focus flags.
+  const version = '5';
 
   if (!force && existing > 0 && meta?.v === version) {
     return { skipped: true, entries: existing };
