@@ -61,6 +61,10 @@ the access control.
 
 * `plantNote` is stored inside the entry `payload`, and the entry page shows it in a warning box — so the plant
   answer appears **next to** the generic definition instead of replacing it silently.
+* Ladder lab teaching copy can be edited the same way without touching git: send `goal`, `tryThis` (array or
+  newline-separated string), and/or `scanHint`. Those merge into `payload` and leave the ladder/I/O alone.
+  The Plant data editor shows these fields for lab entries. Shipped defaults also live in
+  `server/src/seed/data/rungGoals.js` if you prefer a code change.
 * `GET /api/admin/diff/:id` compares the row with what `server/src/seed/*` currently says, field by field.
 * `POST /api/admin/revert/:id` puts the shipped text back and clears the `edited` flag.
 * `DELETE /api/admin/entries/:id` only deletes rows **you** created. Reference rows refuse to be deleted and

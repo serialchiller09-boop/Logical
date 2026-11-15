@@ -10,6 +10,13 @@
 
 export const GEO = { contactW: 108, coilW: 126, blockW: 186, rowH: 76, gap: 10, branchGap: 20, railPad: 30 };
 
+/** Keep block pin values inside the box so long placeholders cannot cover contacts. */
+export function fitPinText(raw, maxChars = 16) {
+  const s = String(raw ?? '');
+  if (s.length <= maxChars) return s;
+  return `${s.slice(0, Math.max(1, maxChars - 1))}…`;
+}
+
 /** Blocks whose output is a retained state bit rather than the instantaneous rung power. */
 const STATE_BLOCKS = new Set(['TON', 'TOF', 'TP', 'RTO', 'CTU', 'CTD', 'CTUD', 'HPA', 'LINT']);
 

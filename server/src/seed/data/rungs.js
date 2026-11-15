@@ -447,7 +447,7 @@ export const RUNGS = [
           { t: 'nc', a: 'CAP1_52a', l: 'Breaker proven open' },
           { t: 'no', a: 'CAP1_NoCurrent', l: 'No-current proof true' },
           { t: 'no', a: 'CAP1_KeyReleaseReq', l: 'Key release requested' },
-          { t: 'blk', k: 'TON', a: 'T_CAP1_Discharge', l: 'Discharge wait timer', p: [{ k: 'PRE', v: 'PLACEHOLDER - manufacturer / approved procedure' }, { k: 'DN', v: 'wait complete' }] }
+          { t: 'blk', k: 'TON', a: 'T_CAP1_Discharge', l: 'Discharge wait timer', p: [{ k: 'PRE', v: 'site PRE' }, { k: 'DN', v: 'wait complete' }] }
         ]
       }
     },
