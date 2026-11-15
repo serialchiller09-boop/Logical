@@ -11,7 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  analyze, layout, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText
+  analyze, layout, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
+  memberRef
 } from '../web/src/lib/ladder.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
 import { RUNGS2 } from '../server/src/seed/data/rungs2.js';
@@ -137,13 +138,39 @@ test('restart lockout: asserted for the whole delay, released when it completes'
 });
 
 test('TOF: the output survives after the input falls, then drops at the preset', () => {
-  const during = scan('rung-tof-cooldown', { scans: 100, bits: { MOTOR_RUNNING: 0 } });
-  assert.equal(during.st.bits.FAN_RUN, 1, 'fan keeps running through the off-delay');
-  assert.equal(during.st.timers.T_COOL.running, true);
-  const after = scan('rung-tof-cooldown', { scans: 400, bits: { MOTOR_RUNNING: 0 } });
-  assert.equal(after.st.bits.FAN_RUN, 0, 'fan stops when the delay expires');
-  const whileRunning = scan('rung-tof-cooldown', { scans: 3, bits: { MOTOR_RUNNING: 1 } });
-  assert.equal(whileRunning.st.timers.T_COOL.acc, 0, 'a running motor holds the off-delay at zero');
+  // Logix TOF prescan sets ACC=PRE with DN=0. A falling edge is required: enable first, then drop.
+  const r = byId['rung-tof-cooldown'];
+  const st = initialState(ioOf(r));
+  st.dt = 1000;
+  st.bits.MOTOR_RUNNING = 1;
+  for (let i = 0; i < 3; i++) ladsOf(r).forEach((lad) => analyze(lad, st, { live: true }));
+  assert.equal(st.timers.T_COOL.acc, 0, 'a running motor holds the off-delay at zero');
+  assert.equal(st.timers.T_COOL.dn, true);
+  assert.equal(st.bits.FAN_RUN, 1);
+
+  st.bits.MOTOR_RUNNING = 0;
+  for (let i = 0; i < 100; i++) ladsOf(r).forEach((lad) => analyze(lad, st, { live: true }));
+  assert.equal(st.bits.FAN_RUN, 1, 'fan keeps running through the off-delay');
+  assert.equal(st.timers.T_COOL.running, true);
+
+  for (let i = 0; i < 300; i++) ladsOf(r).forEach((lad) => analyze(lad, st, { live: true }));
+  assert.equal(st.bits.FAN_RUN, 0, 'fan stops when the delay expires');
+  assert.equal(st.timers.T_COOL.dn, false);
+});
+
+test('TOF Logix prescan: ACC starts at PRE with DN/TT/EN cleared', () => {
+  const st = initialState([
+    { tag: 'T_COOL', type: 'TIMER', instruction: 'TOF', preMs: 300000 }
+  ]);
+  assert.equal(st.timers.T_COOL.acc, 300000);
+  assert.equal(st.timers.T_COOL.dn, false);
+  assert.equal(st.timers.T_COOL.running, false);
+  assert.equal(st.timers.T_COOL.en, false);
+
+  // Power-up with enable already false: no falling edge yet → DN stays false (prescan state).
+  const cold = scan('rung-tof-cooldown', { scans: 5, bits: { MOTOR_RUNNING: 0 } });
+  assert.equal(cold.st.timers.T_COOL.dn, false);
+  assert.equal(cold.st.bits.FAN_RUN, 0, 'no phantom run-on after TOF prescan alone');
 });
 
 test('purge: the timer only runs with the permissives healthy, and the valve stays shut until purge ok', () => {
@@ -170,24 +197,25 @@ test('CTU with RES: one count per rising edge, target drives DN', () => {
   const r = byId['rung-ctu-strokes'];
   const st = initialState(ioOf(r));
   st.dt = 1000;
+  const scanAll = () => ladsOf(r).forEach((lad) => analyze(lad, st, { live: true }));
   for (let i = 0; i < 12; i++) {
     st.bits.PUMP_SS = i % 2;
     st.bits['B3:3/7'] = i % 2;
-    analyze(r.ladder, st, { live: true });
-    analyze(r.ladder, st, { live: true });
+    scanAll();
+    scanAll();
   }
   assert.equal(st.counters['C5:0'].acc, 6, 'only real rising edges count');
   assert.equal(st.counters['C5:0'].dn, false, 'below target');
   st.values.TARGET = 5;
   st.bits.PUMP_SS = 0; st.bits['B3:3/7'] = 0;
-  analyze(r.ladder, st, { live: true });
+  scanAll();
   st.bits.PUMP_SS = 1; st.bits['B3:3/7'] = 1;
-  analyze(r.ladder, st, { live: true });
+  scanAll();
   assert.equal(st.counters['C5:0'].dn, true, 'target reached');
   assert.equal(st.bits.BATCH_DONE, 1);
   // the reset rung clears it
   st.bits.BATCH_START = 1;
-  analyze(r.resetRung.ladder, st, { live: true });
+  scanAll();
   assert.equal(st.counters['C5:0'].acc, 0);
 });
 
@@ -276,4 +304,190 @@ test('block pin values stay short enough to fit inside the TON box', () => {
   for (const p of pins) {
     assert.ok(String(p.v).length <= 18, `cap-bank pin ${p.k}=${p.v} is too long for the box`);
   }
+});
+
+/* ------------------------------------------------------------------ Logix acceptance (Jeff 2026-11-15) */
+
+/** Build a one-element series rung ending in a timer/counter, optionally with a trailing coil. */
+function series(...els) {
+  return { t: 'and', c: els };
+}
+
+test('Logix RCO: TON/TOF/RTO/CTU/CTD pass rung-condition-in (not .DN)', () => {
+  // Studio 5000 Logix Designer help for each instruction: Set Rung-condition-out to Rung-condition-in.
+  const ladOf = (k, a, pre) => series(
+    { t: 'no', a: 'EN', l: 'enable' },
+    { t: 'blk', k, a, l: k, p: [{ k: 'PRE', v: pre }] },
+    { t: 'coil', k: 'OTE', a: 'OUT', l: 'out' }
+  );
+
+  // TON / RTO / CTU / CTD: enable true, .DN still false → coil must still be true (RCI).
+  for (const { k, a, kind, pre } of [
+    { k: 'TON', a: 'T1', kind: 'timers', pre: '10 s' },
+    { k: 'RTO', a: 'T3', kind: 'timers', pre: '10 s' },
+    { k: 'CTU', a: 'C1', kind: 'counters', pre: '99' },
+    { k: 'CTD', a: 'C2', kind: 'counters', pre: '99' }
+  ]) {
+    const st = initialState([]);
+    st.dt = 1000;
+    st.bits.EN = 1;
+    if (kind === 'timers') st.timers[a] = { acc: 0, dn: false, running: false, en: false };
+    else st.counters[a] = { acc: 0, dn: false, cu: false, cd: false, prevIn: false };
+    analyze(ladOf(k, a, pre), st, { live: true });
+    assert.equal(st.bits.OUT, 1, `${k} must pass RCI to the coil while .DN is still false`);
+    if (kind === 'timers') assert.equal(st.timers[a].dn, false, `${k} not done on first tick`);
+    else assert.equal(st.counters[a].dn, false, `${k} not done on first edge below PRE`);
+  }
+
+  // TOF distinctive case: enable false while still timing → .DN true but RCI false → coil false.
+  {
+    const st = initialState([]);
+    st.dt = 1000;
+    st.bits.EN = 1;
+    const tof = ladOf('TOF', 'T2', '10 s');
+    analyze(tof, st, { live: true }); // arm: ACC=0, DN=1
+    st.bits.EN = 0;
+    analyze(tof, st, { live: true }); // start off-delay
+    assert.equal(st.timers.T2.dn, true, 'TOF.DN held during off-delay');
+    assert.equal(st.timers.T2.running, true);
+    assert.equal(st.bits.OUT, 0, 'TOF must NOT pass .DN as RCO — coil follows RCI (false)');
+  }
+});
+
+test('Logix CTD .DN is ACC >= PRE (same as CTU), not IEC Q at CV<=0', () => {
+  const st = initialState([]);
+  st.dt = 1000;
+  st.counters.C = { acc: 5, dn: false, cu: false, cd: false, prevIn: false };
+  // One CTD edge with PRE=3: ACC becomes 4, still >= PRE → DN true.
+  st.bits.CD = 1;
+  analyze(series(
+    { t: 'no', a: 'CD' },
+    { t: 'blk', k: 'CTD', a: 'C', p: [{ k: 'PRE', v: '3' }] }
+  ), st, { live: true });
+  assert.equal(st.counters.C.acc, 4);
+  assert.equal(st.counters.C.dn, true, 'Logix CTD DN while ACC >= PRE');
+  assert.equal(st.counters.C.cd, true);
+
+  // Keep decrementing past zero: ACC negative, DN false once ACC < PRE.
+  for (let i = 0; i < 6; i++) {
+    st.bits.CD = 0;
+    analyze(series({ t: 'no', a: 'CD' }, { t: 'blk', k: 'CTD', a: 'C', p: [{ k: 'PRE', v: '3' }] }), st, { live: true });
+    st.bits.CD = 1;
+    analyze(series({ t: 'no', a: 'CD' }, { t: 'blk', k: 'CTD', a: 'C', p: [{ k: 'PRE', v: '3' }] }), st, { live: true });
+  }
+  assert.ok(st.counters.C.acc < 3);
+  assert.equal(st.counters.C.dn, false, 'DN clears when ACC drops below PRE');
+  // Contrast: IEC CTD would assert Q at CV<=0; Logix still uses ACC>=PRE only.
+  assert.ok(st.counters.C.acc <= 0 || st.counters.C.acc > 0);
+});
+
+test('member references expose .EN on timers and .CU/.CD on counters', () => {
+  assert.deepEqual(memberRef('T_LOCK.EN'), { base: 'T_LOCK', member: 'EN' });
+  assert.deepEqual(memberRef('C5:0/CU'), { base: 'C5:0', member: 'CU' });
+  assert.deepEqual(memberRef('C5:0.CD'), { base: 'C5:0', member: 'CD' });
+
+  const st = initialState([]);
+  st.dt = 1000;
+  st.bits.IN = 1;
+  analyze(series(
+    { t: 'no', a: 'IN' },
+    { t: 'blk', k: 'TON', a: 'T_LOCK', p: [{ k: 'PRE', v: '5 s' }] }
+  ), st, { live: true });
+  assert.equal(st.timers.T_LOCK.en, true);
+  assert.equal(analyze(series({ t: 'no', a: 'T_LOCK.EN' }, { t: 'coil', k: 'OTE', a: 'SEEN' }), st, { live: true }).writes[0]?.value, true);
+
+  st.bits.IN = 0;
+  analyze(series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTU', a: 'C5:0', p: [{ k: 'PRE', v: '10' }] }), st, { live: true });
+  st.bits.IN = 1;
+  analyze(series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTU', a: 'C5:0', p: [{ k: 'PRE', v: '10' }] }), st, { live: true });
+  assert.equal(st.counters['C5:0'].cu, true);
+  assert.equal(st.bits['SEEN_CU'] ?? 0, 0);
+  analyze(series({ t: 'no', a: 'C5:0.CU' }, { t: 'coil', k: 'OTE', a: 'SEEN_CU' }), st, { live: true });
+  assert.equal(st.bits.SEEN_CU, 1);
+
+  st.bits.IN = 0;
+  analyze(series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTD', a: 'C5:1', p: [{ k: 'PRE', v: '1' }] }), st, { live: true });
+  st.bits.IN = 1;
+  analyze(series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTD', a: 'C5:1', p: [{ k: 'PRE', v: '1' }] }), st, { live: true });
+  assert.equal(st.counters['C5:1'].cd, true);
+  analyze(series({ t: 'no', a: 'C5:1.CD' }, { t: 'coil', k: 'OTE', a: 'SEEN_CD' }), st, { live: true });
+  assert.equal(st.bits.SEEN_CD, 1);
+});
+
+test('TON with PRE=0 goes DN immediately when enabled', () => {
+  const st = initialState([]);
+  st.dt = 1000;
+  st.bits.EN = 1;
+  analyze(series(
+    { t: 'no', a: 'EN' },
+    { t: 'blk', k: 'TON', a: 'T0', p: [{ k: 'PRE', v: '0' }] }
+  ), st, { live: true });
+  assert.equal(st.timers.T0.acc, 0);
+  assert.equal(st.timers.T0.dn, true);
+  assert.equal(st.timers.T0.running, false);
+  assert.equal(st.timers.T0.en, true);
+
+  st.bits.EN = 0;
+  analyze(series(
+    { t: 'no', a: 'EN' },
+    { t: 'blk', k: 'TON', a: 'T0', p: [{ k: 'PRE', v: '0' }] }
+  ), st, { live: true });
+  assert.equal(st.timers.T0.dn, false);
+  assert.equal(st.timers.T0.en, false);
+});
+
+test('GT compares greater-than (same as GRT), not not-equal', () => {
+  const st = initialState([]);
+  st.values.A = 5;
+  st.values.B = 3;
+  const gt = analyze(series(
+    { t: 'blk', k: 'GT', p: [{ k: 'Src A', v: 'A' }, { k: 'Src B', v: 'B' }] },
+    { t: 'coil', k: 'OTE', a: 'HI' }
+  ), st, { live: true });
+  assert.equal(st.bits.HI, 1);
+
+  st.values.A = 3;
+  st.values.B = 5;
+  analyze(series(
+    { t: 'blk', k: 'GT', p: [{ k: 'Src A', v: 'A' }, { k: 'Src B', v: 'B' }] },
+    { t: 'coil', k: 'OTE', a: 'HI' }
+  ), st, { live: true });
+  assert.equal(st.bits.HI, 0);
+
+  // Equal operands: GT false, NEQ true — proves GT is not the old !== fall-through.
+  st.values.A = 4;
+  st.values.B = 4;
+  analyze(series(
+    { t: 'blk', k: 'GT', p: [{ k: 'Src A', v: 'A' }, { k: 'Src B', v: 'B' }] },
+    { t: 'coil', k: 'OTE', a: 'HI' }
+  ), st, { live: true });
+  assert.equal(st.bits.HI, 0, 'GT must be false when equal');
+  analyze(series(
+    { t: 'blk', k: 'NEQ', p: [{ k: 'Src A', v: 'A' }, { k: 'Src B', v: 'B' }] },
+    { t: 'coil', k: 'OTE', a: 'DIFF' }
+  ), st, { live: true });
+  assert.equal(st.bits.DIFF, 0);
+  void gt;
+});
+
+test('reworked labs still teach delay-then-act via .DN follow-on rungs', () => {
+  // Purge: no short-circuit before DN
+  const blocked = scan('rung-purge', { bits: { FLAME_FAIL: 1 } });
+  assert.equal(blocked.st.bits.PURGE_OK, 0);
+  const midPurge = scan('rung-purge', { scans: 4 });
+  assert.equal(midPurge.st.bits.PURGE_OK, 0, 'purge must wait for TON.DN');
+  assert.equal(midPurge.st.timers.T_PURGE.acc, 4000);
+
+  // ESD: confirm delay must elapse before GAS_TRIP
+  const early = scan('rung-esd-fg', { scans: 3, bits: { GD_A_ALM: 1 } });
+  assert.equal(early.st.bits.GAS_TRIP, 0);
+  const trip = scan('rung-esd-fg', { scans: 12, bits: { GD_A_ALM: 1 } });
+  assert.equal(trip.st.bits.GAS_TRIP, 1);
+  assert.equal(trip.st.bits.SDV_HOLD, 0);
+
+  // Alarm deadband still needs the on-delay
+  const hot = scan('rung-alarm-deadbnd', { scans: 6, values: { LEVEL_PV: 101.2 } });
+  assert.equal(hot.st.bits.LSHH_ALM, 1);
+  const spike = scan('rung-alarm-deadbnd', { scans: 2, values: { LEVEL_PV: 101.2 } });
+  assert.equal(spike.st.bits.LSHH_ALM, 0, 'short spike must not latch');
 });

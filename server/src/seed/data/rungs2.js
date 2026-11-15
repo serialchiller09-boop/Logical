@@ -71,9 +71,18 @@ export const RUNGS2 = [
         { t: 'no', a: 'BLOWER_RUN', l: 'FD fan running' },
         { t: 'nc', a: 'FLAME_FAIL', l: 'No flame fault' },
         { t: 'nc', a: 'FG_LOW_PS', l: 'Fuel gas pressure OK' },
-        { t: 'blk', k: 'TON', a: 'T_PURGE', l: 'Purge timer', p: [{ k: 'PRE', v: '300 s' }, { k: 'DN', v: 'purge complete' }] },
-        { t: 'coil', k: 'OTE', a: 'PURGE_OK', l: 'Purge done' }
+        { t: 'blk', k: 'TON', a: 'T_PURGE', l: 'Purge timer', p: [{ k: 'PRE', v: '300 s' }, { k: 'DN', v: 'purge complete' }] }
       ]
+    },
+    followOn: {
+      note: 'Purge-done bit from TON .DN on a following rung. Logix TON passes rung-condition-in; .DN is the status to test:',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'T_PURGE.DN', l: 'Purge time elapsed' },
+          { t: 'coil', k: 'OTE', a: 'PURGE_OK', l: 'Purge done' }
+        ]
+      }
     },
     fuelRung: {
       note: 'Fuel gas admission, gated on the purge result, with the pilot and main valves commanded in series with their proven-open feedbacks on the next rung:',
@@ -99,8 +108,8 @@ export const RUNGS2 = [
       { tag: 'FG_SAFETY_OPEN', type: 'DO', addr: 'O:4.0', role: 'Fuel gas safety trip valve (fail closed)', initial: 0 }
     ],
     readThisWay: [
-      'The timer is deliberately in series with the fan running bit: any interruption of combustion air resets the purge accumulation, because a purged furnace is only purged if the air kept moving.',
-      'FLAME_FAIL appears in BOTH rungs. It must stop the purge from being valid and it must close the fuel valve. Two places, one cause - that is intentional and should be documented as such.',
+      'The timer is deliberately in series with the fan running bit: any interruption of combustion air resets the purge accumulation, because a purged furnace is only purged if the air kept moving. PURGE_OK is written from .DN on the next rung.',
+      'FLAME_FAIL appears on the timer rung and on the fuel rung. It must stop the purge from being valid and it must close the fuel valve. Two places, one cause - that is intentional and should be documented as such.',
       'This pattern needs the proven-valve logic (ZSO/ZSC on the fuel trip valves) as an extra rung pair. A fuel gas valve that is commanded open and sits closed is an ignition failure; one commanded closed and sits open is an explosion. Both need detecting.'
     ],
     defects: [
@@ -237,10 +246,19 @@ export const RUNGS2 = [
           { t: 'no', a: 'GD_A_ALM', l: 'A in alarm' },
           { t: 'no', a: 'GD_B_ALM', l: 'B in alarm' }
         ] },
-        { t: 'blk', k: 'TON', a: 'T_FG', l: 'Confirm delay', p: [{ k: 'PRE', v: '10 s' }] },
-        { t: 'nc', a: 'FG_BYPASS', l: 'Not bypassed' },
-        { t: 'coil', k: 'OTE', a: 'GAS_TRIP', l: 'Trip asserted' }
+        { t: 'blk', k: 'TON', a: 'T_FG', l: 'Confirm delay', p: [{ k: 'PRE', v: '10 s' }] }
       ]
+    },
+    followOn: {
+      note: 'Trip coil from TON .DN and the bypass contact. Logix TON passes rung-condition-in; without this split the trip would fire before the confirm delay finished:',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'T_FG.DN', l: 'Confirm delay elapsed' },
+          { t: 'nc', a: 'FG_BYPASS', l: 'Not bypassed' },
+          { t: 'coil', k: 'OTE', a: 'GAS_TRIP', l: 'Trip asserted' }
+        ]
+      }
     },
     solenoidRung: {
       note: 'The final element rung, written the other way round on purpose: it ENERGIZES to hold the valve open, so everything that can fail, fails to a shutdown:',
@@ -268,7 +286,7 @@ export const RUNGS2 = [
     ],
     readThisWay: [
       'Detector ALARM bits are 1oo2 (either one trips) because detection sensitivity matters more here than spurious-trip avoidance; detector FAULT bits are separate and ALSO open the hold circuit. Fault and alarm are different conditions and must never be merged.',
-      'The delay is only on the alarm path. Faults trip immediately, because a dead detector is already a loss of protection.',
+      'The confirm delay is a TON on the alarm path; GAS_TRIP is written from .DN on the next rung (with the bypass). Faults still trip the solenoid hold immediately, because a dead detector is already a loss of protection.',
       'The output rung is a chain of XIOs ending in an energized coil. Read it as "there is no reason to close" - that is exactly why a cut wire closes it.'
     ],
     defects: [
@@ -410,10 +428,19 @@ export const RUNGS2 = [
         { t: 'no', a: 'SEQ_ENABLE', l: 'Enabled' },
         { t: 'nc', a: 'SEQ_TRIP', l: 'No trip' },
         { t: 'blk', k: 'GRT', a: '', l: 'Step done?', p: [{ k: 'Src A', v: 'STEP_OK' }, { k: 'Src B', v: '0' }] },
-        { t: 'blk', k: 'TON', a: 'T_DWELL', l: 'Dwell', p: [{ k: 'PRE', v: '15 s' }] },
-        { t: 'blk', k: 'ONS', a: 'B3:13/7', l: 'Advance once', p: [] },
-        { t: 'blk', k: 'MOV', a: '', l: 'Step + 1', p: [{ k: 'SRC', v: 'STEP + 1' }, { k: 'DST', v: 'STEP' }] }
+        { t: 'blk', k: 'TON', a: 'T_DWELL', l: 'Dwell', p: [{ k: 'PRE', v: '15 s' }] }
       ]
+    },
+    followOn: {
+      note: 'Advance once T_DWELL.DN is true. Logix TON passes rung-condition-in; without reading .DN here the step would race on the same scan the condition became true:',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'T_DWELL.DN', l: 'Dwell elapsed' },
+          { t: 'blk', k: 'ONS', a: 'B3:13/7', l: 'Advance once', p: [] },
+          { t: 'blk', k: 'MOV', a: '', l: 'Step + 1', p: [{ k: 'SRC', v: 'STEP + 1' }, { k: 'DST', v: 'STEP' }] }
+        ]
+      }
     },
     tripRung: {
       note: 'Fault path takes priority over the increment - so it sits in the same file, executed after the advance rung, and writes the step directly:',
@@ -434,8 +461,8 @@ export const RUNGS2 = [
       { tag: 'B3:13/7', type: 'BIT', addr: 'B3:13/7', role: 'Advance one-shot bit', initial: 0 }
     ],
     readThisWay: [
-      'The whole machine is five elements and one integer. Readability comes from the discipline, not the complexity: one rung advances, per-step rungs set STEP_OK, one rung handles the fault, output rungs test STEP = n.',
-      'The ONS before the MOV is what stops the step counter racing through every step in one second while the dwell timer holds true.',
+      'The whole machine is a dwell timer, an advance rung on .DN, and one integer. Readability comes from the discipline, not the complexity: one rung times the dwell, the next advances, per-step rungs set STEP_OK, one rung handles the fault, output rungs test STEP = n.',
+      'The ONS before the MOV is what stops the step counter racing through every step in one second while the dwell .DN holds true.',
       'Writing 90 from a later rung means the fault wins for that scan regardless of the increment. If you invert that order, a trip during an advance gets overwritten - a bug that only shows up on the worst day.',
       'Outputs are driven by comparisons against STEP, so a step number means the same thing on the HMI, in the sequence table, and in the documentation.'
     ],

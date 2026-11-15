@@ -199,7 +199,7 @@ export const RUNGS = [
       ]
     },
     blockRung: {
-      note: 'A second rung uses the timer bit. The split is not decoration: an in-series TON only passes power once .DN is set, so the inhibit has to be written from an XIO on .DN, not taken off the timer contact itself:',
+      note: 'A second rung uses the timer done bit. Logix TON sets rung-condition-out = rung-condition-in (it does not gate on .DN), so the inhibit is written here from an XIO on .DN — not taken as power off the timer box itself:',
       ladder: {
         t: 'and',
         c: [
@@ -215,7 +215,7 @@ export const RUNGS = [
       { tag: 'RESTART_BLOCK', type: 'BIT', addr: 'B3:2/1', role: 'Inhibited-for-restart', initial: 0 }
     ],
     readThisWay: [
-      'The TON sits in series and an XIO on .DN follows it: the lockout is asserted from the moment of the trip and releases when the delay completes. Driving the coil straight off the timer would do the opposite - it would allow restart during the lockout and block it afterwards.',
+      'The TON runs on the trip bit; a following rung with XIO on .DN writes the lockout. That split matches Logix: the timer passes power through, and .DN is examined as a contact on another rung. Driving the coil as if the timer box itself were a done contact would allow restart during the lockout and block it afterwards.',
       'While TRIP_LAT is true the timer keeps accumulating; when the trip clears, TON loses enable and .ACC returns to zero (a TON is non-retentive) - so the next trip starts the full delay again.',
       'Preset unit: on Logix/SLC a TON preset is in MILLISECONDS, so 120 s is typed 120000. That single mismatch is the most common timer bug in existence.'
     ],
@@ -235,26 +235,35 @@ export const RUNGS = [
     level: 'Core',
     oneLine: 'The opposite job: keep something running a while after the process asks it to stop.',
     purpose: 'Keep the compressor aftercooler fan running after the machine unloads, so trapped hot gas is actually cooled instead of cooking the core; then let it stop by itself.',
-    boolean: 'FAN_RUN = TOF(LOADED).Q',
+    boolean: 'FAN_RUN = TOF(LOADED).DN AND NOT FAN_COMMON_TRIP',
     ladder: {
       t: 'and',
       c: [
         { t: 'no', a: 'MOTOR_RUNNING', l: 'Machine loaded' },
-        { t: 'blk', k: 'TOF', a: 'T_COOL', l: 'Run-on timer', p: [{ k: 'PRE', v: '300 s' }, { k: 'DN', v: 'fan commanded' }] },
-        { t: 'nc', a: 'FAN_COMMON_TRIP', l: 'Fan healthy' },
-        { t: 'coil', k: 'OTE', a: 'FAN_RUN', l: 'Fan contactor' }
+        { t: 'blk', k: 'TOF', a: 'T_COOL', l: 'Run-on timer', p: [{ k: 'PRE', v: '300 s' }, { k: 'DN', v: 'fan commanded' }] }
       ]
+    },
+    followOn: {
+      note: 'Fan command examines TOF .DN on a following rung. Logix TOF passes rung-condition-in through; the hold-after-stop lives in .DN, not in the box output:',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'T_COOL.DN', l: 'TOF still timing / done high' },
+          { t: 'nc', a: 'FAN_COMMON_TRIP', l: 'Fan healthy' },
+          { t: 'coil', k: 'OTE', a: 'FAN_RUN', l: 'Fan contactor' }
+        ]
+      }
     },
     io: [
       { tag: 'MOTOR_RUNNING', type: 'DI', addr: 'I:3.0', role: 'Compressor running / loaded', initial: 1 },
-      { tag: 'T_COOL', type: 'TIMER', addr: 'T4:1', role: 'Off-delay timer', initial: 0 },
+      { tag: 'T_COOL', type: 'TIMER', addr: 'T4:1', role: 'Off-delay timer', instruction: 'TOF', preMs: 300000, initial: 0 },
       { tag: 'FAN_COMMON_TRIP', type: 'DI', addr: 'I:3.1', role: 'Fan breaker/fault', initial: 0 },
       { tag: 'FAN_RUN', type: 'DO', addr: 'O:2.0', role: 'Aftercooler fan starter', initial: 0 }
     ],
     readThisWay: [
-      'TOF: done bit is TRUE while the rung is energized AND for the preset after it goes false. So the fan keeps running through the delay without you timing anything explicitly.',
-      'The trip contact is placed AFTER the timer, so a fault on the fan drops the output immediately - the delay never overrides a real protection input.',
-      'Position matters: put that same contact before the timer and a fan fault would still leave the timer "done" and the HMI showing a fan that is off.'
+      'TOF .DN is TRUE while the enable rung is true, and it stays TRUE for the preset after the enable drops. The fan coil reads that .DN bit on a following rung.',
+      'The trip contact sits with the fan coil, so a fault drops the output immediately — the off-delay never overrides a real protection input.',
+      'On power-up Logix sets TOF .ACC = .PRE (prescan). Until the motor has been true at least once, .DN stays false after that prescan — you must see a falling edge from a real run to get run-on.'
     ],
     defects: [
       'Running a TOF off a latched trip bit you forgot to unlatch, so the fan runs until the next shift.',
@@ -278,9 +287,18 @@ export const RUNGS = [
       c: [
         { t: 'no', a: 'PUMP_SS', l: 'Stroke switch' },
         { t: 'blk', k: 'ONS', a: 'B3:3/7', l: 'One shot', p: [] },
-        { t: 'blk', k: 'CTU', a: 'C5:0', l: 'Stroke counter', p: [{ k: 'PRE', v: 'TARGET' }, { k: 'ACC', v: 'strokes' }, { k: 'DN', v: 'batch done' }] },
-        { t: 'coil', k: 'OTE', a: 'BATCH_DONE', l: 'Target reached' }
+        { t: 'blk', k: 'CTU', a: 'C5:0', l: 'Stroke counter', p: [{ k: 'PRE', v: 'TARGET' }, { k: 'ACC', v: 'strokes' }, { k: 'DN', v: 'batch done' }] }
       ]
+    },
+    followOn: {
+      note: 'Done coil examines CTU .DN on a following rung. Logix CTU passes rung-condition-in through; .DN is the status bit to test:',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'C5:0.DN', l: 'At or above target' },
+          { t: 'coil', k: 'OTE', a: 'BATCH_DONE', l: 'Target reached' }
+        ]
+      }
     },
     resetRung: {
       note: 'Reset rung, kept separate and labeled:',
@@ -299,6 +317,7 @@ export const RUNGS = [
     ],
     readThisWay: [
       'CTU counts false-to-true transitions of its rung - so the ONS ahead of it is what makes the count mean "one stroke" instead of "one scan while the switch was closed".',
+      'BATCH_DONE is written from C5:0.DN on a following rung. Logix CTU does not make the box itself a done contact on the same rung.',
       'The counter\'s .ACC is retentive on legacy platforms, which is why the RES rung is part of the pattern and not an optional extra.',
       'The reset rung sits after the counted element. If it ran before, you would reset the count you had just made in that same scan.'
     ],
@@ -323,9 +342,18 @@ export const RUNGS = [
       t: 'and',
       c: [
         { t: 'blk', k: 'GRT', a: '', l: 'LV > HH', p: [{ k: 'Src A', v: 'LEVEL_PV' }, { k: 'Src B', v: '100.0 %' }] },
-        { t: 'blk', k: 'TON', a: 'T_ALARM', l: 'On-delay', p: [{ k: 'PRE', v: '5 s' }] },
-        { t: 'coil', k: 'OTL', a: 'LSHH_ALM', l: 'Alarm' }
+        { t: 'blk', k: 'TON', a: 'T_ALARM', l: 'On-delay', p: [{ k: 'PRE', v: '5 s' }] }
       ]
+    },
+    followOn: {
+      note: 'Latch the alarm from TON .DN on a following rung (Logix TON passes rung-condition-in; .DN is the delayed status bit):',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'T_ALARM.DN', l: 'Delay elapsed' },
+          { t: 'coil', k: 'OTL', a: 'LSHH_ALM', l: 'Alarm' }
+        ]
+      }
     },
     clearRung: {
       note: 'Reset side, using the lower (hysteresis) limit so the alarm cannot re-fire immediately:',
@@ -344,7 +372,7 @@ export const RUNGS = [
     ],
     readThisWay: [
       'Set on one limit, clear on a lower one. That gap is the deadband, and it is what stops the alarm from toggling while the PV sits on the limit.',
-      'The TON in series means a spike shorter than the delay never latches anything. Note the delay is a deliberate risk decision, not a tidiness preference.',
+      'The TON runs while the PV is above the high limit; a following rung latches the alarm from .DN. A spike shorter than the delay never latches anything. Note the delay is a deliberate risk decision, not a tidiness preference.',
       'On a modern platform this whole pattern is one analog-alarm instruction with the deadband and delay as parameters - which is why you should still be able to read it written out.'
     ],
     defects: [
@@ -380,13 +408,22 @@ export const RUNGS = [
       ]
     },
     proveRung: {
-      note: 'Proven-open supervision - a request is not a position:',
+      note: 'Proven-open supervision timer — a request is not a position. The TON runs while commanded and not yet proven:',
       ladder: {
         t: 'and',
         c: [
           { t: 'no', a: 'JT_OPEN_CMD', l: 'Commanded' },
           { t: 'nc', a: 'JT_ZSO', l: 'Not proven' },
-          { t: 'blk', k: 'TON', a: 'T_JTTIME', l: 'Stroke time', p: [{ k: 'PRE', v: '10 s' }] },
+          { t: 'blk', k: 'TON', a: 'T_JTTIME', l: 'Stroke time', p: [{ k: 'PRE', v: '10 s' }] }
+        ]
+      }
+    },
+    followOn: {
+      note: 'Fail latch examines TON .DN on a following rung (Logix TON passes rung-condition-in; status is .DN):',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'T_JTTIME.DN', l: 'Stroke time elapsed' },
           { t: 'coil', k: 'OTL', a: 'JT_FAIL_OPEN', l: 'Valve failed to open' }
         ]
       }
@@ -406,7 +443,7 @@ export const RUNGS = [
     readThisWay: [
       'All the safety conditions are series XIC/XIO: they are AND-ed, and any of them opening stops the command.',
       'The OR branch is a hold path - it keeps the command alive once issued even if the sequence step moves on.',
-      'The second rung is the important one: it times the gap between "commanded" and "proven" and latches a failure. That is how you catch a valve that is air-bound, iced, or has a failed pilot.'
+      'The prove timer times the gap between "commanded" and "proven"; a following rung latches failure from .DN. That is how you catch a valve that is air-bound, iced, or has a failed pilot.'
     ],
     defects: [
       'Advancing the sequence on the output bit instead of the proven position - the plant then continues with a closed J-T valve and the cold box never cools, which looks like a refrigeration problem for hours.',
