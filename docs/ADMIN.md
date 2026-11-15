@@ -14,7 +14,7 @@ whole model:
 
 ## The admin token
 
-All write endpoints are guarded:
+All admin endpoints are guarded:
 
 ```
 PUT    /api/admin/entries/:id
@@ -37,13 +37,37 @@ ADMIN_TOKEN='something-you-would-not-guess' npm start
 #    and is sent as a header on admin calls.
 ```
 
-If `ADMIN_TOKEN` is **not** set, the server logs a warning on boot and accepts the development default
-`logical-admin`. That is convenient on a laptop and wrong on a shared machine — anyone who can reach the
-port can rewrite the register. Either set a token, or don't expose the port.
+### Development vs production
+
+| Environment | `ADMIN_TOKEN` unset | Behavior |
+|---|---|---|
+| Development (`NODE_ENV` not `production`) | yes | Accepts the development default `logical-admin` so a laptop install works without setup. |
+| Production (`NODE_ENV=production`) | yes | **Admin routes stay mounted but refuse every call** with HTTP 503 until you set `ADMIN_TOKEN`. The learning API and personal state still run. |
+| Any | set | That value is required on `x-admin-token`. |
+
+Never ship a shared or internet-facing install without setting `ADMIN_TOKEN`. The development default is for local work only.
 
 There is no user accounts model: this is a single-install working tool. If you put it on a shared server,
 put it behind your normal auth (reverse proxy, SSO, VPN) and treat the token as a break-glass secret, not as
 the access control.
+
+## Personal state (bookmarks, notes, recents)
+
+These routes are not admin-protected. They are scoped to an **anonymous browser session** stored in an
+`httpOnly` cookie named `logical_sid` (random 32-byte id, `SameSite=Lax`, `Secure` in production). The cookie
+is set on the first personal-state request. That keeps notes and bookmarks per browser without accounts, and
+keeps the session id out of page JavaScript.
+
+## Cross-origin API access
+
+By default the API does not grant browser CORS to foreign origins (same-origin SPA or the Vite `/api` proxy
+is the normal path). If a separate UI origin must call the API, set:
+
+```bash
+CORS_ORIGINS=https://ui.example.com,http://127.0.0.1:5173
+```
+
+The browser must send credentials so the session cookie is included.
 
 ## What an edit does
 

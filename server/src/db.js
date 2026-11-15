@@ -47,20 +47,26 @@ CREATE INDEX IF NOT EXISTS idx_entries_kind ON entries(section, kind);
 CREATE INDEX IF NOT EXISTS idx_entries_title ON entries(title);
 
 CREATE TABLE IF NOT EXISTS bookmarks (
-  entry_id    TEXT PRIMARY KEY,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  session_id  TEXT NOT NULL,
+  entry_id    TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (session_id, entry_id)
 );
 
 CREATE TABLE IF NOT EXISTS notes (
-  entry_id    TEXT PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,
+  session_id  TEXT NOT NULL,
+  entry_id    TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
   body        TEXT NOT NULL DEFAULT '',
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (session_id, entry_id)
 );
 
 CREATE TABLE IF NOT EXISTS recents (
-  entry_id    TEXT PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,
+  session_id  TEXT NOT NULL,
+  entry_id    TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
   viewed_at   TEXT NOT NULL DEFAULT (datetime('now')),
-  views       INTEGER NOT NULL DEFAULT 1
+  views       INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (session_id, entry_id)
 );
 
 CREATE TABLE IF NOT EXISTS seed_meta (
@@ -69,6 +75,40 @@ CREATE TABLE IF NOT EXISTS seed_meta (
 );
 `;
 
+/** Older installs used global (unscoped) personal-state tables. Drop that shared
+ *  data rather than invent a session for it — those rows were readable by anyone
+ *  who could reach the API. Fresh installs already have session_id columns. */
+function migrateUserStateSchema(d) {
+  const cols = d.prepare('PRAGMA table_info(bookmarks)').all().map((c) => c.name);
+  if (cols.includes('session_id')) return;
+
+  d.exec(`
+    DROP TABLE IF EXISTS bookmarks;
+    DROP TABLE IF EXISTS notes;
+    DROP TABLE IF EXISTS recents;
+    CREATE TABLE bookmarks (
+      session_id  TEXT NOT NULL,
+      entry_id    TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (session_id, entry_id)
+    );
+    CREATE TABLE notes (
+      session_id  TEXT NOT NULL,
+      entry_id    TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+      body        TEXT NOT NULL DEFAULT '',
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (session_id, entry_id)
+    );
+    CREATE TABLE recents (
+      session_id  TEXT NOT NULL,
+      entry_id    TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+      viewed_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      views       INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (session_id, entry_id)
+    );
+  `);
+}
+
 let db;
 export function getDb() {
   if (db) return db;
@@ -76,6 +116,7 @@ export function getDb() {
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA);
+  migrateUserStateSchema(db);
   return db;
 }
 
@@ -165,6 +206,8 @@ export async function seed({ force = false } = {}) {
       .run('seeded_at', new Date().toISOString());
     // bookmarks have no FK (they are a user list), so drop pointers to content that vanished
     d.prepare('DELETE FROM bookmarks WHERE entry_id NOT IN (SELECT id FROM entries)').run();
+    d.prepare('DELETE FROM notes WHERE entry_id NOT IN (SELECT id FROM entries)').run();
+    d.prepare('DELETE FROM recents WHERE entry_id NOT IN (SELECT id FROM entries)').run();
     const kept = d.prepare('SELECT COUNT(*) AS n FROM entries WHERE edited = 1').get().n;
     return { skipped: false, entries: entries.length, plantEntriesKept: kept };
   });
