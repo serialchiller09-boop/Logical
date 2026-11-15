@@ -2,7 +2,11 @@ import { Link } from 'react-router-dom';
 import { useApp, useTitle } from '../lib/store.jsx';
 import { useAsync, api } from '../lib/api.js';
 import { Loader } from '../components/Bits.jsx';
-import { PANEL_SCENARIOS, panelScenarioHref } from '../data/panelScenarios.js';
+import {
+  PROGRESSIVE_PATH_LEVELS,
+  pathLevelEntryId,
+  pathLevelHref
+} from '../data/progressivePath.js';
 
 export default function Home() {
   useTitle(null);
@@ -12,11 +16,11 @@ export default function Home() {
   const lab = sections.find((s) => s.slug === 'rungs');
   const reference = sections.filter((s) => s.slug !== 'rungs');
   const rungById = new Map((rungs?.entries || []).map((e) => [e.id, e]));
-  const panelScenarios = PANEL_SCENARIOS
+  const pathLevels = PROGRESSIVE_PATH_LEVELS
     .slice()
-    .sort((a, b) => a.order - b.order)
-    .map((s) => ({ ...s, entry: rungById.get(s.entryId) }))
-    .filter((s) => s.entry);
+    .sort((a, b) => a.level - b.level)
+    .map((l) => ({ ...l, entry: rungById.get(pathLevelEntryId(l)) }))
+    .filter((l) => l.entry);
 
   return (
     <>
@@ -38,21 +42,25 @@ export default function Home() {
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-hd">
           <h3>Practice labs</h3>
-          <span className="hd-note">guided labs · panel opens beside the ladder</span>
+          <span className="hd-note">Level 1…8 · open path · panel beside the ladder</span>
         </div>
         <div className="card-bd">
           <p className="tiny muted" style={{ margin: '0 0 10px' }}>
-            Each lab opens a practice panel next to the ladder. Flip the switches, then press Step.
-            Tags stay in this browser — not real plant I/O.
+            One idea at a time. Every level is open — start anywhere, or walk 1→8.
+            Flip the switches, then press Step. Tags stay in this browser — not real plant I/O.
           </p>
           {rungsLoading && <Loader label="loading practice labs" />}
           <div className="rung-lab-grid">
-            {panelScenarios.map((s) => (
-              <Link key={s.entryId} to={panelScenarioHref(s.entryId)} className="rung-lab-card rung-lab-card-panel">
-                <span className="rung-lab-kicker">{s.levelTitle || s.cardTitle}</span>
-                <span className="rung-lab-title">{s.entry.title}</span>
-                <span className="rung-lab-goal">{s.entry.subtitle}</span>
-                <span className="rung-lab-go">open with panel →</span>
+            {pathLevels.map((l) => (
+              <Link
+                key={`level-${l.level}`}
+                to={pathLevelHref(l)}
+                className="rung-lab-card rung-lab-card-panel"
+              >
+                <span className="rung-lab-kicker">Level {l.level} · {l.levelTitle}</span>
+                <span className="rung-lab-title">{l.entry.title}</span>
+                <span className="rung-lab-goal">{l.goal || l.entry.subtitle}</span>
+                <span className="rung-lab-go">open level →</span>
               </Link>
             ))}
           </div>
@@ -61,8 +69,8 @@ export default function Home() {
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-hd">
-          <h3>Try one</h3>
-          <span className="hd-note">goal first — open to simulate</span>
+          <h3>More rungs</h3>
+          <span className="hd-note">all labs — including ones not on the path</span>
         </div>
         <div className="card-bd">
           {rungsLoading && <Loader label="loading rungs" />}

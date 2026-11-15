@@ -9,6 +9,10 @@ import {
   PROGRESSIVE_PATH_LEVELS
 } from '../server/src/seed/index.js';
 import { PANEL_SCENARIOS, panelScenarioHref } from '../web/src/data/panelScenarios.js';
+import {
+  PROGRESSIVE_PATH_LEVELS as WEB_PATH,
+  pathLevelHref
+} from '../web/src/data/progressivePath.js';
 
 const ENTRIES = buildEntries();
 const byId = new Map(ENTRIES.map((e) => [e.id, e]));
@@ -148,7 +152,7 @@ test('cap-bank entry goal states the close pulse win and that the timer is only 
   assert.doesNotMatch(goal, /safe to touch|proves safe/i);
 });
 
-test('Home pin list matches seed scenario ids and deep-links with dock=side', () => {
+test('Home unique-entry pins still match seed scenario ids', () => {
   assert.equal(PANEL_SCENARIOS.length, GUIDED_PANEL_SCENARIOS.length);
   const seedIds = new Set(GUIDED_PANEL_SCENARIOS.map((s) => `rungs:${s.rungId}`));
   for (const p of PANEL_SCENARIOS) {
@@ -157,6 +161,16 @@ test('Home pin list matches seed scenario ids and deep-links with dock=side', ()
     assert.ok(p.levelTitle || p.cardTitle, `${p.entryId}: title`);
     assert.match(panelScenarioHref(p.entryId), /\?dock=side$/);
     assert.match(panelScenarioHref(p.entryId), /^\/e\//);
+  }
+});
+
+test('Home progressive path lists all eight levels with open deep-links', () => {
+  assert.equal(WEB_PATH.length, 8);
+  assert.equal(WEB_PATH.length, PROGRESSIVE_PATH_LEVELS.length);
+  for (const l of WEB_PATH) {
+    assert.ok(byId.has(`rungs:${l.rungId}`), `path level ${l.level} missing entry`);
+    assert.match(pathLevelHref(l), /dock=side/);
+    assert.match(pathLevelHref(l), new RegExp(`level=${l.level}`));
   }
 });
 
