@@ -491,7 +491,8 @@ export function RungSimulator({
           <summary className="tiny muted">Teaching model (not a real PLC runtime)</summary>
           <p className="tiny muted" style={{ margin: '6px 0 0' }}>
             Booleans evaluate as drawn; timers and counters advance one scan period per step;
-            MOV/CPT/SEL/LIM/PID operands resolve when numeric or a named I/O tag. Real controllers also depend on
+            MOV/CPT/SEL/PID operands resolve when numeric or a named I/O tag.
+            LIM tests Low, Test, and High and does not write a clamped value. Real controllers also depend on
             scan overlap, I/O update points, task priority and firmware specifics.
             Shared sandbox values are browser-local teaching state — not live field I/O.
           </p>

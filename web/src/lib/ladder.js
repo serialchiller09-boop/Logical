@@ -279,11 +279,29 @@ function evalBlock(node, ctx, live) {
     return rising;
   }
 
-  if (k === 'MOV' || k === 'CPT' || k === 'SEL' || k === 'LIM' || k === 'PID' || k === 'MSG') {
+  if (k === 'LIM') {
+    // 1756-RM003 pp. 314, 318-319, 321: LIM tests Test against Low and High.
+    // It does not write a clamped number. NAN, or an operand this simulator
+    // cannot read as a number, does not pass.
+    const low = operandValue(param(node, 'LO') ?? param(node, 'LowLimit'), st);
+    const testValue = operandValue(param(node, 'IN') ?? param(node, 'Test'), st);
+    const high = operandValue(param(node, 'HI') ?? param(node, 'HighLimit'), st);
+    return limitTestPasses(low, testValue, high);
+  }
+
+  if (k === 'MOV' || k === 'CPT' || k === 'SEL' || k === 'PID' || k === 'MSG') {
     if (live && enabled) applyDataOp(node, st, ctx);
     return !!enabled;
   }
   return !!enabled;
+}
+
+/** Inclusive band when Low <= High. When Low > High, true on either limit or outside the open interval. */
+function limitTestPasses(low, testValue, high) {
+  if (typeof low !== 'number' || typeof testValue !== 'number' || typeof high !== 'number') return false;
+  if (Number.isNaN(low) || Number.isNaN(testValue) || Number.isNaN(high)) return false;
+  if (low <= high) return testValue >= low && testValue <= high;
+  return testValue <= high || testValue >= low;
 }
 
 function applyDataOp(node, st, ctx) {
@@ -292,12 +310,7 @@ function applyDataOp(node, st, ctx) {
   let v = null;
   if (node.k === 'MOV') v = resolveOperand(param(node, 'SRC'), st.values);
   else if (node.k === 'SEL') v = resolveOperand(bitOf(st, param(node, 'GATE')) ? param(node, 'TRUE') : param(node, 'FALSE'), st.values);
-  else if (node.k === 'LIM') {
-    const lo = resolveOperand(param(node, 'LO'), st.values);
-    const hi = resolveOperand(param(node, 'HI'), st.values);
-    const inV = resolveOperand(param(node, 'IN'), st.values);
-    if (inV != null) v = Math.min(hi ?? Infinity, Math.max(lo ?? -Infinity, inV));
-  } else if (node.k === 'CPT') v = evalExpr(param(node, 'EXPR'), st.values);
+  else if (node.k === 'CPT') v = evalExpr(param(node, 'EXPR'), st.values);
   else if (node.k === 'PID') {
     const sp = resolveOperand(param(node, 'SP'), st.values);
     const pv = resolveOperand(param(node, 'PV'), st.values);
