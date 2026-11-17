@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AppProvider, groupSections, useApp } from './lib/store.jsx';
 import { SearchPalette } from './components/SearchPalette.jsx';
 import { notebookPdfHref } from './lib/controlsNotebook.js';
+import { breadcrumbItems } from './lib/crumbs.js';
 
 const SIDEBAR_COLLAPSED_KEY = 'logical.sidebar-collapsed.v1';
 
@@ -111,13 +112,9 @@ function Sidebar({ onNavigate, open = false, collapsed = false, onToggleCollapse
 }
 
 function Topbar() {
-  const { setPalette, drawer, setDrawer } = useApp();
+  const { sections, setPalette, drawer, setDrawer } = useApp();
   const loc = useLocation();
-  const seg = loc.pathname.split('/').filter(Boolean);
-  const crumbs = [{ to: '/', label: 'reference' }];
-  const LABELS = { s: 'section', e: 'entry', editor: 'rung editor', exercises: 'exercises', 'controls-notebook': 'controls notebook', notebook: 'substation notebook', 'io-sandbox': 'I/O sandbox', tools: 'tools & simulator', saved: 'my list', admin: 'plant data', search: 'search' };
-  if (seg[0] && seg[0] !== '') crumbs.push({ to: `/${seg[0]}${seg[1] ? '' : ''}`, label: LABELS[seg[0]] || seg[0] });
-  if (seg[1]) crumbs.push({ to: null, label: decodeURIComponent(seg[1]).replace(/^.*:/, '') });
+  const crumbs = breadcrumbItems(loc.pathname, sections);
 
   return (
     <header className="topbar">
