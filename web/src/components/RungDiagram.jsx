@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { GEO, layout, frameLadder, fitRung, analyze, initialState, collectElements, collectRefs, fitPinText } from '../lib/ladder.js';
+import { GEO, layout, frameLadder, fitRung, blockBounds, analyze, initialState, collectElements, collectRefs, fitPinText } from '../lib/ladder.js';
 import {
   applyBusToBitsValues,
   isCouplingEnabled,
@@ -102,12 +102,11 @@ function Coil({ it, hot }) {
   );
 }
 
-function Block({ it, hot }) {
-  const { x, y, w, h } = it;
+function Block({ it, hot, geo = GEO }) {
+  const { x, y, w } = it;
   const rows = it.node.p || [];
-  const bh = Math.max(h, GEO.rowH - 14);
-  const boxY = y + (GEO.rowH - bh) / 2;
-  const mid = y + GEO.rowH / 2;
+  const { boxY, bh } = blockBounds(it, geo);
+  const mid = y + geo.rowH / 2;
   const rowLimit = 6;
   const innerX = x + 6;
   const innerW = w - 12;
@@ -181,7 +180,7 @@ export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO 
         {model.items.map((it, i) => {
           const hot = live ? !!map?.get(it.node) : false;
           if (it.node.t === 'coil') return <Coil key={`i${i}`} it={it} hot={hot} />;
-          if (it.node.t === 'blk') return <Block key={`i${i}`} it={it} hot={hot} />;
+          if (it.node.t === 'blk') return <Block key={`i${i}`} it={it} hot={hot} geo={geo} />;
           return <Contact key={`i${i}`} it={it} hot={hot} />;
         })}
       </svg>

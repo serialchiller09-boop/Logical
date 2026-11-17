@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, frameLadder, fitRung, layout
+  analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout
 } from '../web/src/lib/ladder.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
@@ -50,7 +50,7 @@ function addSeries(program, rungIndex, instructions) {
   let next = program;
   for (const instr of instructions) {
     const rungId = next.rungs[rungIndex].id;
-    const res = must(addInstruction(next, { rungId, kind: instr.kind, tag: instr.tag }));
+    const res = must(addInstruction(next, { rungId, kind: instr.kind, tag: instr.tag, pre: instr.pre }));
     next = res.program;
   }
   return next;
@@ -196,8 +196,9 @@ test('validation messages: blank tag, missing OTE, output before a contact, outp
   assert.match(blankError.message, /blank name is not allowed/i);
 
   const open = addSeries(createProgram(), 0, [{ kind: 'XIC', tag: 'Start' }]);
-  const openError = validateProgram(open).find((err) => err.code === 'ote-required');
-  assert.match(openError.message, /must end with an output coil \(OTE\) on the right/);
+  const openError = validateProgram(open).find((err) => err.code === 'output-required');
+  assert.match(openError.message, /must end with an output on the right/);
+  assert.match(openError.message, /OTE/);
 
   const mid = {
     version: 1,
@@ -210,7 +211,7 @@ test('validation messages: blank tag, missing OTE, output before a contact, outp
       ]
     }]
   };
-  const midError = validateProgram(mid).find((err) => err.code === 'ote-not-last');
+  const midError = validateProgram(mid).find((err) => err.code === 'output-not-last');
   assert.match(midError.message, /last instruction/);
   assert.match(midError.message, /before a contact/);
 
@@ -231,7 +232,7 @@ test('validation messages: blank tag, missing OTE, output before a contact, outp
       ]
     }]
   };
-  const insideError = validateProgram(inside).find((err) => err.code === 'ote-in-branch');
+  const insideError = validateProgram(inside).find((err) => err.code === 'output-in-branch');
   assert.match(insideError.message, /cannot sit inside a parallel branch/);
 
   const badName = addSeries(createProgram(), 0, [
@@ -451,6 +452,239 @@ test('editor geometry ties the coil to the right rail and fits a 375px canvas', 
   const wideFit = fitRung(wideFrame.w, phoneCanvas);
   assert.equal(wideFit.scrolls, true);
   assert.equal(wideFit.tagFontPx, LADDER_MIN_TAG_FONT_PX);
+});
+
+test('a version-1 save without timers still loads and scans', () => {
+  const storage = memoryStorage();
+  storage.setItem(EDITOR_STORAGE_KEY, JSON.stringify({
+    version: 1,
+    seq: 8,
+    rungs: [{
+      id: 'r1',
+      elements: [
+        { id: 'e1', kind: 'XIC', tag: 'Start' },
+        { id: 'e2', kind: 'OTE', tag: 'Motor' }
+      ]
+    }]
+  }));
+  const loaded = loadProgram(storage);
+  assert.equal(loaded.version, 1);
+  assert.equal(loaded.rungs[0].elements.map((el) => el.kind).join(','), 'XIC,OTE');
+  assert.equal(scanEditor(loaded, [{ bits: { Start: 1 } }]).traces[0].bits.Motor, 1);
+});
+
+test('OTL holds when its rung is false, and OTU clears only when its rung is true', () => {
+  let program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Start' },
+    { kind: 'OTL', tag: 'Motor' }
+  ]);
+  program = must(addRung(program)).program;
+  program = addSeries(program, 1, [
+    { kind: 'XIC', tag: 'Stop' },
+    { kind: 'OTU', tag: 'Motor' }
+  ]);
+  const { traces } = scanEditor(program, [
+    { bits: { Start: 1, Stop: 0 } },
+    { bits: { Start: 0, Stop: 0 } },
+    { bits: { Stop: 1 } },
+    { bits: { Stop: 0 } }
+  ]);
+  assert.equal(traces[0].bits.Motor, 1);
+  assert.equal(traces[1].bits.Motor, 1, 'Output Latch does nothing when rung-condition-in is false');
+  assert.equal(traces[2].bits.Motor, 0);
+  assert.equal(traces[3].bits.Motor, 0, 'Output Unlatch does nothing when rung-condition-in is false');
+});
+
+test('a seal-in drops when the rung is false; a latch keeps the bit', () => {
+  const sealed = scanEditor(sealInProgram(), [
+    { bits: { Start: 1, Stop: 0 } },
+    { bits: { Start: 0, Stop: 0 } },
+    { bits: { Start: 0, Stop: 1 } }
+  ]);
+  assert.equal(sealed.traces[1].bits.Motor, 1, 'seal-in holds after Start is released');
+  assert.equal(sealed.traces[2].bits.Motor, 0, 'OTE writes 0 when the rung is false');
+
+  let latch = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Start' },
+    { kind: 'OTL', tag: 'Motor' }
+  ]);
+  latch = must(addRung(latch)).program;
+  latch = addSeries(latch, 1, [
+    { kind: 'XIC', tag: 'Stop' },
+    { kind: 'OTU', tag: 'Motor' }
+  ]);
+  const held = scanEditor(latch, [
+    { bits: { Start: 1, Stop: 0 } },
+    { bits: { Start: 0, Stop: 0 } }
+  ]);
+  assert.equal(held.traces[1].bits.Motor, 1, 'OTL keeps the bit with Start released and no OTU');
+});
+
+test('TON reaches DN in 100 ms steps and clears when the rung is false', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Run' },
+    { kind: 'TON', tag: 'T_Delay', pre: 500 }
+  ]);
+  const on = scanEditor(program, Array.from({ length: 5 }, () => ({ bits: { Run: 1 } })));
+  assert.equal(on.traces[0].timers.T_Delay.acc, 100);
+  assert.equal(on.traces[0].timers.T_Delay.en, true);
+  assert.equal(on.traces[0].timers.T_Delay.running, true);
+  assert.equal(on.traces[0].timers.T_Delay.dn, false);
+  assert.equal(on.traces[4].timers.T_Delay.acc, 500);
+  assert.equal(on.traces[4].timers.T_Delay.dn, true);
+  assert.equal(on.traces[4].timers.T_Delay.running, false);
+  const cleared = scanEditor(program, [
+    { bits: { Run: 1 } },
+    { bits: { Run: 1 } },
+    { bits: { Run: 0 } }
+  ]);
+  assert.equal(cleared.traces[2].timers.T_Delay.acc, 0);
+  assert.equal(cleared.traces[2].timers.T_Delay.dn, false);
+  assert.equal(cleared.traces[2].timers.T_Delay.en, false);
+  assert.equal(cleared.traces[2].timers.T_Delay.running, false);
+});
+
+test('TOF times while the rung is false and clears DN when ACC reaches PRE', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Run' },
+    { kind: 'TOF', tag: 'T_Off', pre: 300 }
+  ]);
+  const { traces } = scanEditor(program, [
+    { bits: { Run: 1 } },
+    { bits: { Run: 0 } },
+    { bits: { Run: 0 } },
+    { bits: { Run: 0 } }
+  ]);
+  assert.equal(traces[0].timers.T_Off.acc, 0);
+  assert.equal(traces[0].timers.T_Off.en, true);
+  assert.equal(traces[0].timers.T_Off.dn, true);
+  assert.equal(traces[0].timers.T_Off.running, false);
+  assert.equal(traces[1].timers.T_Off.acc, 100);
+  assert.equal(traces[1].timers.T_Off.dn, true);
+  assert.equal(traces[1].timers.T_Off.running, true);
+  assert.equal(traces[1].timers.T_Off.en, false);
+  assert.equal(traces[3].timers.T_Off.acc, 300);
+  assert.equal(traces[3].timers.T_Off.dn, false);
+  assert.equal(traces[3].timers.T_Off.running, false);
+});
+
+test('CTU counts one rising edge when the input is held, and RES clears it', () => {
+  let program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Part' },
+    { kind: 'CTU', tag: 'C_Parts', pre: 3 }
+  ]);
+  program = must(addRung(program)).program;
+  program = addSeries(program, 1, [
+    { kind: 'XIC', tag: 'Reset' },
+    { kind: 'RES', tag: 'C_Parts' }
+  ]);
+  const held = scanEditor(program, [
+    { bits: { Part: 1, Reset: 0 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 0 } },
+    { bits: { Part: 1 } }
+  ]);
+  assert.equal(held.traces[0].counters.C_Parts.acc, 0, 'prescan .CU blocks an input that is already true');
+  assert.equal(held.traces[2].counters.C_Parts.acc, 0, 'holding that first true does not count');
+  assert.equal(held.traces[4].counters.C_Parts.acc, 1, 'the next false-to-true counts once');
+  assert.equal(held.traces[4].counters.C_Parts.dn, false);
+
+  const done = scanEditor(program, [
+    { bits: { Part: 0, Reset: 0 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 0 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 0 } },
+    { bits: { Part: 1 } }
+  ]);
+  assert.equal(done.traces[5].counters.C_Parts.acc, 3);
+  assert.equal(done.traces[5].counters.C_Parts.dn, true);
+
+  const reset = scanEditor(program, [
+    { bits: { Part: 0, Reset: 0 } },
+    { bits: { Part: 1, Reset: 0 } },
+    { bits: { Part: 0, Reset: 1 } }
+  ]);
+  assert.equal(reset.traces[1].counters.C_Parts.acc, 1);
+  assert.equal(reset.traces[2].counters.C_Parts.acc, 0);
+  assert.equal(reset.traces[2].counters.C_Parts.dn, false);
+  assert.equal(reset.traces[2].counters.C_Parts.cu, false);
+
+  let followed = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Run' },
+    { kind: 'TON', tag: 'T_Delay', pre: 200 }
+  ]);
+  followed = must(addRung(followed)).program;
+  followed = addSeries(followed, 1, [
+    { kind: 'XIC', tag: 'T_Delay.DN' },
+    { kind: 'OTE', tag: 'Done' }
+  ]);
+  const lit = scanEditor(followed, [
+    { bits: { Run: 1 } },
+    { bits: { Run: 1 } }
+  ]);
+  assert.equal(lit.traces[0].bits.Done, 0);
+  assert.equal(lit.traces[1].timers.T_Delay.dn, true);
+  assert.equal(lit.traces[1].bits.Done, 1);
+});
+
+test('CTU prescan leaves ACC at 0 when the input is already true, then counts the next rising edge', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Part' },
+    { kind: 'CTU', tag: 'C_Parts', pre: 3 }
+  ]);
+  const { traces } = scanEditor(program, [
+    { bits: { Part: 1 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 0 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 1 } }
+  ]);
+  assert.equal(traces[0].counters.C_Parts.acc, 0);
+  assert.equal(traces[0].counters.C_Parts.cu, true);
+  assert.equal(traces[1].counters.C_Parts.acc, 0);
+  assert.equal(traces[2].counters.C_Parts.cu, false);
+  assert.equal(traces[3].counters.C_Parts.acc, 1);
+  assert.equal(traces[4].counters.C_Parts.acc, 1, 'holding the rung true after the edge does not count again');
+});
+
+test('a timer or counter block title stays inside the rung frame', () => {
+  const pins = [
+    { k: 'PRE', v: '500' },
+    { k: 'ACC', v: '0' },
+    { k: 'EN', v: '' },
+    { k: 'TT', v: '' },
+    { k: 'DN', v: '' }
+  ];
+  const ton = {
+    t: 'and',
+    c: [
+      { t: 'no', a: 'Run' },
+      { t: 'blk', k: 'TON', a: 'T_Delay', p: pins }
+    ]
+  };
+  const ctu = {
+    t: 'and',
+    c: [
+      { t: 'no', a: 'Part' },
+      { t: 'blk', k: 'CTU', a: 'C_Parts', p: [
+        { k: 'PRE', v: '3' },
+        { k: 'ACC', v: '0' },
+        { k: 'CU', v: '' },
+        { k: 'DN', v: '' }
+      ] }
+    ]
+  };
+  for (const ladder of [ton, ctu]) {
+    const frame = frameLadder(layout(ladder, null, EDITOR_GEO), { geo: EDITOR_GEO });
+    const block = frame.items.find((it) => it.node.t === 'blk');
+    const bounds = blockBounds(block, EDITOR_GEO);
+    assert.ok(bounds.boxY >= 0, `${block.node.k} box top is ${bounds.boxY}`);
+    assert.ok(bounds.titleY >= 12, `${block.node.k} title baseline ${bounds.titleY} is clipped`);
+    assert.ok(bounds.bottom <= frame.h + 0.01, `${block.node.k} block extends past the frame`);
+    assert.ok(bounds.titleY < bounds.boxY + bounds.bh, `${block.node.k} title is outside its box`);
+  }
 });
 
 test('the program round-trips through localStorage and Reset restores one empty rung', () => {
