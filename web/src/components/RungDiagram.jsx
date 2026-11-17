@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { GEO, layout, analyze, initialState, collectElements, collectRefs, fitPinText } from '../lib/ladder.js';
+import { GEO, layout, frameLadder, fitRung, analyze, initialState, collectElements, collectRefs, fitPinText } from '../lib/ladder.js';
 import {
   applyBusToBitsValues,
   isCouplingEnabled,
@@ -145,28 +145,35 @@ function Block({ it, hot }) {
   );
 }
 
-export function RungDiagram({ ladder, map, live, height }) {
+export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO }) {
+  const wrapRef = useRef(null);
+  const [canvasW, setCanvasW] = useState(0);
   const model = useMemo(() => {
     if (!ladder) return null;
-    const box = layout(ladder, map);
-    const L = GEO.railPad;
-    const shift = L + 6;
-    const h = Math.max(box.h, GEO.rowH + 20) + 16;
-    const w = box.w + shift + L + 6;
-    const outY = h / 2;
-    const wires = box.wires
-      .map((wr) => wr.vertical
-        ? { ...wr, x: wr.x + shift, y1: wr.y1 + 8, y2: wr.y2 + 8 }
-        : { ...wr, x1: wr.x1 + shift, x2: wr.x2 + shift, y: wr.y + 8 });
-    wires.push({ x1: box.w + shift, x2: w - L, y: outY, c: live ? !!map?.get(ladder) : false });
-    const items = box.items.map((it) => ({ ...it, x: it.x + shift, y: it.y + 8 }));
-    return { w, h, items, wires, leftRail: L, rightRail: w - L };
-  }, [ladder, map, live]);
+    const box = layout(ladder, map, geo);
+    return frameLadder(box, { geo, conducts: !!(live && map?.get(ladder)) });
+  }, [ladder, map, live, geo]);
+
+  useEffect(() => {
+    if (!fit) return undefined;
+    const el = wrapRef.current;
+    if (!el) return undefined;
+    const measure = () => setCanvasW(el.clientWidth);
+    measure();
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fit, ladder]);
 
   if (!model) return null;
+  const fitted = fit && canvasW > 0 ? fitRung(model.w, canvasW) : null;
+  const renderW = fitted ? fitted.renderWidth : model.w;
+  const renderH = height ?? (fitted ? model.h * (renderW / model.w) : model.h);
+  const scrolls = !!fitted?.scrolls;
   return (
-    <div className="ladder-wrap">
-      <svg className="ladder" width={model.w} height={height ?? model.h} viewBox={`0 0 ${model.w} ${model.h}`} role="img"
+    <div className={`ladder-wrap ${scrolls ? 'is-scrollable' : ''}`} ref={wrapRef}>
+      <svg className="ladder" width={renderW} height={renderH} viewBox={`0 0 ${model.w} ${model.h}`} preserveAspectRatio="xMinYMid meet" role="img"
         aria-label={`Ladder rung: ${describeRung(ladder)}`}>
         <line className="ld-rail" x1={model.leftRail} y1={4} x2={model.leftRail} y2={model.h - 4} />
         <line className="ld-rail" x1={model.rightRail} y1={4} x2={model.rightRail} y2={model.h - 4} />
@@ -178,6 +185,9 @@ export function RungDiagram({ ladder, map, live, height }) {
           return <Contact key={`i${i}`} it={it} hot={hot} />;
         })}
       </svg>
+      {scrolls && (
+        <div className="ladder-more" role="note">Scroll right for the coil and the right rail</div>
+      )}
     </div>
   );
 }

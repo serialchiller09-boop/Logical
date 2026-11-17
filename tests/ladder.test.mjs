@@ -11,8 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  analyze, layout, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
-  memberRef
+  analyze, layout, frameLadder, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
+  memberRef, GEO
 } from '../web/src/lib/ladder.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
 import { RUNGS2 } from '../server/src/seed/data/rungs2.js';
@@ -217,6 +217,24 @@ test('CTU with RES: one count per rising edge, target drives DN', () => {
   st.bits.BATCH_START = 1;
   scanAll();
   assert.equal(st.counters['C5:0'].acc, 0);
+});
+
+test('frameLadder runs the output wire from the coil to the right rail', () => {
+  const ladder = {
+    t: 'and',
+    c: [
+      { t: 'no', a: 'Start' },
+      { t: 'coil', k: 'OTE', a: 'Motor' }
+    ]
+  };
+  const frame = frameLadder(layout(ladder), { geo: GEO });
+  const coil = frame.items.find((it) => it.node.t === 'coil');
+  const coilRight = coil.x + coil.w;
+  assert.equal(frame.outputWire.x1, coilRight);
+  assert.equal(frame.outputWire.x2, frame.rightRail);
+  assert.equal(frame.rightRail - coilRight, GEO.railPad);
+  assert.ok(frame.leftRail < coil.x);
+  assert.ok(frame.rightRail < frame.w);
 });
 
 test('every authored rung: all elements placed, geometry finite, description non-empty', () => {

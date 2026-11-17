@@ -35,6 +35,7 @@ export default function Home() {
             <b className="num">{stats?.rungCount ?? lab?.total ?? 17}</b> runnable rungs →
           </Link>
           <span className="pill">search <kbd>⌘K</kbd></span>
+          <Link className="pill" to="/editor">rung editor</Link>
           <Link className="pill" to="/tools?tab=gallery">printable gallery</Link>
         </div>
       </section>
