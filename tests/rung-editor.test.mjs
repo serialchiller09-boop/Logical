@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, frameLadder, fitRung, layout
+  analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout
 } from '../web/src/lib/ladder.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
@@ -585,11 +585,10 @@ test('CTU counts one rising edge when the input is held, and RES clears it', () 
     { bits: { Part: 0 } },
     { bits: { Part: 1 } }
   ]);
-  assert.equal(held.traces[0].counters.C_Parts.acc, 1);
-  assert.equal(held.traces[0].counters.C_Parts.cu, true);
-  assert.equal(held.traces[2].counters.C_Parts.acc, 1, 'holding the input true does not count again');
-  assert.equal(held.traces[2].counters.C_Parts.dn, false);
-  assert.equal(held.traces[4].counters.C_Parts.acc, 2);
+  assert.equal(held.traces[0].counters.C_Parts.acc, 0, 'prescan .CU blocks an input that is already true');
+  assert.equal(held.traces[2].counters.C_Parts.acc, 0, 'holding that first true does not count');
+  assert.equal(held.traces[4].counters.C_Parts.acc, 1, 'the next false-to-true counts once');
+  assert.equal(held.traces[4].counters.C_Parts.dn, false);
 
   const done = scanEditor(program, [
     { bits: { Part: 0, Reset: 0 } },
@@ -603,13 +602,14 @@ test('CTU counts one rising edge when the input is held, and RES clears it', () 
   assert.equal(done.traces[5].counters.C_Parts.dn, true);
 
   const reset = scanEditor(program, [
+    { bits: { Part: 0, Reset: 0 } },
     { bits: { Part: 1, Reset: 0 } },
     { bits: { Part: 0, Reset: 1 } }
   ]);
-  assert.equal(reset.traces[0].counters.C_Parts.acc, 1);
-  assert.equal(reset.traces[1].counters.C_Parts.acc, 0);
-  assert.equal(reset.traces[1].counters.C_Parts.dn, false);
-  assert.equal(reset.traces[1].counters.C_Parts.cu, false);
+  assert.equal(reset.traces[1].counters.C_Parts.acc, 1);
+  assert.equal(reset.traces[2].counters.C_Parts.acc, 0);
+  assert.equal(reset.traces[2].counters.C_Parts.dn, false);
+  assert.equal(reset.traces[2].counters.C_Parts.cu, false);
 
   let followed = addSeries(createProgram(), 0, [
     { kind: 'XIC', tag: 'Run' },
@@ -627,6 +627,64 @@ test('CTU counts one rising edge when the input is held, and RES clears it', () 
   assert.equal(lit.traces[0].bits.Done, 0);
   assert.equal(lit.traces[1].timers.T_Delay.dn, true);
   assert.equal(lit.traces[1].bits.Done, 1);
+});
+
+test('CTU prescan leaves ACC at 0 when the input is already true, then counts the next rising edge', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Part' },
+    { kind: 'CTU', tag: 'C_Parts', pre: 3 }
+  ]);
+  const { traces } = scanEditor(program, [
+    { bits: { Part: 1 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 0 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 1 } }
+  ]);
+  assert.equal(traces[0].counters.C_Parts.acc, 0);
+  assert.equal(traces[0].counters.C_Parts.cu, true);
+  assert.equal(traces[1].counters.C_Parts.acc, 0);
+  assert.equal(traces[2].counters.C_Parts.cu, false);
+  assert.equal(traces[3].counters.C_Parts.acc, 1);
+  assert.equal(traces[4].counters.C_Parts.acc, 1, 'holding the rung true after the edge does not count again');
+});
+
+test('a timer or counter block title stays inside the rung frame', () => {
+  const pins = [
+    { k: 'PRE', v: '500' },
+    { k: 'ACC', v: '0' },
+    { k: 'EN', v: '' },
+    { k: 'TT', v: '' },
+    { k: 'DN', v: '' }
+  ];
+  const ton = {
+    t: 'and',
+    c: [
+      { t: 'no', a: 'Run' },
+      { t: 'blk', k: 'TON', a: 'T_Delay', p: pins }
+    ]
+  };
+  const ctu = {
+    t: 'and',
+    c: [
+      { t: 'no', a: 'Part' },
+      { t: 'blk', k: 'CTU', a: 'C_Parts', p: [
+        { k: 'PRE', v: '3' },
+        { k: 'ACC', v: '0' },
+        { k: 'CU', v: '' },
+        { k: 'DN', v: '' }
+      ] }
+    ]
+  };
+  for (const ladder of [ton, ctu]) {
+    const frame = frameLadder(layout(ladder, null, EDITOR_GEO), { geo: EDITOR_GEO });
+    const block = frame.items.find((it) => it.node.t === 'blk');
+    const bounds = blockBounds(block, EDITOR_GEO);
+    assert.ok(bounds.boxY >= 0, `${block.node.k} box top is ${bounds.boxY}`);
+    assert.ok(bounds.titleY >= 12, `${block.node.k} title baseline ${bounds.titleY} is clipped`);
+    assert.ok(bounds.bottom <= frame.h + 0.01, `${block.node.k} block extends past the frame`);
+    assert.ok(bounds.titleY < bounds.boxY + bounds.bh, `${block.node.k} title is outside its box`);
+  }
 });
 
 test('the program round-trips through localStorage and Reset restores one empty rung', () => {

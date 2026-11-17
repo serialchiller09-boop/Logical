@@ -32,6 +32,8 @@
  *         Prescan: ACC=PRE, EN/TT/DN false. (Timer Off Delay (TOF))
  *   CTU — Count Up. ACC increments by one when rung-condition-in is true and .CU
  *         was false. .CU then follows rung-condition-in. .DN when ACC >= PRE.
+ *         Prescan (Count Up execution table) sets .CU true before the first scan
+ *         of a fresh or Reset image, so an input that is already true does not count.
  *         (Count Up (CTU))
  *   RES — When rung-condition-in is true, clears TIMER or COUNTER .ACC and the
  *         control bits. When false, changes nothing. (Reset (RES))
@@ -666,6 +668,18 @@ export function imageFromBits(bits = {}) {
 export function applyEditorScan(program, state) {
   const errors = validateProgram(program);
   if (errors.length) return { ok: false, errors, conds: [] };
+  // Count Up (CTU) prescan: .CU is set true so an input that is already true
+  // does not count on the first scan after a fresh image or Reset (going to Run).
+  if (!state._editorRunPrescan) {
+    visitInstructions(program, (instr) => {
+      if (instr.kind !== 'CTU') return;
+      const tag = String(instr.tag ?? '').trim();
+      if (!isEditorTag(tag)) return;
+      const counter = (state.counters[tag] ??= { acc: 0, dn: false, cu: false, cd: false, prevIn: false });
+      counter.cu = true;
+    });
+    state._editorRunPrescan = true;
+  }
   state.dt = EDITOR_SCAN_MS;
   const conds = compileProgram(program).map((ladder) => analyze(ladder, state, { live: true }).conducts);
   return { ok: true, errors: [], conds };

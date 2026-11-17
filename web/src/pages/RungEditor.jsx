@@ -332,7 +332,7 @@ export default function RungEditor() {
               <li>The same manual says unexpected operation may occur if an output tag is overwritten. This page scans rungs from the top of the list downward, and each rung from left to right. When two OTE instructions use the same tag, the lower rung’s write is the value that remains.</li>
             </ul>
             <p>
-              Not simulated from that manual: OTE prescan and postscan both clear the data bit. TON and TOF postscan, and the TON/TOF flow-chart pause that forces .DN, are not simulated. CTU prescan sets .CU true so an input that is already true on the first program scan does not count; this page starts .CU false, so that first true scan counts as one rising edge. Counter .OV past 2,147,483,647 is not simulated. A timer here adds {EDITOR_SCAN_MS} ms per step instead of a controller's wall-clock delta.
+              Not simulated from that manual: OTE prescan and postscan both clear the data bit. TON and TOF postscan, and the TON/TOF flow-chart pause that forces .DN, are not simulated. Counter .OV past 2,147,483,647 is not simulated. A timer here adds {EDITOR_SCAN_MS} ms per step instead of a controller's wall-clock delta. CTU prescan is simulated: the first scan after a fresh start or Reset sets .CU true, so an input that is already on does not count until it goes false and then true.
             </p>
             <ul>
               <li>OTL (Output Latch) sets the BOOL when rung-condition-in is true and leaves it unchanged when rung-condition-in is false.</li>

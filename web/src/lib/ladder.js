@@ -251,8 +251,8 @@ function evalBlock(node, ctx, live) {
     if (live) {
       // Edge against the prior enable bit (.CU / .CD). Count Up (CTU): when rung-condition-in
       // is true and .CU is false, ACC increments by one; when rung-condition-in is false, .CU clears.
-      // Prescan sets .CU true so an already-true input does not count on the first program scan.
-      // That prescan is not applied here: a new counter starts with .CU false, so the first true scan counts.
+      // Count Up prescan (.CU true before the first program scan) is applied by the editor
+      // on a fresh or Reset image, not inside this call.
       if (k === 'CTU') {
         if (enabled && !c.cu) c.acc += 1;
         c.cu = !!enabled;
@@ -485,6 +485,18 @@ function leafSize(n, geo) {
 }
 
 /**
+ * Box for a function-block instruction. A tall block used to be centered on the
+ * contact row, which pushed its title above y=0 and clipped "TON T_Delay".
+ * The box stays inside the instruction slot so the title baseline is below the slot top.
+ */
+export function blockBounds(it, geo = GEO) {
+  const bh = Math.max(it?.h || 0, geo.rowH - 14);
+  const centered = it.y + (geo.rowH - bh) / 2;
+  const boxY = it.h > geo.rowH ? it.y : Math.max(it.y, centered);
+  return { boxY, bh, titleY: boxY + 15, bottom: boxY + bh + (it.node?.l ? 16 : 0) };
+}
+
+/**
  * Place the power rails around a layout() box.
  * The right rail sits one rail-pad past the rightmost instruction, and the output
  * wire runs from that instruction to the rail. layout()'s returned width includes
@@ -494,19 +506,23 @@ function leafSize(n, geo) {
 export function frameLadder(box, { geo = GEO, conducts = false } = {}) {
   const pad = geo.railPad;
   const shift = pad + 6;
-  const h = Math.max(box.h, geo.rowH + 20) + 16;
+  const contentH = Math.max(box.h, geo.rowH + 20);
   const glyphRight = box.items.reduce((max, it) => Math.max(max, it.x + it.w), 0);
   const contentRight = glyphRight + shift;
   const leftRail = pad;
   const rightRail = contentRight + pad;
   const w = rightRail + 6;
-  const outY = h / 2;
+  const outY = contentH / 2 + 8;
+  const items = box.items.map((it) => ({ ...it, x: it.x + shift, y: it.y + 8 }));
+  let h = contentH + 16;
+  for (const it of items) {
+    if (it.node?.t === 'blk') h = Math.max(h, blockBounds(it, geo).bottom + 6);
+  }
   const wires = box.wires.map((wr) => (wr.vertical
     ? { ...wr, x: wr.x + shift, y1: wr.y1 + 8, y2: wr.y2 + 8 }
     : { ...wr, x1: wr.x1 + shift, x2: wr.x2 + shift, y: wr.y + 8 }));
   const outputWire = { x1: contentRight, x2: rightRail, y: outY, c: !!conducts, edge: 'out' };
   wires.push(outputWire);
-  const items = box.items.map((it) => ({ ...it, x: it.x + shift, y: it.y + 8 }));
   return { w, h, items, wires, leftRail, rightRail, contentRight, outputWire };
 }
 
