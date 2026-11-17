@@ -7,19 +7,18 @@ export const RUNGS2 = [
     title: 'Level control loop with manual / auto / cascade modes',
     category: 'Regulatory control',
     level: 'Advanced',
-    oneLine: 'How a controller block, a selector and an output limit fit into a ladder program without lying to the operator.',
+    oneLine: 'How a controller block and a limit test fit on a rung. LIM does not change the valve command.',
     purpose: 'Separator liquid level controlling the letdown valve, with a manual station, high-level override (the override wins when level runs away), and tracking so the mode switch is bumpless.',
-    boolean: 'CV = PID(LV, SP).CV ; SP_selected = override ? SP_HIGH_LIMIT : SP_OP ; output limited by MIN/MAX and by the override',
+    boolean: 'LCV_EN while LOOP_AUTO and LCV_AO is inside 5 to 95 ; LIM does not rewrite LCV_AO ; override MOV still writes the AO on its own rung',
     ladder: {
       t: 'and',
       c: [
         { t: 'no', a: 'LOOP_AUTO', l: 'In AUTO' },
         { t: 'blk', k: 'PID', a: 'LIC_101', l: 'Level PID', p: [
-          { k: 'PV', v: 'SEP1_LV' }, { k: 'SP', v: 'LIC_SP' }, { k: 'CV', v: '-> LCV_AO' },
-          { k: 'Kc', v: '1.2' }, { k: 'Ti', v: '8 min' }, { k: 'Td', v: '0' }, { k: 'Mode', v: '1 = Auto' }
+          { k: 'PV', v: 'SEP1_LV' }, { k: 'SP', v: 'LIC_SP' }, { k: 'KP', v: '1.2' }, { k: 'OUT', v: 'LCV_AO' }
         ] },
-        { t: 'blk', k: 'LIM', a: '', l: 'Clamp output', p: [{ k: 'LO', v: '5 %' }, { k: 'IN', v: 'CV' }, { k: 'HI', v: '95 %' }] },
-        { t: 'coil', k: 'OTE', a: 'LCV_EN', l: 'AO active' }
+        { t: 'blk', k: 'LIM', a: '', l: 'Command in band', p: [{ k: 'LO', v: '5' }, { k: 'IN', v: 'LCV_AO' }, { k: 'HI', v: '95' }] },
+        { t: 'coil', k: 'OTE', a: 'LCV_EN', l: 'In band' }
       ]
     },
     overrideRung: {
@@ -42,8 +41,8 @@ export const RUNGS2 = [
       { tag: 'LCV_EN', type: 'BIT', addr: 'B3:6/2', role: 'AO enabled / not in manual test', initial: 1 }
     ],
     readThisWay: [
-      'The PID block does its calculation while its rung is true. If you let the enable bit go false you have just frozen the controller, not put it in manual - which is a different and worse state: the output holds and the integral stops tracking.',
-      'The clamp (LO/HI) keeps the valve off its seats and off fully open so the positioner has authority left in both directions. Those numbers are the loop\'s practical travel limits, not a safety function.',
+      'The PID block is shown with structure names from 1756-RM003 pp. 675-677 (.PV, .SP, .KP, .OUT). The lab does not run the Logix PID equation.',
+      'LIM tests whether LCV_AO is from 5 through 95, inclusive (1756-RM003 pp. 314 and 319). It does not pull an out-of-range command back inside that band. 5 and 95 are placeholders, not a valve spec.',
       'The override rung is an exclusive OR of two MOV paths - exactly one writes the AO each scan. Anything that lets two rungs write the same AO produces a valve that jitters between them.'
     ],
     defects: [
@@ -54,7 +53,7 @@ export const RUNGS2 = [
     ],
     status: 'illustrative-example',
     mnemonics: ['XIC', 'XIO', 'PID', 'LIM', 'MOV', 'OTE'],
-    note: 'PID member spelling (.Kc, .Ti, .Mode, .MAXI...) differs by controller family and firmware revision. The structure above is the concept; confirm the exact operands against the manual for your controller.'
+    note: 'Pins use 1756-RM003 PID structure names (.PV, .SP, .KP, .OUT), pp. 675-677. The 5 and 95 limits are placeholders, not design values. LIM tests the band; it does not clamp.'
   },
 
   {

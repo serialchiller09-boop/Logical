@@ -16,6 +16,7 @@ import {
 } from '../web/src/lib/ladder.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
 import { RUNGS2 } from '../server/src/seed/data/rungs2.js';
+import { INSTRUCTIONS } from '../server/src/seed/data/instructions.js';
 
 const ALL = [...RUNGS, ...RUNGS2];
 const byId = Object.fromEntries(ALL.map((r) => [r.id, r]));
@@ -508,4 +509,73 @@ test('reworked labs still teach delay-then-act via .DN follow-on rungs', () => {
   assert.equal(hot.st.bits.LSHH_ALM, 1);
   const spike = scan('rung-alarm-deadbnd', { scans: 2, values: { LEVEL_PV: 101.2 } });
   assert.equal(spike.st.bits.LSHH_ALM, 0, 'short spike must not latch');
+});
+
+test('LIM is a range test: inside, outside, boundaries, reversed limits, and no clamp', () => {
+  const rung = (lo, inn, hi) => series(
+    { t: 'no', a: 'EN' },
+    { t: 'blk', k: 'LIM', p: [{ k: 'LO', v: String(lo) }, { k: 'IN', v: String(inn) }, { k: 'HI', v: String(hi) }] },
+    { t: 'coil', k: 'OTE', a: 'OUT' }
+  );
+  const out = (lo, inn, hi, bits = { EN: 1 }) => {
+    const st = initialState([]);
+    Object.assign(st.bits, bits);
+    analyze(rung(lo, inn, hi), st, { live: true });
+    return st.bits.OUT ? 1 : 0;
+  };
+  assert.equal(out(0, 5, 10), 1, 'inside');
+  assert.equal(out(0, -1, 10), 0, 'below');
+  assert.equal(out(0, 11, 10), 0, 'above');
+  assert.equal(out(0, 0, 10), 1, 'low boundary');
+  assert.equal(out(0, 10, 10), 1, 'high boundary');
+  assert.equal(out(10, 10, 0), 1, 'reversed: equal to Low');
+  assert.equal(out(10, 0, 0), 1, 'reversed: equal to High');
+  assert.equal(out(10, 11, 0), 1, 'reversed: outside above Low');
+  assert.equal(out(10, -1, 0), 1, 'reversed: outside below High');
+  assert.equal(out(10, 5, 0), 0, 'reversed: strictly inside is false');
+  assert.equal(out(0, 5, 10, { EN: 0 }), 0, 'false rung does not pass');
+
+  const st = initialState([]);
+  st.bits.EN = 1;
+  st.values = { LO: NaN, X: 1, HI: 10, CMD: 50 };
+  analyze(series(
+    { t: 'no', a: 'EN' },
+    { t: 'blk', k: 'LIM', p: [{ k: 'LO', v: 'LO' }, { k: 'IN', v: 'X' }, { k: 'HI', v: 'HI' }] },
+    { t: 'coil', k: 'OTE', a: 'NAN_OUT' }
+  ), st, { live: true });
+  assert.equal(st.bits.NAN_OUT, 0, 'NAN fails the test');
+  analyze(series(
+    { t: 'no', a: 'EN' },
+    { t: 'blk', k: 'LIM', p: [{ k: 'LO', v: '0' }, { k: 'IN', v: 'CMD' }, { k: 'HI', v: '10' }] },
+    { t: 'coil', k: 'OTE', a: 'CLAMP' }
+  ), st, { live: true });
+  assert.equal(st.values.CMD, 50, 'LIM does not rewrite the tested value');
+  assert.equal(st.bits.CLAMP, 0, '50 is above the high limit');
+});
+
+test('level-loop LIM tests the valve command and leaves it unchanged', () => {
+  const inside = scan('rung-pid-level');
+  assert.equal(inside.st.bits.LCV_EN, 1);
+  assert.equal(inside.st.values.LCV_AO, 50);
+  const outside = scan('rung-pid-level', { values: { LCV_AO: 100 } });
+  assert.equal(outside.st.bits.LCV_EN, 0);
+  assert.equal(outside.st.values.LCV_AO, 100);
+});
+
+test('changed Logix entries cite 1756-RM003 and drop the old names', () => {
+  const byMnemonic = Object.fromEntries(INSTRUCTIONS.map((item) => [item.id, item]));
+  assert.match(byMnemonic['in-cps'].name, /Synchronous Copy File/);
+  assert.match(byMnemonic['in-cps'].function, /p\. 464/);
+  assert.doesNotMatch(byMnemonic['in-cps'].function, /single precision/i);
+  assert.match(byMnemonic['in-gsv'].name, /Get System Value/);
+  assert.match(byMnemonic['in-gsv'].function, /p\. 173/);
+  assert.doesNotMatch(`${byMnemonic['in-gsv'].mnemonic} ${byMnemonic['in-gsv'].name}`, /GSF/);
+  assert.match(byMnemonic['in-lim'].function, /p\. 314/);
+  assert.match(byMnemonic['in-lim'].function, /does not write a clamped value/);
+  assert.match(byMnemonic['in-pid'].function, /pp\. 672-677/);
+  assert.doesNotMatch(JSON.stringify(byMnemonic['in-pid'].members), /\.Kc|\.Mode|\.DBNDBND|\.INDEP/);
+  assert.match(byMnemonic['in-xic'].gotcha, /BOOL bit/);
+  assert.match(byMnemonic['in-xic'].gotcha, /p\. 64/);
+  assert.match(byMnemonic['in-ote'].function, /postscan/);
+  assert.match(byMnemonic['in-ote'].function, /p\. 84/);
 });

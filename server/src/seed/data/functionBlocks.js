@@ -73,7 +73,7 @@ export const FUNCTION_BLOCKS = [
     status: 'standard'
   },
   {
-    id: 'fb-limit', block: 'LIMIT / MED', family: 'Selection / clamping', logix: 'LIM (clamp), SEL/MUX (select)',
+    id: 'fb-limit', block: 'LIMIT / MED', family: 'Selection / clamping', logix: 'Not LIM. 1756-RM003 p. 314 LIM is a range test. SEL/MUX select.',
     pins: [{ p: 'IN / MN / MX', d: 'value, min, max' }, { p: 'OUT', d: 'clamped' }, { p: 'QQ_H / QQ_L', d: 'limit-hit flags' }],
     behaviour: 'LIMIT clamps into a range and flags when it clamped. MED picks the median of three - the standard way to get a fault-tolerant measurement from three transmitters.',
     gasPlant: 'Output clamping, setpoint protection, best-of-three or 2oo3 transmitter selection.',

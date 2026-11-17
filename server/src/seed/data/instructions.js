@@ -70,8 +70,8 @@ export const INSTRUCTIONS = [
       { name: '[address]', desc: 'bit or word: a whole word/integer is true when non-zero' }
     ],
     usage: 'Start button (NO), permissive "lube pressure OK", timer .DN, "Auto mode" bit, "valve proven open" ZSO.',
-    gotcha: 'On a word operand, XIC is a non-zero test, not a bit test. XIC N7:0 is true for any value other than 0.',
-    sources: [{ label: 'Rockwell 1747-RM001C SLC Instruction Set Reference' }, { label: 'Rockwell 1785-RM001 PLC-5 Instruction Set Reference' }],
+    gotcha: '1756-RM003 p. 64: the XIC operand is a BOOL bit. A non-zero test of a whole word, such as XIC N7:0, is SLC 500 / PLC-5 behavior in 1747-RM001 and 1785-RM001, not the BOOL operand in this Logix manual.',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Examine If Closed (XIC), p. 64' }, { label: 'Rockwell 1747-RM001C SLC Instruction Set Reference' }, { label: 'Rockwell 1785-RM001 PLC-5 Instruction Set Reference' }],
     status: 'standard'
   },
   {
@@ -119,10 +119,10 @@ export const INSTRUCTIONS = [
     id: 'in-ote', mnemonic: 'OTE', name: 'Output Energize', category: 'Coil',
     symbol: '---( )---', ascii: '-( )-',
     iec: 'coil |-( )| / assignment :=', siemens: '—( )—',
-    function: 'Writes the rung result to the address: 1 when the rung is true, 0 when it is false. Non-retentive - the bit follows the rung every scan.',
+    function: 'Writes the rung result to the address: 1 when the rung is true, 0 when it is false. Non-retentive — the bit follows the rung every scan. 1756-RM003 OTE execution table (heading on p. 83, prescan and postscan rows on p. 84) also clears that data bit on prescan and on postscan; this lab and the rung editor do not simulate that prescan or postscan.',
     usage: 'The default output: motor starters, valves, indicator lamps, interlock-permissive bits.',
     gotcha: 'Two OTEs on the same address is a defect: last-executed wins and the first becomes invisible. Many controllers will also warn you; do not ignore it.',
-    sources: [{ label: 'Rockwell 1747-RM001C / 1785-RM001' }],
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Output Energize (OTE), pp. 83-84' }, { label: 'Rockwell 1747-RM001C / 1785-RM001' }],
     status: 'standard'
   },
   {
@@ -306,12 +306,13 @@ export const INSTRUCTIONS = [
     status: 'standard'
   },
   {
-    id: 'in-lim', mnemonic: 'LIM', name: 'Limit (clamp)', category: 'Data',
-    symbol: '-[LIM lo>in>hi]-', ascii: '-[LIM]-',
-    iec: 'LIMIT / MED', siemens: 'LIMIT / MED3',
-    function: 'Clamps a value between a low and a high limit.',
-    usage: 'PID output clamping to a valve travel range, protecting a setpoint from operator over-entry, split-range allocation, override selection.',
-    gotcha: 'A soft clamp is not a safety function. It does not protect against a program fault or an out-of-range write, and it disappears the moment somebody edits the limit.',
+    id: 'in-lim', mnemonic: 'LIM', name: 'Limit (test)', category: 'Compare',
+    symbol: '-[LIM Low Test High]-', ascii: '-[LIM]-',
+    iec: 'A compare, not the IEC LIMIT clamp', siemens: 'Not the LIMIT clamp',
+    function: '1756-RM003 p. 314: LIM tests whether Test is within Low Limit and High Limit. It does not write a clamped value. When Low Limit is less than or equal to High Limit, the test is true if Test is equal to either limit or between them (pp. 318-319 and Example 1 on p. 321). When Low Limit is greater than High Limit, the test is true if Test is equal to either limit or outside the open interval between them (pp. 318-319). If any operand is Not a Number, the result is false (pp. 314 and 319). On a true rung, rung-condition-out follows that test; on a false rung, rung-condition-out is false (p. 319).',
+    usage: 'Permit a step only while a measurement is inside a band. A value outside the band stays outside; this instruction does not pull it back in.',
+    gotcha: 'Do not use LIM where you need a clamped output. High/Low Limit (HLL) is a different instruction in the same manual. The LIM flow-chart figure was not readable in the text extract; the rules above are from the operation table and Example 1. Example 2’s numbers were not readable.',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Limit (LIM), pp. 314-321' }],
     status: 'standard'
   },
   {
@@ -324,21 +325,23 @@ export const INSTRUCTIONS = [
     status: 'standard'
   },
   {
-    id: 'in-gsv', mnemonic: 'GSV / GSF', name: 'Get/Set Status Word Value / Flag', category: 'Data',
-    symbol: '-[GSV]-', ascii: '-[GSV]-',
+    id: 'in-gsv', mnemonic: 'GSV / SSV', name: 'Get System Value / Set System Value', category: 'Data',
+    symbol: '-[GSV]- / -[SSV]-', ascii: '-[GSV]-',
     iec: 'vendor-specific', siemens: 'n/a',
-    function: 'Writes into controller status-word elements that are otherwise read-only by ordinary tag reference. GSV sets a value; GSF sets a flag bit.',
-    usage: 'Legacy and integration code manipulating controller status words - e.g. communication or operating-mode items not exposed as normal tags.',
-    gotcha: 'Exact spelling, availability, and which status words may be written vary by platform and generation. Check the mnemonic and the writable range of the target word in the instruction set manual for the controller in front of you before porting any rung that uses them.',
-    sources: [{ label: 'Rockwell Logix 5000 instruction set' }],
+    function: '1756-RM003 p. 173: GSV and SSV get and set controller system data stored in objects. There is no PLC-5 status file. When the rung is true, GSV places the named attribute in Dest, and SSV writes Source into that attribute. The operands are Class name, Instance name, Attribute name, and Dest or Source.',
+    usage: 'Read or write a controller object attribute, such as fault or task data, instead of a status-file word.',
+    gotcha: '1756-RM003 p. 174: use SSV carefully. If the destination tag is too small, GSV can write past a member into the next member, or stop and log a minor fault and leave Dest unchanged. This page does not list the object classes.',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Get System Value (GSV) and Set System Value (SSV), pp. 173-174' }],
     status: 'vendor'
   },
   {
-    id: 'in-cps', mnemonic: 'CPS', name: 'Compute with Single Precision', category: 'Math',
+    id: 'in-cps', mnemonic: 'CPS', name: 'Synchronous Copy File', category: 'Data',
     symbol: '-[CPS]-', ascii: '-[CPS]-',
-    iec: 'n/a (legacy)', siemens: 'n/a',
-    function: 'PLC-5-era floating point compute. Same role as CPT in single precision.',
-    usage: 'Legacy program reading only - and a useful reminder that type handling differs more across generations than across vendors.',
+    iec: 'n/a', siemens: 'n/a',
+    function: '1756-RM003 p. 464: CPS copies the values in Source into Dest. The Source is unchanged. Operands are Source, Dest, and Length (p. 465). p. 467: tasks that try to interrupt a CPS copy are delayed until the instruction is done. COP is the copy that allows the source to change during the copy.',
+    usage: 'Copy a produced tag, consumed tag, or other block when the source must not change in the middle of the copy.',
+    gotcha: 'CPS is not a compute. The manual points to 1756-UM001 to estimate how long the delayed tasks wait. This page does not quote that manual.',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Synchronous Copy File (CPS), pp. 464-467' }],
     status: 'vendor'
   },
 
@@ -401,21 +404,20 @@ export const INSTRUCTIONS = [
   // ---- control
   {
     id: 'in-pid', mnemonic: 'PID', name: 'PID loop instruction / control block', category: 'Control',
-    symbol: '-[PID]-', ascii: '-[PID PV SP CV Kc Ti Td Mode]-',
+    symbol: '-[PID]-', ascii: '-[PID .PV .SP .KP .OUT]-',
     iec: 'PID / PID_LOOPS function block', siemens: 'PID_Compact / CONT_C (SFC: PID)',
-    function: 'Computes a controller output from setpoint and process variable with proportional, integral, and derivative action; handles manual/auto, output and integral limits, tracking, and cascade.',
+    function: '1756-RM003 pp. 672-677: PID uses one PID structure per instruction. This entry lists members from that structure table. It does not reproduce the PID equation.',
     members: [
-      { name: '.PV / .SP / .CV', desc: 'process variable, setpoint, controller output (0-100%)' },
-      { name: '.Kc', desc: 'proportional gain (dimensionless; some controllers use proportional band instead)' },
-      { name: '.Ti / .Td', desc: 'integral and derivative TIME (or reset RATE, depending on the setting) - units are the classic gotcha' },
-      { name: '.Mode', desc: 'Logix convention: 0 = Manual, 1 = Auto, 2 = Cascade' },
-      { name: '.MAXI/.MINI', desc: 'integral limits (anti-windup clamp)' },
-      { name: '.MAXQ/.MINQ', desc: 'output (control variable) limits' },
-      { name: '.DBNDBND', desc: 'control deviation band - alarm if PV stays away from SP too long' },
-      { name: '.INDEP', desc: 'selects whether Ti/Td are interpreted in minutes or seconds' },
-      { name: '.CTL1/.CTL2', desc: 'control switches (e.g. ramp/velocity limiting); the exact set is firmware-specific' }
+      { name: '.CTL', desc: 'DINT of status bits (p. 675). .MO bit 24 is station mode (0 = automatic, 1 = manual). .SWM bit 26 is software manual (0 = no, 1 = yes). .PE bit 23 selects the equation (0 = independent, 1 = dependent). .CT bit 30 is cascade type (0 = slave, 1 = master). .CL bit 29 is cascade loop (0 = no, 1 = yes).' },
+      { name: '.SP / .PV / .ERR / .OUT', desc: 'Setpoint, scaled process variable, scaled error, and output percent (pp. 675-677).' },
+      { name: '.KP / .KI / .KD', desc: '.KP is proportional gain, or controller gain for dependent gains, both unitless (p. 675 and the Tuning tab on p. 678). .KI is integral gain in 1/sec, or reset time in minutes per repeat for dependent gains (p. 678). .KD is derivative gain in seconds for independent gains (p. 675). The dependent rate-time phrase sits on a broken line in this extract and is not restated.' },
+      { name: '.MAXO / .MINO', desc: 'Maximum and minimum output limit, percent of output (p. 676).' },
+      { name: '.DB', desc: 'Deadband in engineering units (p. 676).' },
+      { name: '.MAXI / .MINI', desc: 'Maximum and minimum unscaled PV (p. 677). This extract does not call these integral limits.' },
+      { name: '.SO / .BIAS', desc: '.SO is set output percent. In software manual mode it is the output; in auto it displays the output percent. .BIAS is output bias percent (p. 678).' }
     ],
-    note: 'Member spellings and the meaning of some switches DO differ between controller families and firmware revisions. Confirm against the instruction set manual for the exact controller - this app will not guess on your behalf.',
+    note: '1756-RM003 p. 678: manual (.MO) overrides software manual (.SWM) if both are selected. Names that are not in this structure table were removed: .Mode as 0/1/2, .Kc, .CV, .Ti, .Td, .MAXQ, .MINQ, .DBNDBND, .INDEP, and .CTL1/.CTL2. The table also has .UPD, alarm limits, tieback, and scaling members; this page does not list every one.',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Proportional Integral Derivative (PID) structure, pp. 672-678' }],
     usage: 'Everything regulatory in the plant: separator pressure letdown, level dump, glycol circulation, TEG temperature, fuel gas header pressure, dew point trim, compressor anti-surge (usually a dedicated block), discharge temperature.',
     gotcha: 'A PID written in the BPCS is not a safety layer. High level protection is a switch to a trip, not the controller driving harder. And bumpless transfer requires the tracking to be right on the manual-to-auto transition or you will step the valve.',
     status: 'standard'
