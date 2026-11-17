@@ -48,9 +48,22 @@ function targetLabel(program, selection) {
   return `rung ${number}`;
 }
 
-export default function RungEditor() {
-  useTitle('Rung editor');
-  const [program, setProgram] = useState(loadInitial);
+export default function RungEditor({
+  controlledProgram = null,
+  onProgramChange = null,
+  seedProgram = null,
+  pinned = null,
+  hideIntro = false,
+  header = null,
+  title = null
+} = {}) {
+  useTitle(title || (hideIntro ? null : 'Rung editor'));
+  const controlled = typeof onProgramChange === 'function';
+  const [program, setProgramState] = useState(() => controlledProgram || loadInitial());
+  function setProgram(next) {
+    setProgramState(next);
+    if (controlled) onProgramChange(next);
+  }
   const [selection, setSelection] = useState(null);
   const [mode, setMode] = useState('edit');
   const [running, setRunning] = useState(false);
@@ -66,15 +79,22 @@ export default function RungEditor() {
   programRef.current = program;
 
   const errors = useMemo(() => validateProgram(program), [program]);
-  const roles = useMemo(() => tagRoles(program), [program]);
+  const roles = useMemo(() => {
+    const base = tagRoles(program);
+    if (!pinned) return base;
+    const outputs = [...new Set([...(pinned.outputs || []), ...base.outputs])];
+    const inputs = [...new Set([...(pinned.inputs || []), ...base.inputs])].filter((tag) => !outputs.includes(tag));
+    return { ...base, inputs, outputs };
+  }, [program, pinned]);
   const preview = useMemo(() => previewEditor(program, stateRef.current), [program, scanRev]);
   const live = mode === 'run' && errors.length === 0;
   const target = targetLabel(program, selection);
 
   useEffect(() => {
+    if (controlled) return;
     const result = saveProgram(program, window.localStorage);
     setSaveNote(result.ok ? null : result.message);
-  }, [program]);
+  }, [program, controlled]);
 
   useEffect(() => {
     if (!pendingFocus) return;
@@ -194,6 +214,15 @@ export default function RungEditor() {
     setOpError(null);
     setConfirmReset(false);
     setMode('edit');
+    if (seedProgram) {
+      setProgram(structuredClone(seedProgram));
+      onReset?.();
+      return;
+    }
+    if (controlled) {
+      onReset?.();
+      return;
+    }
     setProgram(resetStoredProgram(window.localStorage));
   }
 
@@ -201,13 +230,19 @@ export default function RungEditor() {
 
   return (
     <div className="re-page">
+      {header}
+      {hideIntro ? (
+        <p className="re-limit">{EDITOR_BRANCH_LIMIT_TEXT}</p>
+      ) : (
       <header className="re-hero">
         <h1>Rung editor</h1>
         <p>
           Write rungs with XIC, XIO, OTE, OTL, OTU, TON, TOF, CTU, and RES. The drawing and the scan use the same ladder engine as the lab.
         </p>
         <p className="re-limit">{EDITOR_BRANCH_LIMIT_TEXT}</p>
+        <p><a href="/exercises">Graded exercises</a> check a program by what the outputs do.</p>
       </header>
+      )}
 
       <div className="re-modes" role="tablist" aria-label="Editor mode">
         <button type="button" className="re-mode" role="tab" id="re-tab-edit" aria-selected={mode === 'edit'} aria-controls="re-panel" onClick={() => chooseMode('edit')}>Edit</button>
