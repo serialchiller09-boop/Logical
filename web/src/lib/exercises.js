@@ -25,9 +25,10 @@ export const EXERCISES = [
     inputs: ['Switch'],
     outputs: LAMP,
     task: [
-      'Make Lamp follow Switch. When Switch is on, Lamp is on. When Switch is off, Lamp is off.',
-      'Use the tags Switch and Lamp. 1756-RM003 Examine If Closed (XIC) is true when its BOOL is 1 and rung-condition-in is true. Output Energize (OTE) writes that rung-condition-in to its BOOL on every scan: 1 when the rung is true, 0 when it is false.'
+      'Make Lamp follow Switch. When Switch is on, Lamp is on. When Switch is off, Lamp is off.'
     ],
+    hint: 'Use the tags Switch and Lamp. An XIC on Switch in front of the Lamp coil follows the switch.',
+    reference: '1756-RM003 Examine If Closed (XIC) is true when its BOOL is 1 and rung-condition-in is true. Output Energize (OTE) writes that rung-condition-in to its BOOL on every scan: 1 when the rung is true, 0 when it is false.',
     steps: [
       { bits: { Switch: 0 }, expect: { Lamp: 0 }, situation: 'With Switch off' },
       { bits: { Switch: 1 }, expect: { Lamp: 1 }, situation: 'With Switch on' },
@@ -40,9 +41,10 @@ export const EXERCISES = [
     inputs: ['Switch'],
     outputs: LAMP,
     task: [
-      'Lamp is on only while Switch is off. When Switch is on, Lamp is off.',
-      '1756-RM003 Examine If Open (XIO) is true when its BOOL is 0 and rung-condition-in is true. OTE still writes 0 whenever its rung is false.'
+      'Turn Lamp on only while Switch is off. When Switch is on, Lamp is off.'
     ],
+    hint: 'Use an XIO on Switch. It passes while Switch is off.',
+    reference: '1756-RM003 Examine If Open (XIO) is true when its BOOL is 0 and rung-condition-in is true. OTE writes 0 whenever its rung is false.',
     steps: [
       { bits: { Switch: 0 }, expect: { Lamp: 1 }, situation: 'With Switch off' },
       { bits: { Switch: 1 }, expect: { Lamp: 0 }, situation: 'With Switch on' },
@@ -55,9 +57,10 @@ export const EXERCISES = [
     inputs: ['SwitchA', 'SwitchB'],
     outputs: LAMP,
     task: [
-      'Lamp is on only when SwitchA and SwitchB are both on. Either one off turns Lamp off.',
-      'In this editor, contacts in series are the AND. Each XIC is true only when its own bit is 1 (1756-RM003 Examine If Closed).'
+      'Turn Lamp on only when SwitchA and SwitchB are both on. Either switch off turns Lamp off.'
     ],
+    hint: 'In this editor, contacts in series are the AND.',
+    reference: '1756-RM003 Examine If Closed (XIC) is true when its BOOL is 1 and rung-condition-in is true. "Series is AND" describes this editor. It is not a sentence in that manual.',
     steps: [
       { bits: { SwitchA: 1, SwitchB: 1 }, expect: { Lamp: 1 }, situation: 'With SwitchA and SwitchB both on' },
       { bits: { SwitchA: 1, SwitchB: 0 }, expect: { Lamp: 0 }, situation: 'With only SwitchA on' },
@@ -71,9 +74,10 @@ export const EXERCISES = [
     inputs: ['SwitchA', 'SwitchB'],
     outputs: LAMP,
     task: [
-      'Lamp is on when SwitchA is on, or SwitchB is on, or both. Lamp is off only when both are off.',
-      'In this editor, a parallel branch is the OR. This page does not claim that wording is a sentence in 1756-RM003. Each contact is still an XIC: true when its bit is 1.'
+      'Turn Lamp on when SwitchA is on, or SwitchB is on, or both. Lamp is off only when both are off.'
     ],
+    hint: 'In this editor, a parallel branch is the OR.',
+    reference: '1756-RM003 Examine If Closed (XIC) is true when its BOOL is 1 and rung-condition-in is true. "A parallel branch is the OR" describes this editor. It is not a sentence in that manual.',
     steps: [
       { bits: { SwitchA: 1, SwitchB: 0 }, expect: { Lamp: 1 }, situation: 'With only SwitchA on' },
       { bits: { SwitchA: 0, SwitchB: 1 }, expect: { Lamp: 1 }, situation: 'With only SwitchB on' },
@@ -87,13 +91,15 @@ export const EXERCISES = [
     inputs: ['Start', 'Stop'],
     outputs: ['Motor'],
     task: [
-      'Start turns Motor on. After Start is released, Motor stays on. Pressing Stop turns Motor off, and it stays off after Stop is released.',
-      'Assumption for this exercise, not a rule from the manual: Stop is a normally closed field contact. The tag Stop is TRUE when the button is not pressed, and FALSE when it is pressed.',
-      '1756-RM003 Examine If Closed (XIC) is true when that bit is 1. Output Energize (OTE) writes 0 on every scan whose rung is false, so a coil does not hold by itself. Output Latch (OTL) leaves the bit unchanged when its rung is false; Output Unlatch (OTU) clears the bit only when its rung is true.'
+      'Start turns Motor on, and Motor stays on after you release Start. Stop turns Motor off even while Start is still held, and Motor stays off after you release Stop.',
+      'For this exercise, Stop is a normally closed field contact. The tag Stop is TRUE when the button is not pressed, and FALSE when it is pressed.'
     ],
+    hint: 'A plain coil turns off when its rung goes false, so Motor needs a way to hold itself. Stop has to be able to break that hold.',
+    reference: '1756-RM003 Examine If Closed (XIC) is true when that bit is 1. Output Energize (OTE) writes 0 on every scan whose rung is false, so a coil does not hold by itself. Output Latch (OTL) leaves the bit unchanged when its rung is false. Output Unlatch (OTU) clears the bit only when its rung is true. The normally closed Stop wiring is an exercise assumption, not a rule from the manual.',
     steps: [
       { bits: { Start: 1, Stop: 1 }, expect: { Motor: 1 }, situation: 'With Start pressed and Stop not pressed' },
       { bits: { Start: 0, Stop: 1 }, expect: { Motor: 1 }, situation: 'With Start pressed then released, and Stop not pressed' },
+      { bits: { Start: 1, Stop: 0 }, expect: { Motor: 0 }, situation: 'With Start and Stop both pressed' },
       { bits: { Start: 0, Stop: 0 }, expect: { Motor: 0 }, situation: 'When Stop is pressed' },
       { bits: { Start: 0, Stop: 1 }, expect: { Motor: 0 }, situation: 'After Stop is released' }
     ]
@@ -104,9 +110,10 @@ export const EXERCISES = [
     inputs: ['Start'],
     outputs: ['Motor'],
     task: [
-      'While Start is held, Motor stays off until 2 seconds have passed, then Motor turns on. Use a TON.',
-      '1756-RM003 Timer On Delay (TON), and the timer chapter: the time base is 1 millisecond, so a 2 second preset is 2000. .DN is set when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. This page adds 100 ms of elapsed time on every step, in place of the manual’s (current time minus last time scanned). That 100 ms step is not a Logix task period.'
+      'Hold Start, and Motor stays off for 2 seconds, then turns on. Release Start, and Motor turns off.'
     ],
+    hint: 'Use a timer on delay (TON). Each step on this page is 100 ms, so a 2 second preset is 2000.',
+    reference: '1756-RM003 Timer On Delay (TON), and the timer chapter: the time base is 1 millisecond, so a 2 second preset is 2000. .DN is set when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. This page adds 100 ms of elapsed time on every step, in place of the manual’s (current time minus last time scanned). That 100 ms step is not a Logix task period.',
     steps: [
       {
         bits: { Start: 1 },
@@ -115,9 +122,20 @@ export const EXERCISES = [
         situation: 'After Start has been held for 1.9 seconds (19 steps of 100 ms)'
       },
       {
+        // The motor rung may sit above the TON. That rung reads .DN before this scan's
+        // timer update, so Motor can turn on one scan later. Off at 1.9 s, on by 2.1 s.
         bits: { Start: 1 },
+        repeat: 2,
         expect: { Motor: 1 },
-        situation: 'After Start has been held for 2.0 seconds (20 steps of 100 ms)'
+        situation: 'By the time Start has been held for 2.1 seconds (21 steps of 100 ms)'
+      },
+      {
+        // Same one-scan lag on the way down: the motor rung can still see the old .DN
+        // on the scan Start drops. A latch stays on, so two scans is enough to fail it.
+        bits: { Start: 0 },
+        repeat: 2,
+        expect: { Motor: 0 },
+        situation: 'After Start is released'
       }
     ]
   }

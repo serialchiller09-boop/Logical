@@ -1550,7 +1550,18 @@ button.lab-dock-led {
 .ex-page { min-width: 0; max-width: 100%; }
 .ex-page h1 { font: 650 clamp(26px, 4vw, 36px)/1.15 var(--mono); letter-spacing: -.02em; }
 .ex-score, .ex-kicker, .ex-tags { color: var(--ink-2); }
-.ex-task p { max-width: 70ch; }
+.ex-task p, .ex-hint { max-width: 70ch; }
+.ex-hint { color: var(--ink-2); }
+.ex-ref {
+  margin: 0 0 14px; padding: 10px 12px; max-width: 70ch;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--panel-2);
+}
+.ex-ref h2 {
+  margin: 0 0 4px; font: 600 11px/1.4 var(--sans); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.ex-ref p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.ex-page .btn { min-height: 44px; min-width: 44px; }
 .ex-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .ex-card {
   display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 14px;

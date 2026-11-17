@@ -175,9 +175,27 @@ test('start/stop: seal-in and a latch both pass; no branch fails and stays off',
   ]));
   assert.match(xioStop.message, /Stop not pressed/);
   assert.equal(xioStop.actual.Motor, 0);
+
+  // Start is in parallel with the seal, so a held Start keeps the motor on while Stop is pressed.
+  let override = createProgram();
+  const overrideRung = override.rungs[0].id;
+  res = must(addInstruction(override, { rungId: overrideRung, kind: 'XIC', tag: 'Start' }));
+  override = res.program;
+  res = must(addParallelBranch(override, { rungId: overrideRung, elementId: res.focusId }));
+  override = res.program;
+  res = must(addInstruction(override, { rungId: overrideRung, kind: 'XIC', tag: 'Motor', place: 'leg', legIndex: 1 }));
+  override = res.program;
+  res = must(addInstruction(override, { rungId: overrideRung, kind: 'XIC', tag: 'Stop', place: 'leg', legIndex: 1 }));
+  override = res.program;
+  override = must(addInstruction(override, { rungId: overrideRung, kind: 'OTE', tag: 'Motor' })).program;
+  const stopLoses = fail('start-stop', override);
+  assert.match(stopLoses.message, /Start and Stop both pressed/);
+  assert.match(stopLoses.message, /Motor should be off, but it turned on/);
+  assert.equal(stopLoses.expected.Motor, 0);
+  assert.equal(stopLoses.actual.Motor, 1);
 });
 
-test('motor delay: a 2 second TON passes; an immediate coil and a 1 second timer fail', () => {
+test('motor delay: either rung order passes; a latch, an immediate coil, and a 1 second timer fail', () => {
   let program = addSeries(createProgram(), 0, [
     { kind: 'XIC', tag: 'Start' },
     { kind: 'TON', tag: 'T_Delay', pre: 2000 }
@@ -188,6 +206,33 @@ test('motor delay: a 2 second TON passes; an immediate coil and a 1 second timer
     { kind: 'OTE', tag: 'Motor' }
   ]);
   pass('motor-delay', program);
+
+  // Motor rung above the TON reads .DN from the previous scan, so it turns on one scan later.
+  let reversed = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'T_Delay.DN' },
+    { kind: 'OTE', tag: 'Motor' }
+  ]);
+  reversed = must(addRung(reversed)).program;
+  reversed = addSeries(reversed, 1, [
+    { kind: 'XIC', tag: 'Start' },
+    { kind: 'TON', tag: 'T_Delay', pre: 2000 }
+  ]);
+  pass('motor-delay', reversed);
+
+  let latched = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Start' },
+    { kind: 'TON', tag: 'T_Delay', pre: 2000 }
+  ]);
+  latched = must(addRung(latched)).program;
+  latched = addSeries(latched, 1, [
+    { kind: 'XIC', tag: 'T_Delay.DN' },
+    { kind: 'OTL', tag: 'Motor' }
+  ]);
+  const held = fail('motor-delay', latched);
+  assert.match(held.message, /After Start is released/);
+  assert.match(held.message, /Motor should be off, but it turned on/);
+  assert.equal(held.expected.Motor, 0);
+  assert.equal(held.actual.Motor, 1);
 
   const immediate = fail('motor-delay', xicOte('Start', 'Motor'));
   assert.match(immediate.message, /1\.9 seconds/);
@@ -237,8 +282,20 @@ test('the exercise page names Check and the list', () => {
   const page = awaitText('../web/src/pages/Exercise.jsx');
   assert.match(list, /aria-label="Graded exercises"/);
   assert.match(page, /aria-label="Check this exercise"/);
+  assert.match(page, /Rockwell reference/);
   const tasks = readFileSync(new URL('../web/src/lib/exercises.js', import.meta.url), 'utf8');
   assert.match(tasks, /Stop is TRUE when the button is not pressed/);
+  for (const exercise of EXERCISES) {
+    assert.ok(exercise.hint && !/rung-condition-in|BOOL/.test(exercise.hint), exercise.id);
+    assert.match(exercise.reference, /1756-RM003/);
+    for (const paragraph of exercise.task) {
+      assert.doesNotMatch(paragraph, /rung-condition-in|BOOL/);
+    }
+  }
+  assert.deepEqual(byId['start-stop'].steps.map((step) => step.expect.Motor), [1, 1, 0, 0, 0]);
+  assert.deepEqual(byId['start-stop'].steps[2].bits, { Start: 1, Stop: 0 });
+  assert.equal(byId['motor-delay'].steps[1].repeat, 2);
+  assert.equal(byId['motor-delay'].steps[2].expect.Motor, 0);
 });
 
 function awaitText(path) {

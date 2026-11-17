@@ -69,7 +69,12 @@ export default function Exercise() {
       <h1>{exercise.title}</h1>
       <div className="ex-task">
         {exercise.task.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+        <p className="ex-hint">{exercise.hint}</p>
       </div>
+      <aside className="ex-ref" aria-label="Rockwell reference">
+        <h2>Rockwell reference</h2>
+        <p>{exercise.reference}</p>
+      </aside>
       <p className="ex-tags">
         Inputs: {exercise.inputs.join(', ')}. Output: {exercise.outputs.join(', ')}.
         The output tag is already on the rung. Add the conditions.
