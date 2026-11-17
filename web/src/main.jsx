@@ -12,6 +12,8 @@ import ProjectNotebook from './pages/ProjectNotebook.jsx';
 import ControlsNotebook from './pages/ControlsNotebook.jsx';
 import IoSandbox from './pages/IoSandbox.jsx';
 import RungEditor from './pages/RungEditor.jsx';
+import Exercise from './pages/Exercise.jsx';
+import Exercises from './pages/Exercises.jsx';
 import NotFound from './pages/NotFound.jsx';
 import './styles.css';
 
@@ -49,6 +51,8 @@ createRoot(document.getElementById('root')).render(
             <Route path="controls-notebook" element={<ControlsNotebook />} />
             <Route path="notebook" element={<ProjectNotebook />} />
             <Route path="editor" element={<RungEditor />} />
+            <Route path="exercises" element={<Exercises />} />
+            <Route path="exercises/:id" element={<Exercise />} />
             <Route path="io-sandbox" element={<IoSandbox />} />
             <Route path="saved" element={<Saved />} />
             <Route path="admin" element={<Admin />} />
