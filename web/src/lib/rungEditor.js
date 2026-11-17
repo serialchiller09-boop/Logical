@@ -17,28 +17,64 @@
  *         scan (true → 1, false → 0) and sets rung-condition-out equal to
  *         rung-condition-in. The operands note says unexpected operation may
  *         occur if an output tag is overwritten.
+ *   OTL — Output Latch. When rung-condition-in is true, sets the BOOL.
+ *         When rung-condition-in is false, leaves the BOOL unchanged.
+ *         Rung-condition-out equals rung-condition-in. (Output Latch (OTL))
+ *   OTU — Output Unlatch. When rung-condition-in is true, clears the BOOL.
+ *         When rung-condition-in is false, leaves the BOOL unchanged.
+ *         (Output Unlatch (OTU))
+ *   TON — Timer On Delay. TIMER .PRE/.ACC are milliseconds (time base 1 ms).
+ *         Enabled: ACC increases by the scan's elapsed time, .EN is true,
+ *         .DN when ACC >= PRE, .TT while timing. Disabled: ACC, EN, TT, DN clear.
+ *         (Timer On Delay (TON))
+ *   TOF — Timer Off Delay. Rung true: ACC=0, EN true, TT false, DN true.
+ *         Rung false: ACC increases, DN stays true until ACC reaches PRE, then DN clears.
+ *         Prescan: ACC=PRE, EN/TT/DN false. (Timer Off Delay (TOF))
+ *   CTU — Count Up. ACC increments by one when rung-condition-in is true and .CU
+ *         was false. .CU then follows rung-condition-in. .DN when ACC >= PRE.
+ *         (Count Up (CTU))
+ *   RES — When rung-condition-in is true, clears TIMER or COUNTER .ACC and the
+ *         control bits. When false, changes nothing. (Reset (RES))
  * This trainer scans rungs top to bottom and each rung left to right, so a later
  * OTE is the write that remains. OTE prescan/postscan (the manual clears the
- * bit) is not simulated.
+ * bit) is not simulated. Each editor scan adds EDITOR_SCAN_MS milliseconds as the
+ * timer's elapsed time. The manual adds (current_time - last_time_scanned); this
+ * fixed step is the stand-in for that elapsed time, not a Logix task period.
  *
  * Editor limits that are NOT Studio 5000 rules: one parallel branch per rung,
- * one level deep, contacts only inside a branch, OTE only as the rightmost
- * series instruction, and a restricted BOOL tag spelling.
+ * one level deep, contacts only inside a branch, one output instruction at the
+ * right end (OTE, OTL, OTU, TON, TOF, CTU, or RES), and a restricted tag spelling.
  */
 
 import { analyze, initialState } from './ladder.js';
 
 export const EDITOR_STORAGE_KEY = 'logical.rung-editor.v1';
 
+/** Each Step, and each tick while Start is running, adds this many milliseconds to a timer. */
+export const EDITOR_SCAN_MS = 100;
+
 /** Shown on the page. Kept here so tests can pin the wording learners actually see. */
 export const EDITOR_BRANCH_LIMIT_TEXT =
-  'One parallel branch per rung, and only one level deep. Each leg is contacts in series (XIC or XIO). A branch inside a leg is not available. The output coil (OTE) stays on the right, after the branch, not inside it.';
+  'One parallel branch per rung, and only one level deep. Each leg is contacts in series (XIC or XIO). A branch inside a leg is not available. The output stays on the right, after the branch, not inside it. The output can be OTE, OTL, OTU, TON, TOF, CTU, or RES.';
 
 const TAG_RE = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
-const KINDS = new Set(['XIC', 'XIO', 'OTE']);
+const CONTACT_TAG_RE = /^[A-Za-z][A-Za-z0-9_]{0,31}\.(DN|EN|TT|CU)$/;
+const CONTACT_KINDS = new Set(['XIC', 'XIO']);
+const OUTPUT_KINDS = new Set(['OTE', 'OTL', 'OTU', 'TON', 'TOF', 'CTU', 'RES']);
+const PRESET_KINDS = new Set(['TON', 'TOF', 'CTU']);
+const KINDS = new Set([...CONTACT_KINDS, ...OUTPUT_KINDS]);
 
 export function isEditorTag(tag) {
   return TAG_RE.test(String(tag ?? ''));
+}
+
+export function isContactTag(tag) {
+  const text = String(tag ?? '');
+  return TAG_RE.test(text) || CONTACT_TAG_RE.test(text);
+}
+
+function isOutputKind(kind) {
+  return OUTPUT_KINDS.has(kind);
 }
 
 function fail(program, code, message) {
@@ -129,28 +165,35 @@ export function deleteRung(program, rungId) {
 }
 
 function seriesInsertIndex(elements, afterId) {
-  const oteAt = elements.findIndex((el) => el.kind === 'OTE');
+  const outputAt = elements.findIndex((el) => isOutputKind(el.kind));
   let index;
   if (afterId) {
     const at = elements.findIndex((el) => el.id === afterId);
     if (at < 0) return { error: 'The selected instruction is not on this rung.' };
     index = at + 1;
-  } else if (oteAt >= 0) index = oteAt;
+  } else if (outputAt >= 0) index = outputAt;
   else index = elements.length;
-  if (oteAt >= 0 && index > oteAt) index = oteAt;
+  if (outputAt >= 0 && index > outputAt) index = outputAt;
   return { index };
+}
+
+function defaultPreset(kind) {
+  if (kind === 'CTU') return 3;
+  if (kind === 'TON' || kind === 'TOF') return 500;
+  return null;
 }
 
 export function addInstruction(program, {
   rungId,
   kind,
   tag = '',
+  pre,
   place = 'series',
   afterId = null,
   legIndex = null
 } = {}) {
   if (!KINDS.has(kind)) {
-    return fail(program, 'bad-kind', 'This editor can add XIC, XIO, or OTE.');
+    return fail(program, 'bad-kind', 'This editor can add XIC, XIO, OTE, OTL, OTU, TON, TOF, CTU, or RES.');
   }
   const next = cloneProgram(program);
   const rung = (next.rungs || []).find((r) => r.id === rungId);
@@ -158,20 +201,21 @@ export function addInstruction(program, {
   if (!Array.isArray(rung.elements)) rung.elements = [];
   const cleanTag = String(tag ?? '').trim();
   const node = { id: nextId(next, 'e'), kind, tag: cleanTag };
+  if (PRESET_KINDS.has(kind)) node.pre = pre == null ? defaultPreset(kind) : pre;
 
-  if (kind === 'OTE') {
+  if (isOutputKind(kind)) {
     if (place === 'leg') {
       return fail(
         program,
-        'ote-in-branch',
-        'An output coil (OTE) cannot sit inside a parallel branch in this editor. Put the OTE on the right, after the branch.'
+        'output-in-branch',
+        'An output cannot sit inside a parallel branch in this editor. Put OTE, OTL, OTU, TON, TOF, CTU, or RES on the right, after the branch.'
       );
     }
-    if (rung.elements.some((el) => el.kind === 'OTE')) {
+    if (rung.elements.some((el) => isOutputKind(el.kind))) {
       return fail(
         program,
-        'ote-exists',
-        'This rung already has an output coil (OTE) on the right. Delete it before adding another. Two coils on one rung are not part of this editor.'
+        'output-exists',
+        'This rung already has an output on the right. Delete it before adding another. This editor allows one output instruction per rung.'
       );
     }
     rung.elements.push(node);
@@ -235,6 +279,22 @@ export function setInstructionTag(program, { rungId, elementId, tag } = {}) {
       place: found.where === 'leg' ? 'leg' : 'series',
       legIndex: found.where === 'leg' ? found.legIndex : null
     }
+  };
+}
+
+export function setInstructionPreset(program, { rungId, elementId, pre } = {}) {
+  const next = cloneProgram(program);
+  const rung = (next.rungs || []).find((r) => r.id === rungId);
+  if (!rung) return fail(program, 'missing-rung', 'That rung is not in the program.');
+  const found = locate(rung, elementId);
+  if (!found || !PRESET_KINDS.has(found.element.kind)) {
+    return fail(program, 'missing-instruction', 'That instruction does not have a preset.');
+  }
+  found.element.pre = pre;
+  return {
+    ok: true,
+    program: next,
+    selection: { rungId, elementId, place: 'series', legIndex: null }
   };
 }
 
@@ -357,20 +417,43 @@ export function addParallelBranch(program, { rungId, elementId = null, addLeg = 
 function tagError(label, rungId, instr) {
   const name = instr.kind || 'instruction';
   const tag = String(instr.tag ?? '').trim();
+  const contact = CONTACT_KINDS.has(instr.kind);
   if (!tag) {
     return {
       code: 'empty-tag',
       rungId,
       elementId: instr.id || null,
-      message: `${label}: the ${name} instruction needs a BOOL tag name. A blank name is not allowed.`
+      message: `${label}: the ${name} instruction needs a tag name. A blank name is not allowed.`
     };
   }
-  if (!isEditorTag(tag)) {
+  const ok = contact ? isContactTag(tag) : isEditorTag(tag);
+  if (!ok) {
+    const extra = contact
+      ? ' A contact may also use a status member: .DN, .EN, .TT, or .CU.'
+      : '';
     return {
       code: 'bad-tag',
       rungId,
       elementId: instr.id || null,
-      message: `${label}: "${tag}" is not a tag name this editor accepts. Start with a letter, then use only letters, digits, or underscores, up to 40 characters. This spelling limit is part of the editor, not a Studio 5000 rule confirmed from 1756-RM003.`
+      message: `${label}: "${tag}" is not a tag name this editor accepts. Start with a letter, then use only letters, digits, or underscores, up to 40 characters.${extra} This spelling limit is part of the editor, not a Studio 5000 rule confirmed from 1756-RM003.`
+    };
+  }
+  return null;
+}
+
+function presetError(label, rungId, instr) {
+  if (!PRESET_KINDS.has(instr.kind)) return null;
+  const raw = instr.pre;
+  const n = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim());
+  const unitNote = instr.kind === 'CTU'
+    ? 'CTU preset is a count.'
+    : 'Timer preset is milliseconds. 1756-RM003 says the timer time base is 1 ms.';
+  if (raw === '' || raw == null || Number.isNaN(n) || !Number.isInteger(n) || n < 0) {
+    return {
+      code: 'bad-preset',
+      rungId,
+      elementId: instr.id || null,
+      message: `${label}: ${instr.kind} needs a preset of 0 or a whole number. ${unitNote} A negative preset is not accepted here.`
     };
   }
   return null;
@@ -391,20 +474,22 @@ function pushInstrErrors(errors, label, rungId, instr, { inBranch }) {
       code: 'bad-kind',
       rungId,
       elementId: instr.id || null,
-      message: `${label}: "${instr.kind}" is not an instruction this editor can scan. Use XIC, XIO, or OTE.`
+      message: `${label}: "${instr.kind}" is not an instruction this editor can scan. Use XIC, XIO, OTE, OTL, OTU, TON, TOF, CTU, or RES.`
     });
     return;
   }
-  if (inBranch && instr.kind === 'OTE') {
+  if (inBranch && isOutputKind(instr.kind)) {
     errors.push({
-      code: 'ote-in-branch',
+      code: 'output-in-branch',
       rungId,
       elementId: instr.id || null,
-      message: `${label}: an output coil (OTE) cannot sit inside a parallel branch in this editor. Put the OTE on the right, after the branch.`
+      message: `${label}: an output cannot sit inside a parallel branch in this editor. Put it on the right, after the branch.`
     });
   }
   const tag = tagError(label, rungId, instr);
   if (tag) errors.push(tag);
+  const preset = presetError(label, rungId, instr);
+  if (preset) errors.push(preset);
 }
 
 export function validateProgram(program) {
@@ -448,32 +533,65 @@ export function validateProgram(program) {
         return;
       }
       pushInstrErrors(errors, label, rung.id, el, { inBranch: false });
-      if (el.kind === 'OTE' && index !== elements.length - 1) {
+      if (isOutputKind(el.kind) && index !== elements.length - 1) {
         errors.push({
-          code: 'ote-not-last',
+          code: 'output-not-last',
           rungId: rung.id,
           elementId: el.id || null,
-          message: `${label}: an output coil (OTE) has to be the last instruction on the rung. This editor does not place an output before a contact.`
+          message: `${label}: an output has to be the last instruction on the rung. This editor does not place an output before a contact.`
         });
       }
     });
     const last = elements[elements.length - 1];
-    if (!last || last.kind !== 'OTE') {
+    if (!last || !isOutputKind(last.kind)) {
       errors.push({
-        code: 'ote-required',
+        code: 'output-required',
         rungId: rung.id,
-        message: `${label} must end with an output coil (OTE) on the right.`
+        message: `${label} must end with an output on the right (OTE, OTL, OTU, TON, TOF, CTU, or RES).`
       });
     }
   });
   return errors;
 }
 
+function presetNumber(instr) {
+  const n = typeof instr.pre === 'number' ? instr.pre : Number(String(instr.pre ?? '').trim());
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+function statusPins(kind, pre) {
+  if (kind === 'TON' || kind === 'TOF') {
+    return [
+      { k: 'PRE', v: String(pre) },
+      { k: 'ACC', v: '0' },
+      { k: 'EN', v: '' },
+      { k: 'TT', v: '' },
+      { k: 'DN', v: '' }
+    ];
+  }
+  if (kind === 'CTU') {
+    return [
+      { k: 'PRE', v: String(pre) },
+      { k: 'ACC', v: '0' },
+      { k: 'CU', v: '' },
+      { k: 'DN', v: '' }
+    ];
+  }
+  return [];
+}
+
 function compileLeaf(instr) {
   const tag = String(instr.tag ?? '').trim() || '?';
   if (instr.kind === 'XIC') return { t: 'no', a: tag };
   if (instr.kind === 'XIO') return { t: 'nc', a: tag };
-  if (instr.kind === 'OTE') return { t: 'coil', k: 'OTE', a: tag };
+  if (instr.kind === 'OTE' || instr.kind === 'OTL' || instr.kind === 'OTU') {
+    return { t: 'coil', k: instr.kind, a: tag };
+  }
+  if (instr.kind === 'TON' || instr.kind === 'TOF' || instr.kind === 'CTU') {
+    const pre = presetNumber(instr);
+    return { t: 'blk', k: instr.kind, a: tag, p: statusPins(instr.kind, pre) };
+  }
+  if (instr.kind === 'RES') return { t: 'blk', k: 'RES', a: tag };
   return { t: 'no', a: tag };
 }
 
@@ -489,7 +607,7 @@ export function compileRung(rung) {
   for (const el of rung?.elements || []) {
     if (el.kind === 'branch') {
       children.push({ t: 'or', c: (el.legs || []).map(compileLeg) });
-    } else if (el.kind === 'XIC' || el.kind === 'XIO' || el.kind === 'OTE') {
+    } else if (KINDS.has(el.kind)) {
       children.push(compileLeaf(el));
     }
   }
@@ -515,9 +633,13 @@ export function tagRoles(program) {
   const write = new Map();
   visitInstructions(program, (instr) => {
     const tag = String(instr.tag ?? '').trim();
-    if (!isEditorTag(tag)) return;
-    if (instr.kind === 'OTE') write.set(tag, (write.get(tag) || 0) + 1);
-    else if (instr.kind === 'XIC' || instr.kind === 'XIO') read.add(tag);
+    if (instr.kind === 'OTE' || instr.kind === 'OTL' || instr.kind === 'OTU') {
+      if (!isEditorTag(tag)) return;
+      write.set(tag, (write.get(tag) || 0) + 1);
+    } else if (instr.kind === 'XIC' || instr.kind === 'XIO') {
+      if (!isEditorTag(tag)) return;
+      read.add(tag);
+    }
   });
   const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
   const outputs = [...write.keys()].sort(byName);
@@ -536,24 +658,27 @@ export function imageFromBits(bits = {}) {
   for (const [tag, value] of Object.entries(bits || {})) {
     state.bits[tag] = value ? 1 : 0;
   }
-  state.dt = 1000;
+  state.dt = EDITOR_SCAN_MS;
   return state;
 }
 
-/** One live scan, top rung to bottom. Mutates `state.bits` when an OTE writes. */
+/** One live scan, top rung to bottom. Mutates bits, timers, and counters. */
 export function applyEditorScan(program, state) {
   const errors = validateProgram(program);
   if (errors.length) return { ok: false, errors, conds: [] };
+  state.dt = EDITOR_SCAN_MS;
   const conds = compileProgram(program).map((ladder) => analyze(ladder, state, { live: true }).conducts);
   return { ok: true, errors: [], conds };
 }
 
-/** Drawing pass. Does not write coils. `bits` may be a bit map or an engine state. */
+function isEngineState(value) {
+  return !!(value && typeof value === 'object' && value.bits && value.timers && value.counters);
+}
+
+/** Drawing pass. Does not write coils or advance timers. */
 export function previewEditor(program, bitsOrState) {
-  const source = bitsOrState && typeof bitsOrState === 'object' && bitsOrState.bits && bitsOrState.values
-    ? bitsOrState.bits
-    : bitsOrState;
-  const state = imageFromBits(source || {});
+  const state = isEngineState(bitsOrState) ? structuredClone(bitsOrState) : imageFromBits(bitsOrState || {});
+  state.dt = 0;
   const before = { ...state.bits };
   const ladders = compileProgram(program);
   const maps = [];
@@ -563,7 +688,7 @@ export function previewEditor(program, bitsOrState) {
     maps.push(res.map);
     conds.push(res.conducts);
   }
-  return { ladders, maps, conds, bits: state.bits, bitsBefore: before };
+  return { ladders, maps, conds, bits: state.bits, bitsBefore: before, timers: state.timers, counters: state.counters };
 }
 
 /**
@@ -587,7 +712,12 @@ export function scanEditor(program, steps) {
       err.errors = res.errors;
       throw err;
     }
-    traces.push({ bits: { ...state.bits }, conds: res.conds.slice() });
+    traces.push({
+      bits: { ...state.bits },
+      conds: res.conds.slice(),
+      timers: structuredClone(state.timers),
+      counters: structuredClone(state.counters)
+    });
   }
   return { state, traces };
 }
@@ -598,7 +728,9 @@ function sanitizeInstruction(raw, seen) {
   const id = typeof raw.id === 'string' && raw.id && !seen.has(raw.id) ? raw.id : null;
   if (!id) return null;
   seen.add(id);
-  return { id, kind: raw.kind, tag: String(raw.tag ?? '').trim() };
+  const clean = { id, kind: raw.kind, tag: String(raw.tag ?? '').trim() };
+  if (PRESET_KINDS.has(raw.kind) && (typeof raw.pre === 'number' || typeof raw.pre === 'string')) clean.pre = raw.pre;
+  return clean;
 }
 
 export function parseStoredProgram(raw) {
@@ -626,7 +758,7 @@ export function parseStoredProgram(raw) {
           const contacts = [];
           for (const instr of leg) {
             const clean = sanitizeInstruction(instr, seen);
-            if (clean && clean.kind !== 'OTE') contacts.push(clean);
+            if (clean && !isOutputKind(clean.kind)) contacts.push(clean);
           }
           legs.push(contacts);
         }

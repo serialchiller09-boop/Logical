@@ -249,7 +249,10 @@ function evalBlock(node, ctx, live) {
     const pre = num(operandValue(param(node, 'Target') ?? param(node, 'PRE'), st));
     c.pre = pre;
     if (live) {
-      // Edge against the prior enable bit (.CU / .CD), matching Studio 5000 CTU/CTD help.
+      // Edge against the prior enable bit (.CU / .CD). Count Up (CTU): when rung-condition-in
+      // is true and .CU is false, ACC increments by one; when rung-condition-in is false, .CU clears.
+      // Prescan sets .CU true so an already-true input does not count on the first program scan.
+      // That prescan is not applied here: a new counter starts with .CU false, so the first true scan counts.
       if (k === 'CTU') {
         if (enabled && !c.cu) c.acc += 1;
         c.cu = !!enabled;
@@ -318,6 +321,10 @@ function annotatePins(node, st) {
     if ((key === 'PRE' || key === 'PT') && isTimer) {
       const ms = presetMs(node, st.values);
       out = ms ? `${Math.round((ms / 1000) * 10) / 10} s = ${ms} ms` : resolveOperand(p.v, st.values) ?? p.v;
+    } else if ((key === 'CU' || key === 'CD') && store && typeof store[key.toLowerCase()] === 'boolean') {
+      // COUNTER status bits. A pin named CU/CD used to be treated as an accumulator alias;
+      // no seeded rung uses that pin name. Show the enable bit when the counter has one.
+      out = store[key.toLowerCase()] ? 'TRUE' : 'false';
     } else if (key === 'ACC' || key === 'ET' || key === 'CU' || key === 'CD' || key === 'CV') {
       out = store ? Math.round(store.acc ?? 0) : resolveOperand(p.v, st.values) ?? p.v;
     } else if (key === 'DN' || key === 'Q' || key === 'V') {

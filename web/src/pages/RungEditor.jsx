@@ -4,6 +4,7 @@ import { EDITOR_GEO } from '../lib/ladder.js';
 import { useTitle } from '../lib/store.jsx';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
+  EDITOR_SCAN_MS,
   addInstruction,
   addParallelBranch,
   addRung,
@@ -16,12 +17,14 @@ import {
   previewEditor,
   resetStoredProgram,
   saveProgram,
+  setInstructionPreset,
   setInstructionTag,
   tagRoles,
   validateProgram
 } from '../lib/rungEditor.js';
 
 const SCAN_MS = 500;
+const OUTPUT_KINDS = new Set(['OTE', 'OTL', 'OTU', 'TON', 'TOF', 'CTU', 'RES']);
 
 function loadInitial() {
   if (typeof window === 'undefined') return loadProgram(null);
@@ -52,19 +55,19 @@ export default function RungEditor() {
   const [mode, setMode] = useState('edit');
   const [running, setRunning] = useState(false);
   const [scans, setScans] = useState(0);
-  const [bits, setBits] = useState({});
   const [opError, setOpError] = useState(null);
   const [saveNote, setSaveNote] = useState(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [pendingFocus, setPendingFocus] = useState(null);
-  const bitsRef = useRef(bits);
+  const [scanRev, setScanRev] = useState(0);
+  const stateRef = useRef(null);
+  if (!stateRef.current) stateRef.current = imageFromBits({});
   const programRef = useRef(program);
-  bitsRef.current = bits;
   programRef.current = program;
 
   const errors = useMemo(() => validateProgram(program), [program]);
   const roles = useMemo(() => tagRoles(program), [program]);
-  const preview = useMemo(() => previewEditor(program, bits), [program, bits]);
+  const preview = useMemo(() => previewEditor(program, stateRef.current), [program, scanRev]);
   const live = mode === 'run' && errors.length === 0;
   const target = targetLabel(program, selection);
 
@@ -89,23 +92,21 @@ export default function RungEditor() {
         setRunning(false);
         return;
       }
-      const state = imageFromBits(bitsRef.current);
+      const state = stateRef.current;
+      state.dt = EDITOR_SCAN_MS;
       const res = applyEditorScan(current, state);
       if (!res.ok) {
         setRunning(false);
         return;
       }
-      const nextBits = { ...state.bits };
-      bitsRef.current = nextBits;
-      setBits(nextBits);
+      setScanRev((n) => n + 1);
       setScans((count) => count + 1);
     }, SCAN_MS);
     return () => clearInterval(id);
   }, [running]);
 
-  function commitBits(next) {
-    bitsRef.current = next;
-    setBits(next);
+  function bumpScan() {
+    setScanRev((n) => n + 1);
   }
 
   function applyResult(result) {
@@ -129,8 +130,8 @@ export default function RungEditor() {
   function onAdd(kind) {
     const { rung, selection: sel } = selectionFor(program, selection);
     if (!rung) return;
-    if (kind === 'OTE') {
-      applyResult(addInstruction(program, { rungId: rung.id, kind: 'OTE' }));
+    if (OUTPUT_KINDS.has(kind)) {
+      applyResult(addInstruction(program, { rungId: rung.id, kind }));
       return;
     }
     if (sel.place === 'leg' && sel.legIndex != null) {
@@ -167,25 +168,28 @@ export default function RungEditor() {
 
   function stepOnce() {
     if (errors.length || running) return;
-    const state = imageFromBits(bitsRef.current);
+    const state = stateRef.current;
+    state.dt = EDITOR_SCAN_MS;
     const res = applyEditorScan(program, state);
     if (!res.ok) {
       setOpError(res.errors[0]?.message || 'This program cannot be scanned yet.');
       return;
     }
-    commitBits({ ...state.bits });
+    bumpScan();
     setScans((count) => count + 1);
   }
 
   function toggleInput(tag) {
-    const next = { ...bitsRef.current, [tag]: bitsRef.current[tag] ? 0 : 1 };
-    commitBits(next);
+    const state = stateRef.current;
+    state.bits[tag] = state.bits[tag] ? 0 : 1;
+    bumpScan();
   }
 
   function resetProgram() {
     setRunning(false);
     setScans(0);
-    commitBits({});
+    stateRef.current = imageFromBits({});
+    bumpScan();
     setSelection(null);
     setOpError(null);
     setConfirmReset(false);
@@ -200,8 +204,7 @@ export default function RungEditor() {
       <header className="re-hero">
         <h1>Rung editor</h1>
         <p>
-          Write your own rungs with XIC, XIO, and OTE. The drawing and the scan use the same ladder engine as the lab.
-          BOOL tags only.
+          Write rungs with XIC, XIO, OTE, OTL, OTU, TON, TOF, CTU, and RES. The drawing and the scan use the same ladder engine as the lab.
         </p>
         <p className="re-limit">{EDITOR_BRANCH_LIMIT_TEXT}</p>
       </header>
@@ -224,6 +227,12 @@ export default function RungEditor() {
               <button type="button" className="btn" aria-label="Add XIC" onClick={() => onAdd('XIC')}>Add XIC</button>
               <button type="button" className="btn" aria-label="Add XIO" onClick={() => onAdd('XIO')}>Add XIO</button>
               <button type="button" className="btn" aria-label="Add OTE" onClick={() => onAdd('OTE')}>Add OTE</button>
+              <button type="button" className="btn" aria-label="Add OTL" onClick={() => onAdd('OTL')}>Add OTL</button>
+              <button type="button" className="btn" aria-label="Add OTU" onClick={() => onAdd('OTU')}>Add OTU</button>
+              <button type="button" className="btn" aria-label="Add TON" onClick={() => onAdd('TON')}>Add TON</button>
+              <button type="button" className="btn" aria-label="Add TOF" onClick={() => onAdd('TOF')}>Add TOF</button>
+              <button type="button" className="btn" aria-label="Add CTU" onClick={() => onAdd('CTU')}>Add CTU</button>
+              <button type="button" className="btn" aria-label="Add RES" onClick={() => onAdd('RES')}>Add RES</button>
               <button type="button" className="btn" aria-label={branchOnTarget ? 'Add parallel leg' : 'Add parallel branch'} onClick={onBranch}>
                 {branchOnTarget ? 'Add parallel leg' : 'Add parallel branch'}
               </button>
@@ -241,8 +250,8 @@ export default function RungEditor() {
             </div>
             <p className="re-scan-status" role="status">
               Scan {scans}. {running ? 'Running' : 'Stopped'}.
-              {' '}Continuous scan steps about twice a second in this browser. That is not a Logix task rate.
-              Outputs change when you step or while Start is running. Orange wires show whether each rung would conduct with the bits as they are now.
+              {' '}Each step adds {EDITOR_SCAN_MS} ms, including while Start is running.
+              {' '}1756-RM003 adds the time since a timer was last scanned. This page uses {EDITOR_SCAN_MS} ms for that elapsed time. It is not a Logix task period.
             </p>
           </div>
         )}
@@ -280,7 +289,9 @@ export default function RungEditor() {
               onDelete={(elementId) => applyResult(deleteInstruction(program, { rungId: rung.id, elementId }))}
               onDeleteLeg={(branchId, legIndex) => applyResult(deleteLeg(program, { rungId: rung.id, branchId, legIndex }))}
               onDeleteRung={() => applyResult(deleteRung(program, rung.id))}
+              onPreset={(elementId, pre) => applyResult(setInstructionPreset(program, { rungId: rung.id, elementId, pre }))}
               canDeleteRung={program.rungs.length > 1}
+              scanState={stateRef.current}
             />
           ))}
         </ol>
@@ -288,7 +299,7 @@ export default function RungEditor() {
         {mode === 'run' && (
           <IoPanel
             roles={roles}
-            bits={bits}
+            bits={stateRef.current.bits}
             onToggle={toggleInput}
           />
         )}
@@ -321,10 +332,19 @@ export default function RungEditor() {
               <li>The same manual says unexpected operation may occur if an output tag is overwritten. This page scans rungs from the top of the list downward, and each rung from left to right. When two OTE instructions use the same tag, the lower rung’s write is the value that remains.</li>
             </ul>
             <p>
-              Not simulated from that manual: OTE prescan and postscan both clear the data bit. This page leaves a bit where the last scan put it until you step again or press Reset.
+              Not simulated from that manual: OTE prescan and postscan both clear the data bit. TON and TOF postscan, and the TON/TOF flow-chart pause that forces .DN, are not simulated. CTU prescan sets .CU true so an input that is already true on the first program scan does not count; this page starts .CU false, so that first true scan counts as one rising edge. Counter .OV past 2,147,483,647 is not simulated. A timer here adds {EDITOR_SCAN_MS} ms per step instead of a controller's wall-clock delta.
             </p>
+            <ul>
+              <li>OTL (Output Latch) sets the BOOL when rung-condition-in is true and leaves it unchanged when rung-condition-in is false.</li>
+              <li>OTU (Output Unlatch) clears the BOOL when rung-condition-in is true and leaves it unchanged when rung-condition-in is false.</li>
+              <li>TON (Timer On Delay) accumulates while the rung is true. .DN is true when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. Time base is 1 ms.</li>
+              <li>TOF (Timer Off Delay): a true rung sets .EN and .DN and clears .ACC and .TT. A false rung accumulates. .DN stays true until .ACC reaches .PRE, then .DN clears. Prescan sets .ACC equal to .PRE and clears .EN, .TT, and .DN.</li>
+              <li>CTU (Count Up) adds one to .ACC only when the rung goes from false to true. .DN is true when .ACC is at least .PRE. Holding the rung true does not count again.</li>
+              <li>RES (Reset), when the rung is true, clears a TIMER or COUNTER .ACC and its control bits. A false rung does not.</li>
+              <li>XIC and XIO may read .DN, .EN, .TT, or .CU on the tag those instructions use.</li>
+            </ul>
             <p>
-              Editor limits, not Studio 5000 rules: {EDITOR_BRANCH_LIMIT_TEXT} Tag names are case-sensitive here. A name must start with a letter, then use letters, digits, or underscores, up to 40 characters. That spelling limit was not confirmed against Studio 5000 tag rules. 1756-RM003’s 40-character note is for JMP/LBL label names, which is a different thing. Timers, counters, and latches are not on this page.
+              Editor limits, not Studio 5000 rules: {EDITOR_BRANCH_LIMIT_TEXT} Tag names are case-sensitive here. A name must start with a letter, then use letters, digits, or underscores, up to 40 characters. That spelling limit was not confirmed against Studio 5000 tag rules. 1756-RM003’s 40-character note is for JMP/LBL label names, which is a different thing.
             </p>
             <p>This is a teaching scan in the browser, not a controller, and not plant I/O.</p>
           </div>
@@ -348,7 +368,9 @@ function RungCard({
   onDelete,
   onDeleteLeg,
   onDeleteRung,
-  canDeleteRung
+  onPreset,
+  canDeleteRung,
+  scanState
 }) {
   const selectedRung = selection?.place === 'rung';
   const [confirming, setConfirming] = useState(false);
@@ -385,8 +407,9 @@ function RungCard({
       </div>
       <div className="card-bd">
         <div className="re-canvas">
-          <RungDiagram ladder={ladder} map={live ? map : null} live={live} fit geo={EDITOR_GEO} />
-        </div>
+            <RungDiagram ladder={ladder} map={live ? map : null} live={live} fit geo={EDITOR_GEO} />
+          </div>
+          {mode === 'run' && <Faceplate rung={rung} scanState={scanState} onPreset={onPreset} />}
         {mode === 'edit' && (
           rung.elements.length === 0 ? (
             <p className="re-empty">This rung is empty. Add an XIC, an XIO, or an OTE.</p>
@@ -413,6 +436,7 @@ function RungCard({
                     selected={selection?.elementId === el.id}
                     onSelect={() => onSelect({ rungId: rung.id, elementId: el.id, place: 'series', legIndex: null })}
                     onTag={onTag}
+                    onPreset={onPreset}
                     onDelete={onDelete}
                   />
                 )
@@ -484,8 +508,10 @@ function BranchBlock({ rung, number, branch, selection, onSelect, onTag, onDelet
   );
 }
 
-function InstructionRow({ rungNumber, instr, legIndex, selected, onSelect, onTag, onDelete }) {
+function InstructionRow({ rungNumber, instr, legIndex, selected, onSelect, onTag, onPreset, onDelete }) {
   const where = legIndex == null ? `rung ${rungNumber}` : `rung ${rungNumber}, leg ${legIndex + 1}`;
+  const hasPreset = instr.kind === 'TON' || instr.kind === 'TOF' || instr.kind === 'CTU';
+  const presetUnit = instr.kind === 'CTU' ? 'count' : 'ms';
   return (
     <li
       className={`re-instr ${selected ? 'is-selected' : ''}`}
@@ -503,13 +529,63 @@ function InstructionRow({ rungNumber, instr, legIndex, selected, onSelect, onTag
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          placeholder="BOOL tag"
+          placeholder={hasPreset ? 'timer or counter tag' : 'tag'}
           aria-label={`${instr.kind} tag name on ${where}`}
           onChange={(event) => onTag(instr.id, event.target.value)}
         />
       </label>
+      {hasPreset && (
+        <label className="re-tag">
+          <span className="re-tag-name">PRE {presetUnit}</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            value={instr.pre ?? ''}
+            aria-label={`${instr.kind} preset on ${where}`}
+            onChange={(event) => onPreset(instr.id, event.target.value === '' ? '' : Number(event.target.value))}
+          />
+        </label>
+      )}
       <button type="button" className="btn" aria-label={`Delete ${instr.kind} ${instr.tag || 'blank tag'} on ${where}`} onClick={() => onDelete(instr.id)}>Delete</button>
     </li>
+  );
+}
+
+function Faceplate({ rung, scanState, onPreset }) {
+  const blocks = (rung.elements || []).filter((el) => el.kind === 'TON' || el.kind === 'TOF' || el.kind === 'CTU');
+  if (!blocks.length) return null;
+  return (
+    <div className="re-faceplate">
+      {blocks.map((instr) => {
+        const store = instr.kind === 'CTU' ? scanState?.counters?.[instr.tag] : scanState?.timers?.[instr.tag];
+        const acc = store?.acc ?? 0;
+        const bits = instr.kind === 'CTU'
+          ? `CU ${store?.cu ? '1' : '0'} · DN ${store?.dn ? '1' : '0'}`
+          : `EN ${store?.en ? '1' : '0'} · TT ${store?.running ? '1' : '0'} · DN ${store?.dn ? '1' : '0'}`;
+        const unit = instr.kind === 'CTU' ? '' : ' ms';
+        const text = `ACC ${acc}${unit} · ${bits}`;
+        return (
+          <div key={instr.id} className="re-face" role="status" aria-label={`${instr.kind} ${instr.tag || 'blank'} ${text}`}>
+            <div>{instr.kind} {instr.tag || 'tag'}</div>
+            <div>{text}</div>
+            <label className="re-tag">
+              <span className="re-tag-name">PRE {instr.kind === 'CTU' ? 'count' : 'ms'}</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                value={instr.pre ?? ''}
+                aria-label={`PRE for ${instr.kind} ${instr.tag || 'blank'}`}
+                onChange={(event) => onPreset(instr.id, event.target.value === '' ? '' : Number(event.target.value))}
+              />
+            </label>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
