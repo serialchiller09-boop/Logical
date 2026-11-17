@@ -10,6 +10,17 @@
 
 export const GEO = { contactW: 108, coilW: 126, blockW: 186, rowH: 76, gap: 10, branchGap: 20, railPad: 30 };
 
+/**
+ * Narrower boxes for the learner editor. A seal-in (branch, contact, coil, both rails)
+ * stays narrow enough that scaling it into a 375px canvas keeps the tag name at least
+ * LADDER_MIN_TAG_FONT_PX. The lab keeps GEO.
+ */
+export const EDITOR_GEO = { contactW: 78, coilW: 90, blockW: 168, rowH: GEO.rowH, gap: 8, branchGap: 18, railPad: 16 };
+
+/** Address text size in .ld-addr. fitRung will not scale a rung below the minimum. */
+export const LADDER_TAG_FONT_PX = 12.5;
+export const LADDER_MIN_TAG_FONT_PX = 11;
+
 /** Keep block pin values inside the box so long placeholders cannot cover contacts. */
 export function fitPinText(raw, maxChars = 16) {
   const s = String(raw ?? '');
@@ -409,16 +420,16 @@ function shiftWire(wr, dx, dy) {
   return out;
 }
 
-export function layout(node, map) {
+export function layout(node, map, geo = GEO) {
   const cond = (n) => (map && map.size ? !!map.get(n) : undefined);
 
   const box = (n) => {
-    if (!n) return { w: 0, h: GEO.rowH, items: [], wires: [], c: false };
+    if (!n) return { w: 0, h: geo.rowH, items: [], wires: [], c: false };
     if (n.t === 'and') {
       const kids = (n.c || []).map(box);
-      const gap = kids.length > 1 ? GEO.gap : 0;
+      const gap = kids.length > 1 ? geo.gap : 0;
       const w = kids.reduce((s, k) => s + k.w, 0) + gap * Math.max(0, kids.length - 1);
-      const h = Math.max(GEO.rowH, ...kids.map((k) => k.h));
+      const h = Math.max(geo.rowH, ...kids.map((k) => k.h));
       const items = [], wires = [];
       let x = 0;
       kids.forEach((k, idx) => {
@@ -428,42 +439,85 @@ export function layout(node, map) {
         if (idx > 0) wires.push({ x1: x - gap, x2: x, y: h / 2, c: !!kids[idx - 1].c });
         x += k.w + gap;
       });
-      // lead-in and lead-out
-      wires.push({ x1: -GEO.railPad, x2: 0, y: h / 2, c: cond(n.c?.[0]) ?? true, edge: 'in' });
+      // lead-in from the left rail. The right rail is added by frameLadder, at the last glyph.
+      wires.push({ x1: -geo.railPad, x2: 0, y: h / 2, c: cond(n.c?.[0]) ?? true, edge: 'in' });
       return { w: Math.max(w, 60), h, items, wires, c: cond(n) };
     }
     if (n.t === 'or') {
       const kids = (n.c || []).map(box);
-      const innerW = Math.max(...kids.map((k) => k.w), GEO.contactW);
-      const h = kids.reduce((s, k) => s + k.h, GEO.branchGap * (kids.length + 1));
+      const innerW = Math.max(...kids.map((k) => k.w), geo.contactW);
+      const h = kids.reduce((s, k) => s + k.h, geo.branchGap * (kids.length + 1));
       const items = [], wires = [];
       const busL = 0, busR = innerW;
-      let y = GEO.branchGap;
+      let y = geo.branchGap;
       kids.forEach((k) => {
         const midY = y + k.h / 2;
         k.items.forEach((it) => items.push({ ...it, x: it.x + (k.w < innerW ? (innerW - k.w) / 2 : 0), y: it.y + y }));
         k.wires.forEach((wr) => wires.push(shiftWire(wr, 8, y)));
         wires.push({ x1: busL, x2: busL + 8, y: midY, c: true });
         wires.push({ x1: busR - 8, x2: busR, y: midY, c: !!k.c });
-        y += k.h + GEO.branchGap;
+        y += k.h + geo.branchGap;
       });
-      wires.push({ vertical: true, x: busL, y1: GEO.branchGap, y2: h - GEO.branchGap, c: true, bus: true });
-      wires.push({ vertical: true, x: busR, y1: GEO.branchGap, y2: h - GEO.branchGap, c: kids.some((k) => k.c), bus: true });
+      wires.push({ vertical: true, x: busL, y1: geo.branchGap, y2: h - geo.branchGap, c: true, bus: true });
+      wires.push({ vertical: true, x: busR, y1: geo.branchGap, y2: h - geo.branchGap, c: kids.some((k) => k.c), bus: true });
       return { w: innerW + 16, h, items, wires, c: cond(n) };
     }
-    const size = leafSize(n);
+    const size = leafSize(n, geo);
     return { w: size.w, h: size.h, items: [{ node: n, x: 0, y: 0, ...size, c: cond(n) }], wires: [], c: cond(n) };
   };
 
   const root = box(node);
-  return { w: root.w + GEO.railPad * 2 + 16, h: Math.max(root.h, GEO.rowH + 24), items: root.items, wires: root.wires };
+  return { w: root.w + geo.railPad * 2 + 16, h: Math.max(root.h, geo.rowH + 24), items: root.items, wires: root.wires };
 }
 
-function leafSize(n) {
-  if (n.t === 'coil') return { w: GEO.coilW, h: GEO.rowH };
-  if (n.t === 'blk') { const rows = Math.max(1, (n.p || []).length); return { w: GEO.blockW, h: Math.max(GEO.rowH, 30 + rows * 20) }; }
-  if (n.t === 'short') return { w: 44, h: GEO.rowH };
-  return { w: GEO.contactW, h: GEO.rowH };
+function leafSize(n, geo) {
+  if (n.t === 'coil') return { w: geo.coilW, h: geo.rowH };
+  if (n.t === 'blk') { const rows = Math.max(1, (n.p || []).length); return { w: geo.blockW, h: Math.max(geo.rowH, 30 + rows * 20) }; }
+  if (n.t === 'short') return { w: 44, h: geo.rowH };
+  return { w: geo.contactW, h: geo.rowH };
+}
+
+/**
+ * Place the power rails around a layout() box.
+ * The right rail sits one rail-pad past the rightmost instruction, and the output
+ * wire runs from that instruction to the rail. layout()'s returned width includes
+ * spare padding that is not part of the glyphs; using it as the wire start left a
+ * gap and a short stub at a rail that floated to the right of the coil.
+ */
+export function frameLadder(box, { geo = GEO, conducts = false } = {}) {
+  const pad = geo.railPad;
+  const shift = pad + 6;
+  const h = Math.max(box.h, geo.rowH + 20) + 16;
+  const glyphRight = box.items.reduce((max, it) => Math.max(max, it.x + it.w), 0);
+  const contentRight = glyphRight + shift;
+  const leftRail = pad;
+  const rightRail = contentRight + pad;
+  const w = rightRail + 6;
+  const outY = h / 2;
+  const wires = box.wires.map((wr) => (wr.vertical
+    ? { ...wr, x: wr.x + shift, y1: wr.y1 + 8, y2: wr.y2 + 8 }
+    : { ...wr, x1: wr.x1 + shift, x2: wr.x2 + shift, y: wr.y + 8 }));
+  const outputWire = { x1: contentRight, x2: rightRail, y: outY, c: !!conducts, edge: 'out' };
+  wires.push(outputWire);
+  const items = box.items.map((it) => ({ ...it, x: it.x + shift, y: it.y + 8 }));
+  return { w, h, items, wires, leftRail, rightRail, contentRight, outputWire };
+}
+
+/**
+ * Shrink a rung into the canvas, but not so far that the tag name drops below
+ * LADDER_MIN_TAG_FONT_PX. Wider rungs scroll, and the editor shows a cue.
+ * Does not scale up: a short rung stays at its drawn size with the rail against the coil.
+ */
+export function fitRung(svgWidth, canvasWidth) {
+  const width = Math.max(1, svgWidth);
+  const canvas = Math.max(0, canvasWidth);
+  const minScale = LADDER_MIN_TAG_FONT_PX / LADDER_TAG_FONT_PX;
+  const natural = canvas > 0 ? Math.min(1, canvas / width) : 1;
+  if (natural + 1e-9 >= minScale) {
+    const scale = natural;
+    return { scale, scrolls: false, renderWidth: width * scale, tagFontPx: LADDER_TAG_FONT_PX * scale };
+  }
+  return { scale: minScale, scrolls: true, renderWidth: width * minScale, tagFontPx: LADDER_MIN_TAG_FONT_PX };
 }
 
 /* ------------------------------------------------------------------ state helpers */

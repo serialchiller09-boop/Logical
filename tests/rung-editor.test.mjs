@@ -7,7 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { analyze, initialState } from '../web/src/lib/ladder.js';
+import {
+  analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, frameLadder, fitRung, layout
+} from '../web/src/lib/ladder.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
   EDITOR_STORAGE_KEY,
@@ -422,6 +424,33 @@ test('a program with a blank tag is not scanned', () => {
   const refused = applyEditorScan(program, initialState([]));
   assert.equal(refused.ok, false);
   assert.equal(refused.errors[0].code, 'empty-tag');
+});
+
+test('editor geometry ties the coil to the right rail and fits a 375px canvas', () => {
+  const ladder = compileRung(sealInProgram().rungs[0]);
+  const frame = frameLadder(layout(ladder, null, EDITOR_GEO), { geo: EDITOR_GEO });
+  const coil = frame.items.find((it) => it.node.t === 'coil');
+  const coilRight = coil.x + coil.w;
+  assert.equal(frame.outputWire.x1, coilRight, 'the output wire starts at the coil');
+  assert.equal(frame.outputWire.x2, frame.rightRail, 'the output wire ends at the right rail');
+  assert.equal(frame.rightRail - coilRight, EDITOR_GEO.railPad);
+  assert.ok(frame.items.some((it) => it.node.t === 'no' && it.node.a === 'Start'));
+  assert.ok(frame.items.some((it) => it.node.t === 'nc' && it.node.a === 'Stop'));
+  // Page pad 16, card pad 15, card border 1, each side. The rung must fit this canvas.
+  const phoneCanvas = 375 - (16 + 15 + 1) * 2;
+  const fit = fitRung(frame.w, phoneCanvas);
+  assert.equal(fit.scrolls, false);
+  assert.ok(fit.renderWidth <= phoneCanvas + 0.01);
+  assert.ok(fit.tagFontPx >= LADDER_MIN_TAG_FONT_PX);
+
+  const wide = addSeries(createProgram(), 0, [
+    ...Array.from({ length: 8 }, (_, i) => ({ kind: 'XIC', tag: `In${i}` })),
+    { kind: 'OTE', tag: 'Out' }
+  ]);
+  const wideFrame = frameLadder(layout(compileRung(wide.rungs[0]), null, EDITOR_GEO), { geo: EDITOR_GEO });
+  const wideFit = fitRung(wideFrame.w, phoneCanvas);
+  assert.equal(wideFit.scrolls, true);
+  assert.equal(wideFit.tagFontPx, LADDER_MIN_TAG_FONT_PX);
 });
 
 test('the program round-trips through localStorage and Reset restores one empty rung', () => {

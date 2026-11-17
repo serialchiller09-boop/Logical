@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RungDiagram } from '../components/RungDiagram.jsx';
+import { EDITOR_GEO } from '../lib/ladder.js';
 import { useTitle } from '../lib/store.jsx';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
@@ -384,7 +385,7 @@ function RungCard({
       </div>
       <div className="card-bd">
         <div className="re-canvas">
-          <RungDiagram ladder={ladder} map={live ? map : null} live={live} />
+          <RungDiagram ladder={ladder} map={live ? map : null} live={live} fit geo={EDITOR_GEO} />
         </div>
         {mode === 'edit' && (
           rung.elements.length === 0 ? (

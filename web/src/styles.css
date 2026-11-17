@@ -1524,8 +1524,16 @@ button.lab-dock-led {
 .re-rung-hd { flex-wrap: wrap; }
 .re-rung-hd h2 { font: 650 16px/1.2 var(--mono); }
 .re-canvas { max-width: 100%; min-width: 0; }
-.re-canvas .ladder-wrap { max-width: 100%; overflow-x: auto; }
-.re-canvas .ladder { max-width: none; margin: 0; }
+.re-canvas .ladder-wrap { position: relative; max-width: 100%; overflow-x: hidden; }
+.re-canvas .ladder-wrap.is-scrollable { overflow-x: auto; }
+.re-canvas .ladder { max-width: 100%; margin: 0; }
+.ladder-more {
+  position: sticky; right: 0; bottom: 8px; z-index: 2;
+  display: flex; align-items: center; justify-content: flex-end;
+  min-height: 44px; margin-top: -44px; padding: 0 10px 0 48px;
+  background: linear-gradient(90deg, transparent, var(--panel) 42%);
+  color: var(--accent); font: 700 14px/1.2 var(--sans); pointer-events: none;
+}
 .re-instr, .re-branch, .re-leg {
   min-width: 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: #0c141c;
 }
