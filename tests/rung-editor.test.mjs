@@ -11,7 +11,7 @@ import {
   analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout,
   scanLadders, LAB_DEFAULT_SCAN_MS
 } from '../web/src/lib/ladder.js';
-import { panelPointsFromRoles, toggledBit } from '../web/src/lib/ioSandbox.js';
+import { panelPointsFromRoles, toggledBit, inputKeyAction, nextInputBit, resolveInputSetup } from '../web/src/lib/ioSandbox.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
   EDITOR_STORAGE_KEY,
@@ -744,6 +744,54 @@ test('on Edit, Step scans a switch into the lamp and errors disable Step', () =>
   assert.match(page, /onStep=\{stepOnce\}/);
   assert.match(page, /editStepControl\(errors\)/);
   assert.match(page, /min-width: 421px/);
+  assert.match(page, /A momentary input is seen only when a scan runs while it is held/);
+  assert.match(page, /EDITOR_RUN_INTERVAL_MS/);
+  assert.match(page, /onPointerUp/);
+  assert.match(page, /onPointerCancel/);
+  assert.match(page, /onPointerLeave/);
+  assert.match(page, /aria-pressed=\{on\}/);
+});
+
+test('a held momentary input is seen by applyEditorScan, and release, repeat, and text fields are ignored', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Start' },
+    { kind: 'OTE', tag: 'Lamp' }
+  ]);
+  const setup = resolveInputSetup(['Start', 'Stop'], { Start: 'pb' }, {});
+  assert.equal(setup.modes.Start, 'pb');
+  assert.equal(setup.modes.Stop, 'switch');
+  assert.equal(setup.bindings.Start, '1');
+  assert.equal(setup.bindings.Stop, '2');
+
+  const body = { tagName: 'BODY' };
+  const field = { tagName: 'INPUT', type: 'text' };
+  const down = inputKeyAction({ type: 'keydown', key: '1', repeat: false, target: body }, setup);
+  assert.deepEqual(down, { tag: 'Start', action: 'press' });
+  assert.equal(inputKeyAction({ type: 'keydown', key: '1', repeat: true, target: body }, setup), null);
+  assert.equal(inputKeyAction({ type: 'keydown', key: '1', repeat: false, target: field }, setup), null);
+  assert.equal(inputKeyAction({ type: 'keydown', key: '1', repeat: false, ctrlKey: true, target: body }, setup), null);
+  assert.equal(inputKeyAction({ type: 'keydown', key: '1', repeat: false, metaKey: true, target: body }, setup), null);
+  assert.equal(inputKeyAction({ type: 'keydown', key: '1', repeat: false, altKey: true, target: body }, setup), null);
+
+  const state = imageFromBits({});
+  state.bits.Start = nextInputBit(state.bits, down);
+  const seen = applyEditorScan(program, state);
+  assert.equal(seen.ok, true);
+  assert.equal(state.bits.Start, 1);
+  assert.equal(state.bits.Lamp, 1);
+
+  const upInField = inputKeyAction({ type: 'keyup', key: '1', target: field }, setup);
+  assert.deepEqual(upInField, { tag: 'Start', action: 'release' });
+  state.bits.Start = nextInputBit(state.bits, upInField);
+  applyEditorScan(program, state);
+  assert.equal(state.bits.Start, 0);
+  assert.equal(state.bits.Lamp, 0);
+
+  const maintained = inputKeyAction({ type: 'keydown', key: '2', repeat: false, target: body }, setup);
+  assert.deepEqual(maintained, { tag: 'Stop', action: 'toggle' });
+  assert.equal(inputKeyAction({ type: 'keyup', key: '2', target: body }, setup), null);
+  assert.equal(nextInputBit({}, maintained), 1);
+  assert.equal(nextInputBit({ Stop: 1 }, maintained), 0);
 });
 
 test('the lab default step stays 1 s and says so next to the controls', () => {

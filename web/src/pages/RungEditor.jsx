@@ -2,9 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RungDiagram } from '../components/RungDiagram.jsx';
 import { EDITOR_GEO } from '../lib/ladder.js';
 import { useTitle } from '../lib/store.jsx';
-import { panelPointsFromRoles, toggledBit } from '../lib/ioSandbox.js';
+import {
+  assignInputKey,
+  inputKeyAction,
+  isTextEntryTarget,
+  nextInputBit,
+  panelPointsFromRoles,
+  releaseMomentaryBits,
+  resolveInputSetup,
+  toggledBit
+} from '../lib/ioSandbox.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
+  EDITOR_RUN_INTERVAL_MS,
   EDITOR_SCAN_MS,
   addInstruction,
   addParallelBranch,
@@ -25,8 +35,8 @@ import {
   validateProgram
 } from '../lib/rungEditor.js';
 
-const SCAN_MS = 500;
 const OUTPUT_KINDS = new Set(['OTE', 'OTL', 'OTU', 'TON', 'TOF', 'CTU', 'RES']);
+const MOMENTARY_NOTE = `A momentary input is seen only when a scan runs while it is held: Start scans every ${EDITOR_RUN_INTERVAL_MS} ms, and with Step you hold the button and press Step.`;
 
 function loadInitial() {
   if (typeof window === 'undefined') return loadProgram(null);
@@ -83,6 +93,15 @@ export default function RungEditor({
   const errors = useMemo(() => validateProgram(program), [program]);
   const scanControl = useMemo(() => editStepControl(errors), [errors]);
   const points = useMemo(() => panelPointsFromRoles(tagRoles(program), pinned), [program, pinned]);
+  const [inputModes, setInputModes] = useState({});
+  const [customKeys, setCustomKeys] = useState({});
+  const [captureTag, setCaptureTag] = useState(null);
+  const inputTags = useMemo(() => points.inputs.map((point) => point.tag), [points]);
+  const inputSetup = useMemo(() => resolveInputSetup(inputTags, inputModes, customKeys), [inputTags, inputModes, customKeys]);
+  const setupRef = useRef(inputSetup);
+  setupRef.current = inputSetup;
+  const captureRef = useRef(captureTag);
+  captureRef.current = captureTag;
   const [ioOpen, setIoOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.matchMedia('(min-width: 421px)').matches;
@@ -122,7 +141,7 @@ export default function RungEditor({
       }
       setScanRev((n) => n + 1);
       setScans((count) => count + 1);
-    }, SCAN_MS);
+    }, EDITOR_RUN_INTERVAL_MS);
     return () => clearInterval(id);
   }, [running]);
 
@@ -200,11 +219,60 @@ export default function RungEditor({
     setScans((count) => count + 1);
   }
 
-  function toggleInput(tag) {
-    const state = stateRef.current;
-    state.bits[tag] = toggledBit(state.bits, tag);
+  function setInputBit(tag, value) {
+    stateRef.current.bits[tag] = value ? 1 : 0;
     bumpScan();
   }
+
+  function toggleInput(tag) {
+    setInputBit(tag, toggledBit(stateRef.current.bits, tag));
+  }
+
+  function chooseInputMode(tag, type) {
+    setInputModes((current) => ({ ...current, [tag]: type === 'pb' ? 'pb' : 'switch' }));
+    setInputBit(tag, 0);
+  }
+
+  useEffect(() => {
+    const onKey = (event) => {
+      const waiting = captureRef.current;
+      if (waiting) {
+        if (event.type !== 'keydown' || event.repeat) return;
+        if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (isTextEntryTarget(event.target)) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setCaptureTag(null);
+          return;
+        }
+        const assigned = assignInputKey(customKeys, waiting, event.key);
+        if (!assigned.ok) return;
+        event.preventDefault();
+        setCustomKeys(assigned.bindings);
+        setCaptureTag(null);
+        return;
+      }
+      const action = inputKeyAction(event, setupRef.current);
+      if (!action) return;
+      event.preventDefault();
+      setInputBit(action.tag, nextInputBit(stateRef.current.bits, action));
+    };
+    const onBlur = () => {
+      const setup = setupRef.current;
+      const released = releaseMomentaryBits(stateRef.current.bits, setup.modes);
+      if (released === stateRef.current.bits) return;
+      stateRef.current.bits = released;
+      bumpScan();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [customKeys]);
 
   function resetProgram() {
     setRunning(false);
@@ -254,13 +322,20 @@ export default function RungEditor({
         <IoPanel
           points={points}
           bits={stateRef.current.bits}
+          setup={inputSetup}
+          captureTag={captureTag}
           onToggle={toggleInput}
+          onPress={(tag) => setInputBit(tag, 1)}
+          onRelease={(tag) => setInputBit(tag, 0)}
+          onMode={chooseInputMode}
+          onCapture={setCaptureTag}
           mode={mode}
           open={ioOpen}
           onOpenChange={setIoOpen}
           onStep={stepOnce}
           scanDisabled={scanControl.disabled}
           scanReason={scanControl.reason}
+          momentaryNote={MOMENTARY_NOTE}
         />
         {mode === 'edit' && (
           <div className="re-palette" role="group" aria-label="Add instructions">
@@ -636,11 +711,99 @@ function onRowKey(event, onDelete) {
   }
 }
 
-function IoPanel({ points, bits, onToggle, mode, open, onOpenChange, onStep, scanDisabled, scanReason }) {
+function InputCell({ tag, on, kind, binding, capturing, onToggle, onPress, onRelease, onMode, onCapture }) {
+  const momentary = kind === 'pb';
+  const keyText = binding || 'none';
+  const hold = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    event.preventDefault();
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* already released */ }
+    onPress(tag);
+  };
+  const drop = () => onRelease(tag);
+  return (
+    <div className="re-io-cell">
+      <div className="re-io-tag">{tag}</div>
+      <div className="re-io-kinds" role="group" aria-label={`${tag} input type`}>
+        <button
+          type="button"
+          className={`btn ${momentary ? '' : 'btn-on'}`}
+          aria-pressed={!momentary}
+          aria-label={`${tag} maintained switch`}
+          onClick={() => onMode(tag, 'switch')}
+        >
+          Switch
+        </button>
+        <button
+          type="button"
+          className={`btn ${momentary ? 'btn-on' : ''}`}
+          aria-pressed={momentary}
+          aria-label={`${tag} momentary pushbutton`}
+          onClick={() => onMode(tag, 'pb')}
+        >
+          PB
+        </button>
+      </div>
+      {momentary ? (
+        <button
+          type="button"
+          className={`re-toggle re-pb ${on ? 'is-on' : ''}`}
+          aria-pressed={on}
+          aria-label={`${tag} momentary pushbutton, key ${keyText}, ${on ? 'on' : 'off'}`}
+          onPointerDown={hold}
+          onPointerUp={drop}
+          onPointerCancel={drop}
+          onPointerLeave={drop}
+          onKeyDown={(event) => {
+            if (event.repeat) return;
+            if (event.key !== ' ' && event.key !== 'Enter') return;
+            event.preventDefault();
+            onPress(tag);
+          }}
+          onKeyUp={(event) => {
+            if (event.key !== ' ' && event.key !== 'Enter') return;
+            event.preventDefault();
+            onRelease(tag);
+          }}
+        >
+          <span className="re-toggle-knob" aria-hidden="true" />
+          <span>{on ? 'On' : 'Off'}</span>
+          <span className="re-keycap" aria-hidden="true">{keyText}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`re-toggle ${on ? 'is-on' : ''}`}
+          aria-pressed={on}
+          aria-label={`${tag} maintained switch, key ${keyText}, ${on ? 'on' : 'off'}`}
+          onClick={() => onToggle(tag)}
+        >
+          <span className="re-toggle-knob" aria-hidden="true" />
+          <span>{on ? 'On' : 'Off'}</span>
+          <span className="re-keycap" aria-hidden="true">{keyText}</span>
+        </button>
+      )}
+      <button
+        type="button"
+        className="btn"
+        aria-label={capturing ? `Press a letter or digit for ${tag}` : `Key ${keyText} for ${tag}. Change key.`}
+        aria-pressed={capturing}
+        onClick={() => onCapture(capturing ? null : tag)}
+      >
+        {capturing ? 'Press a key' : `Key ${keyText}`}
+      </button>
+    </div>
+  );
+}
+
+function IoPanel({
+  points, bits, setup, captureTag, onToggle, onPress, onRelease, onMode, onCapture,
+  mode, open, onOpenChange, onStep, scanDisabled, scanReason, momentaryNote
+}) {
   const bitOn = (tag) => !!bits[tag];
   const inputNote = mode === 'run'
-    ? 'Maintained switches for tags an XIC or XIO reads. Press Step one scan, or Start, on this tab. The switch itself does not scan.'
-    : 'Maintained switches for tags an XIC or XIO reads. Press Step one scan, beside the switches, to update the lamps. The switch itself does not scan.';
+    ? 'Press Step one scan, or Start, on this tab. The input itself does not scan.'
+    : 'Press Step one scan, beside the switches, to update the lamps. The input itself does not scan.';
   return (
     <details className="card re-io-card" open={open} onToggle={(event) => onOpenChange(event.currentTarget.open)}>
       <summary className="card-hd">
@@ -649,27 +812,25 @@ function IoPanel({ points, bits, onToggle, mode, open, onOpenChange, onStep, sca
       <div className="card-bd">
         <h3>Inputs</h3>
         <p className="re-io-note">{inputNote}</p>
+        <p className="re-io-note">{momentaryNote}</p>
         <div className="re-io-row">
           {points.inputs.length === 0 ? <p className="re-empty">No input tags yet.</p> : (
             <div className="re-io">
-              {points.inputs.map((point) => {
-                const on = bitOn(point.tag);
-                return (
-                  <div key={point.tag} className="re-io-cell">
-                    <div className="re-io-tag">{point.tag}</div>
-                    <button
-                      type="button"
-                      className={`re-toggle ${on ? 'is-on' : ''}`}
-                      aria-pressed={on}
-                      aria-label={`${point.tag} switch, ${on ? 'on' : 'off'}`}
-                      onClick={() => onToggle(point.tag)}
-                    >
-                      <span className="re-toggle-knob" aria-hidden="true" />
-                      <span>{on ? 'On' : 'Off'}</span>
-                    </button>
-                  </div>
-                );
-              })}
+              {points.inputs.map((point) => (
+                <InputCell
+                  key={point.tag}
+                  tag={point.tag}
+                  on={bitOn(point.tag)}
+                  kind={setup.modes[point.tag] === 'pb' ? 'pb' : 'switch'}
+                  binding={setup.bindings[point.tag] || ''}
+                  capturing={captureTag === point.tag}
+                  onToggle={onToggle}
+                  onPress={onPress}
+                  onRelease={onRelease}
+                  onMode={onMode}
+                  onCapture={onCapture}
+                />
+              ))}
             </div>
           )}
           {mode === 'edit' && (

@@ -55,6 +55,12 @@ export const EDITOR_STORAGE_KEY = 'logical.rung-editor.v1';
 /** Each Step, and each tick while Start is running, adds this many milliseconds to a timer. */
 export const EDITOR_SCAN_MS = 100;
 
+/**
+ * Wall-clock gap between scans while Start is running.
+ * This is not EDITOR_SCAN_MS, and it is not a Logix task period.
+ */
+export const EDITOR_RUN_INTERVAL_MS = 500;
+
 /** Shown on the page. Kept here so tests can pin the wording learners actually see. */
 export const EDITOR_BRANCH_LIMIT_TEXT =
   'One parallel branch per rung, and only one level deep. Each leg is contacts in series (XIC or XIO). A branch inside a leg is not available. The output stays on the right, after the branch, not inside it. The output can be OTE, OTL, OTU, TON, TOF, CTU, or RES.';
