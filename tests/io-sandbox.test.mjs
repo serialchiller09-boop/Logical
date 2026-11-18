@@ -10,10 +10,10 @@ import {
   createTrainerPanel,
   lampTest,
   normalizePanel,
-  formatOutputBit,
+  formatDint,
   normalizeLampColor,
-  normalizeOutputView,
-  outputViewLabel,
+  normalizeNumberView,
+  numberViewLabel,
   panelPointsFromRoles,
   panelToCsv,
   removeWidget,
@@ -117,17 +117,23 @@ test('input keys default to 1-9, and a custom key belongs to one input', () => {
   assert.deepEqual(releaseMomentaryBits({ Start: 1, Stop: 1 }, { Start: 'pb', Stop: 'switch' }), { Start: 0, Stop: 1 });
 });
 
-test('a BOOL output is a lamp or the same 0 or 1 in decimal, hex, and binary', () => {
-  assert.deepEqual(formatOutputBit(0, 'lamp'), { view: 'lamp', text: 'Off' });
-  assert.deepEqual(formatOutputBit(1, 'lamp'), { view: 'lamp', text: 'On' });
-  assert.deepEqual(formatOutputBit(1, 'decimal'), { view: 'decimal', text: '1' });
-  assert.deepEqual(formatOutputBit(0, 'hex'), { view: 'hex', text: '0' });
-  assert.deepEqual(formatOutputBit(1, 'binary'), { view: 'binary', text: '1' });
-  assert.equal(formatOutputBit(1, 'float').view, 'lamp');
-  assert.equal(normalizeOutputView('nope'), 'lamp');
-  assert.equal(normalizeLampColor('red'), 'red');
-  assert.equal(normalizeLampColor('blue'), 'green');
-  assert.equal(outputViewLabel('hex'), 'Hex');
+test('a DINT is decimal, 32-bit hex, or 32-bit binary, including the max and a negative', () => {
+  assert.deepEqual(formatDint(0, 'decimal'), { view: 'decimal', text: '0' });
+  assert.deepEqual(formatDint(0, 'hex'), { view: 'hex', text: '16#0000_0000' });
+  assert.deepEqual(formatDint(0, 'binary'), { view: 'binary', text: '2#0000_0000_0000_0000_0000_0000_0000_0000' });
+  assert.deepEqual(formatDint(5, 'decimal'), { view: 'decimal', text: '5' });
+  assert.deepEqual(formatDint(5, 'hex'), { view: 'hex', text: '16#0000_0005' });
+  assert.deepEqual(formatDint(5, 'binary'), { view: 'binary', text: '2#0000_0000_0000_0000_0000_0000_0000_0101' });
+  assert.equal(formatDint(2147483647, 'decimal').text, '2147483647');
+  assert.equal(formatDint(2147483647, 'hex').text, '16#7FFF_FFFF');
+  assert.equal(formatDint(2147483647, 'binary').text, '2#0111_1111_1111_1111_1111_1111_1111_1111');
+  assert.equal(formatDint(-1, 'decimal').text, '-1');
+  assert.equal(formatDint(-1, 'hex').text, '16#FFFF_FFFF');
+  assert.equal(formatDint(-1, 'binary').text, '2#1111_1111_1111_1111_1111_1111_1111_1111');
+  assert.equal(formatDint(-2147483648, 'hex').text, '16#8000_0000');
+  assert.equal(normalizeNumberView('float'), 'decimal');
+  assert.equal(normalizeLampColor('amber'), 'amber');
+  assert.equal(numberViewLabel('hex'), 'Hex');
 
   const css = readFileSync(new URL('../web/src/styles.css', import.meta.url), 'utf8');
   const ink = css.match(/--ink:\s*(#[0-9a-fA-F]{6})/)[1];

@@ -670,6 +670,27 @@ export function imageFromBits(bits = {}) {
   return state;
 }
 
+/** TON, TOF, and CTU preset and accumulated value. .PRE and .ACC are DINT. */
+export function editorNumberValues(program, state) {
+  const found = [];
+  const seen = new Set();
+  visitInstructions(program, (instr) => {
+    if (instr.kind !== 'TON' && instr.kind !== 'TOF' && instr.kind !== 'CTU') return;
+    const tag = String(instr.tag ?? '').trim();
+    if (!isEditorTag(tag) || seen.has(tag)) return;
+    seen.add(tag);
+    const box = instr.kind === 'CTU' ? state?.counters : state?.timers;
+    const acc = Number(box?.[tag]?.acc);
+    found.push({
+      tag,
+      kind: instr.kind,
+      pre: presetNumber(instr),
+      acc: Number.isFinite(acc) ? acc : 0
+    });
+  });
+  return found;
+}
+
 /** One live scan, top rung to bottom. Mutates bits, timers, and counters. */
 export function applyEditorScan(program, state) {
   const errors = validateProgram(program);

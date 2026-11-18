@@ -1639,7 +1639,13 @@ button.lab-dock-led {
 .re-led.is-on.is-amber { background: #f0b429; box-shadow: 0 0 8px rgba(240, 180, 41, .7); }
 .re-led.is-on.is-red { background: #ff5d55; box-shadow: 0 0 8px rgba(255, 93, 85, .7); }
 .re-out-value { font: 700 16px/1 var(--mono); }
-.re-out-style { margin-left: auto; color: var(--ink-2); font: 650 13px/1 var(--sans); }
+.re-num {
+  display: flex; flex-direction: column; gap: 4px; min-height: 44px; min-width: 0;
+  padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--line-2);
+  background: #0a1017; color: var(--ink);
+}
+.re-num-name { font: 650 11px/1.2 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+.re-num-value { font: 700 14px/1.35 var(--mono); overflow-wrap: anywhere; }
 .re-rules { border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); padding: 0; }
 .re-rules summary { min-height: 44px; display: flex; align-items: center; padding: 10px 12px; cursor: pointer; font-weight: 650; }
 .re-rules summary:focus-visible { outline: 2px solid rgba(79, 209, 224, .85); outline-offset: 2px; }
