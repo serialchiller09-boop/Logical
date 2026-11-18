@@ -1605,6 +1605,14 @@ button.lab-dock-led {
 .re-branch { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 .re-branch-hd, .re-leg-hd { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
 .re-leg { padding: 8px; }
+.re-io-card summary { cursor: pointer; min-height: 44px; }
+.re-io-card summary:focus-visible { outline: 2px solid rgba(79, 209, 224, .85); outline-offset: 2px; }
+.re-io-card summary h2 { min-width: 0; }
+.re-io-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.re-io-row .re-io, .re-io-row .re-empty { flex: 1 1 180px; min-width: 0; }
+.re-io-step { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex: 0 1 200px; min-width: 0; }
+.re-io-step .btn { width: 100%; }
+.re-io-reason { margin: 0; color: var(--ink-2); font-size: 14px; }
 .re-io { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px; }
 .re-io-cell {
   border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--panel-2); padding: 8px;
@@ -1633,4 +1641,6 @@ button.lab-dock-led {
   .re-instr, .re-instr:has(.re-tag + .re-tag) { grid-template-columns: minmax(0, 1fr) auto; }
   .re-kind { grid-column: 1 / -1; line-height: 1.2; }
   .re-io { grid-template-columns: minmax(0, 1fr); }
+  .re-io-row { flex-direction: column; align-items: stretch; }
+  .re-io-step { flex-basis: auto; }
 }

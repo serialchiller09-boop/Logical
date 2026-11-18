@@ -10,6 +10,7 @@ import {
   addParallelBranch,
   addRung,
   applyEditorScan,
+  editStepControl,
   deleteInstruction,
   deleteLeg,
   deleteRung,
@@ -80,7 +81,12 @@ export default function RungEditor({
   programRef.current = program;
 
   const errors = useMemo(() => validateProgram(program), [program]);
+  const scanControl = useMemo(() => editStepControl(errors), [errors]);
   const points = useMemo(() => panelPointsFromRoles(tagRoles(program), pinned), [program, pinned]);
+  const [ioOpen, setIoOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(min-width: 421px)').matches;
+  });
   const preview = useMemo(() => previewEditor(program, stateRef.current), [program, scanRev]);
   const live = mode === 'run' && errors.length === 0;
   const target = targetLabel(program, selection);
@@ -182,7 +188,7 @@ export default function RungEditor({
   }
 
   function stepOnce() {
-    if (errors.length || running) return;
+    if (editStepControl(errors).disabled || running) return;
     const state = stateRef.current;
     state.dt = EDITOR_SCAN_MS;
     const res = applyEditorScan(program, state);
@@ -249,6 +255,12 @@ export default function RungEditor({
           points={points}
           bits={stateRef.current.bits}
           onToggle={toggleInput}
+          mode={mode}
+          open={ioOpen}
+          onOpenChange={setIoOpen}
+          onStep={stepOnce}
+          scanDisabled={scanControl.disabled}
+          scanReason={scanControl.reason}
         />
         {mode === 'edit' && (
           <div className="re-palette" role="group" aria-label="Add instructions">
@@ -624,36 +636,58 @@ function onRowKey(event, onDelete) {
   }
 }
 
-function IoPanel({ points, bits, onToggle }) {
+function IoPanel({ points, bits, onToggle, mode, open, onOpenChange, onStep, scanDisabled, scanReason }) {
   const bitOn = (tag) => !!bits[tag];
+  const inputNote = mode === 'run'
+    ? 'Maintained switches for tags an XIC or XIO reads. Press Step one scan, or Start, on this tab. The switch itself does not scan.'
+    : 'Maintained switches for tags an XIC or XIO reads. Press Step one scan, beside the switches, to update the lamps. The switch itself does not scan.';
   return (
-    <section className="card re-io-card" aria-label="Inputs and outputs">
-      <div className="card-hd"><h2>Inputs and outputs</h2></div>
+    <details className="card re-io-card" open={open} onToggle={(event) => onOpenChange(event.currentTarget.open)}>
+      <summary className="card-hd">
+        <h2>Inputs and outputs</h2>
+      </summary>
       <div className="card-bd">
         <h3>Inputs</h3>
-        <p className="re-io-note">Maintained switches for tags an XIC or XIO reads. Outputs change on the next Step, or while Start is running. The switch itself does not scan.</p>
-        {points.inputs.length === 0 ? <p className="re-empty">No input tags yet.</p> : (
-          <div className="re-io">
-            {points.inputs.map((point) => {
-              const on = bitOn(point.tag);
-              return (
-                <div key={point.tag} className="re-io-cell">
-                  <div className="re-io-tag">{point.tag}</div>
-                  <button
-                    type="button"
-                    className={`re-toggle ${on ? 'is-on' : ''}`}
-                    aria-pressed={on}
-                    aria-label={`${point.tag} switch, ${on ? 'on' : 'off'}`}
-                    onClick={() => onToggle(point.tag)}
-                  >
-                    <span className="re-toggle-knob" aria-hidden="true" />
-                    <span>{on ? 'On' : 'Off'}</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <p className="re-io-note">{inputNote}</p>
+        <div className="re-io-row">
+          {points.inputs.length === 0 ? <p className="re-empty">No input tags yet.</p> : (
+            <div className="re-io">
+              {points.inputs.map((point) => {
+                const on = bitOn(point.tag);
+                return (
+                  <div key={point.tag} className="re-io-cell">
+                    <div className="re-io-tag">{point.tag}</div>
+                    <button
+                      type="button"
+                      className={`re-toggle ${on ? 'is-on' : ''}`}
+                      aria-pressed={on}
+                      aria-label={`${point.tag} switch, ${on ? 'on' : 'off'}`}
+                      onClick={() => onToggle(point.tag)}
+                    >
+                      <span className="re-toggle-knob" aria-hidden="true" />
+                      <span>{on ? 'On' : 'Off'}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {mode === 'edit' && (
+            <div className="re-io-step">
+              <button
+                type="button"
+                className="btn"
+                aria-label="Step one scan"
+                aria-describedby={scanDisabled ? 're-edit-step-reason' : undefined}
+                disabled={scanDisabled}
+                onClick={onStep}
+              >
+                Step one scan
+              </button>
+              {scanDisabled && <p id="re-edit-step-reason" className="re-io-reason" role="status">{scanReason}</p>}
+            </div>
+          )}
+        </div>
         <h3>Outputs</h3>
         <p className="re-io-note">Indicator lamps for tags an output writes. A tag that is also read, such as a seal-in, stays a lamp and is not a switch.</p>
         {points.duplicateOutputs.length > 0 && (
@@ -679,6 +713,6 @@ function IoPanel({ points, bits, onToggle }) {
           </div>
         )}
       </div>
-    </section>
+    </details>
   );
 }
