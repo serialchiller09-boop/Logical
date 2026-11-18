@@ -529,6 +529,40 @@ export function panelToBusSnapshot(panel) {
   return { bits, values };
 }
 
+/**
+ * Editor and exercise tags use the sandbox widget kinds.
+ * Inputs are maintained switches. Outputs are indicator lamps.
+ * A tag that is both read and written (a seal-in) stays an output, not a switch.
+ */
+export function panelPointsFromRoles(roles, pinned) {
+  const outputs = uniqueTags([...(pinned?.outputs || []), ...(roles?.outputs || [])]);
+  const written = new Set(outputs);
+  const inputs = uniqueTags([...(pinned?.inputs || []), ...(roles?.inputs || [])]).filter((tag) => !written.has(tag));
+  const duplicates = uniqueTags(roles?.duplicateOutputs || []).filter((tag) => written.has(tag));
+  return {
+    inputs: inputs.map((tag) => ({ tag, type: 'switch', kind: WIDGET_TYPES.switch.kind })),
+    outputs: outputs.map((tag) => ({ tag, type: 'led', kind: WIDGET_TYPES.led.kind })),
+    duplicateOutputs: duplicates
+  };
+}
+
+/** Maintained switch. 1 is on, 0 is off. Does not scan by itself. */
+export function toggledBit(bits, tag) {
+  return bits && bits[tag] ? 0 : 1;
+}
+
+function uniqueTags(tags) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of tags || []) {
+    const tag = normalizeTagName(raw);
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+  }
+  return out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
 export function countByType(panel) {
   const out = { led: 0, switch: 0, pb: 0, pot: 0 };
   for (const w of panel.widgets) {

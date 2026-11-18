@@ -683,6 +683,14 @@ export function applyEditorScan(program, state) {
   return { ok: true, errors: [], conds };
 }
 
+/** Edit-tab Step. The button uses this, then applyEditorScan. A program with errors does not scan. */
+export function editStepControl(errors) {
+  if (Array.isArray(errors) && errors.length > 0) {
+    return { disabled: true, reason: 'Step is off until this program can be scanned.' };
+  }
+  return { disabled: false, reason: '' };
+}
+
 function isEngineState(value) {
   return !!(value && typeof value === 'object' && value.bits && value.timers && value.counters);
 }

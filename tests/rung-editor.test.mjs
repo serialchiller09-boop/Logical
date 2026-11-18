@@ -11,6 +11,7 @@ import {
   analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout,
   scanLadders, LAB_DEFAULT_SCAN_MS
 } from '../web/src/lib/ladder.js';
+import { panelPointsFromRoles, toggledBit } from '../web/src/lib/ioSandbox.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
   EDITOR_STORAGE_KEY,
@@ -18,6 +19,8 @@ import {
   addParallelBranch,
   addRung,
   applyEditorScan,
+  editStepControl,
+  imageFromBits,
   compileProgram,
   compileRung,
   createProgram,
@@ -684,6 +687,63 @@ test('lab and editor CTU counts match, including an input that is already true a
   scanLadders(ladders, resetLab);
   assert.equal(resetLab.counters.C_Parts.acc, 0);
   assert.equal(resetLab.counters.C_Parts.acc, again.traces[0].counters.C_Parts.acc);
+});
+
+test('a switch toggle feeds the next editor scan and the lamp follows OTE', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Switch' },
+    { kind: 'OTE', tag: 'Lamp' }
+  ]);
+  const points = panelPointsFromRoles(tagRoles(program));
+  assert.deepEqual(points.inputs.map((point) => point.tag), ['Switch']);
+  assert.equal(points.inputs[0].type, 'switch');
+  assert.deepEqual(points.outputs.map((point) => point.tag), ['Lamp']);
+  assert.equal(points.outputs[0].type, 'led');
+
+  const state = imageFromBits({});
+  state.bits.Switch = toggledBit(state.bits, 'Switch');
+  applyEditorScan(program, state);
+  assert.equal(state.bits.Switch, 1);
+  assert.equal(state.bits.Lamp, 1);
+  state.bits.Switch = toggledBit(state.bits, 'Switch');
+  applyEditorScan(program, state);
+  assert.equal(state.bits.Switch, 0);
+  assert.equal(state.bits.Lamp, 0);
+});
+
+test('on Edit, Step scans a switch into the lamp and errors disable Step', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Switch' },
+    { kind: 'OTE', tag: 'Lamp' }
+  ]);
+  const ready = editStepControl(validateProgram(program));
+  assert.equal(ready.disabled, false);
+  assert.equal(ready.reason, '');
+
+  const state = imageFromBits({});
+  state.bits.Switch = toggledBit(state.bits, 'Switch');
+  const scanned = applyEditorScan(program, state);
+  assert.equal(scanned.ok, true);
+  assert.equal(state.bits.Switch, 1);
+  assert.equal(state.bits.Lamp, 1);
+
+  const blocked = editStepControl(validateProgram(createProgram()));
+  assert.equal(blocked.disabled, true);
+  assert.equal(blocked.reason, 'Step is off until this program can be scanned.');
+  const refused = applyEditorScan(createProgram(), imageFromBits({ Switch: 1 }));
+  assert.equal(refused.ok, false);
+
+  const page = readFileSync(new URL('../web/src/pages/RungEditor.jsx', import.meta.url), 'utf8');
+  const panel = page.slice(page.indexOf('function IoPanel'));
+  assert.match(panel, /mode === 'edit'/);
+  assert.match(panel, /aria-label="Step one scan"/);
+  assert.match(panel, /disabled=\{scanDisabled\}/);
+  assert.match(panel, /re-edit-step-reason/);
+  assert.match(panel, /Press Step one scan, beside the switches/);
+  assert.match(panel, /Press Step one scan, or Start, on this tab/);
+  assert.match(page, /onStep=\{stepOnce\}/);
+  assert.match(page, /editStepControl\(errors\)/);
+  assert.match(page, /min-width: 421px/);
 });
 
 test('the lab default step stays 1 s and says so next to the controls', () => {
