@@ -551,6 +551,125 @@ export function toggledBit(bits, tag) {
   return bits && bits[tag] ? 0 : 1;
 }
 
+const DEFAULT_INPUT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+/** First nine inputs get keys 1 through 9, in the order given. Later inputs have no default. */
+export function defaultInputKeys(tags) {
+  const bindings = {};
+  (tags || []).forEach((tag, index) => {
+    if (index < DEFAULT_INPUT_KEYS.length) bindings[tag] = DEFAULT_INPUT_KEYS[index];
+  });
+  return bindings;
+}
+
+/**
+ * Learner modes and custom keys, with defaults filling any unbound input.
+ * A custom key wins over a default, and one key belongs to one input.
+ */
+export function resolveInputSetup(tags, modes = {}, custom = {}) {
+  const list = (tags || []).filter(Boolean);
+  const bindings = {};
+  const used = new Set();
+  for (const tag of list) {
+    const chosen = normalizeBindingKey(custom[tag]);
+    if (!chosen || used.has(chosen)) continue;
+    bindings[tag] = chosen;
+    used.add(chosen);
+  }
+  const defaults = defaultInputKeys(list);
+  for (const tag of list) {
+    if (bindings[tag]) continue;
+    const preferred = defaults[tag];
+    const key = preferred && !used.has(preferred)
+      ? preferred
+      : DEFAULT_INPUT_KEYS.find((item) => !used.has(item));
+    if (!key) continue;
+    bindings[tag] = key;
+    used.add(key);
+  }
+  const resolvedModes = {};
+  for (const tag of list) resolvedModes[tag] = modes[tag] === 'pb' ? 'pb' : 'switch';
+  return { bindings, modes: resolvedModes };
+}
+
+/** A letter or digit, with no Shift. Empty when the key cannot be a binding. */
+export function normalizeBindingKey(key) {
+  const text = String(key || '');
+  if (text.length !== 1 || !/^[0-9a-z]$/i.test(text)) return '';
+  return text.toLowerCase();
+}
+
+/** True when the event target is a field the learner is typing in. */
+export function isTextEntryTarget(target) {
+  if (!target || typeof target !== 'object') return false;
+  const tag = String(target.tagName || '').toUpperCase();
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'INPUT') {
+    const type = String(target.type || 'text').toLowerCase();
+    return !['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'range', 'color'].includes(type);
+  }
+  return !!target.isContentEditable;
+}
+
+/**
+ * What a key event does to an editor input.
+ * Momentary: press on keydown, release on keyup, repeat ignored.
+ * Maintained: toggle on keydown. Ctrl, Cmd, Alt, and Shift are left to the browser.
+ * A keydown in a text field does nothing. A keyup still releases a momentary input
+ * so a held key cannot stay on after the learner starts typing.
+ */
+export function inputKeyAction(event, setup) {
+  if (!event || event.repeat) return null;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return null;
+  if (event.type !== 'keydown' && event.type !== 'keyup') return null;
+  const key = normalizeBindingKey(event.key);
+  if (!key) return null;
+  const tag = Object.keys(setup?.bindings || {}).find((name) => setup.bindings[name] === key);
+  if (!tag) return null;
+  const momentary = setup?.modes?.[tag] === 'pb';
+  if (event.type === 'keydown') {
+    if (isTextEntryTarget(event.target)) return null;
+    return { tag, action: momentary ? 'press' : 'toggle' };
+  }
+  if (!momentary) return null;
+  return { tag, action: 'release' };
+}
+
+/** Apply one inputKeyAction result. Does not scan. */
+export function nextInputBit(bits, action) {
+  if (!action) return 0;
+  if (action.action === 'press') return 1;
+  if (action.action === 'release') return 0;
+  return toggledBit(bits, action.tag);
+}
+
+/** Move a key onto one input and clear it from any other input. */
+export function assignInputKey(bindings, tag, key) {
+  const normalized = normalizeBindingKey(key);
+  if (!tag || !normalized) {
+    return { ok: false, bindings: { ...(bindings || {}) }, reason: 'Use a letter or a digit, with no Ctrl, Cmd, Alt, or Shift.' };
+  }
+  const next = { ...(bindings || {}) };
+  for (const name of Object.keys(next)) {
+    if (next[name] === normalized) delete next[name];
+  }
+  next[tag] = normalized;
+  return { ok: true, bindings: next, key: normalized };
+}
+
+/** Clear every momentary input. Used when the window loses focus. */
+export function releaseMomentaryBits(bits, modes) {
+  const next = { ...(bits || {}) };
+  let changed = false;
+  for (const tag of Object.keys(modes || {})) {
+    if (modes[tag] === 'pb' && next[tag]) {
+      next[tag] = 0;
+      changed = true;
+    }
+  }
+  return changed ? next : bits;
+}
+
 function uniqueTags(tags) {
   const seen = new Set();
   const out = [];

@@ -13,6 +13,11 @@ import {
   panelToCsv,
   removeWidget,
   setTag,
+  assignInputKey,
+  defaultInputKeys,
+  isTextEntryTarget,
+  releaseMomentaryBits,
+  resolveInputSetup,
   toggledBit
 } from '../web/src/lib/ioSandbox.js';
 
@@ -87,6 +92,24 @@ test('editor tags map to sandbox switches and lamps, and a seal-in stays a lamp'
   assert.deepEqual(points.inputs.map((point) => point.type), ['switch', 'switch']);
   assert.deepEqual(points.outputs, [{ tag: 'Motor', type: 'led', kind: 'output' }]);
   assert.equal(points.inputs.every((point) => point.kind === 'input'), true);
+});
+
+test('input keys default to 1-9, and a custom key belongs to one input', () => {
+  assert.deepEqual(defaultInputKeys(['Start', 'Stop', 'Lamp']), { Start: '1', Stop: '2', Lamp: '3' });
+  const ten = Array.from({ length: 10 }, (_, index) => `In${index}`);
+  assert.equal(defaultInputKeys(ten).In9, undefined);
+  const moved = assignInputKey({ Stop: '2' }, 'Start', '2');
+  assert.equal(moved.ok, true);
+  assert.equal(moved.bindings.Start, '2');
+  assert.equal(moved.bindings.Stop, undefined);
+  assert.equal(assignInputKey({}, 'Start', 'Enter').ok, false);
+  const setup = resolveInputSetup(['Start', 'Stop'], {}, moved.bindings);
+  assert.equal(setup.bindings.Start, '2');
+  assert.notEqual(setup.bindings.Stop, '2');
+  assert.equal(isTextEntryTarget({ tagName: 'INPUT', type: 'text' }), true);
+  assert.equal(isTextEntryTarget({ tagName: 'INPUT', type: 'number' }), true);
+  assert.equal(isTextEntryTarget({ tagName: 'BUTTON' }), false);
+  assert.deepEqual(releaseMomentaryBits({ Start: 1, Stop: 1 }, { Start: 'pb', Stop: 'switch' }), { Start: 0, Stop: 1 });
 });
 
 test('a maintained switch toggles 0 and 1 and does not invent a third state', () => {
