@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { GEO, layout, frameLadder, fitRung, blockBounds, analyze, initialState, collectElements, collectRefs, fitPinText } from '../lib/ladder.js';
+import { GEO, layout, frameLadder, fitRung, blockBounds, analyze, initialState, collectElements, collectRefs, fitPinText, scanLadders, LAB_DEFAULT_SCAN_MS } from '../lib/ladder.js';
 import {
   applyBusToBitsValues,
   isCouplingEnabled,
@@ -231,7 +231,7 @@ export function RungSimulator({
   const stRef = useRef(structuredClone(baseState));
   const [tick, setTick] = useState(0);
   const [scans, setScans] = useState(0);
-  const [dt, setDt] = useState(1000);
+  const [dt, setDt] = useState(LAB_DEFAULT_SCAN_MS);
   const [auto, setAuto] = useState(false);
   const [log, setLog] = useState([]);
   const [showMap, setShowMap] = useState(true);
@@ -315,10 +315,11 @@ export function RungSimulator({
     const st = stRef.current;
     st.dt = dt;
     const writes = [];
-    for (const r of rungs) {
-      const res = analyze(r.ladder, st, { live: true });
-      writes.push(...res.writes.map((w) => ({ ...w, rung: r.title })));
-    }
+    const results = scanLadders(rungs.map((r) => r.ladder), st);
+    results.forEach((res, index) => {
+      const title = rungs[index]?.title;
+      writes.push(...res.writes.map((w) => ({ ...w, rung: title })));
+    });
     setScans((n) => n + 1);
     if (writes.length) setLog((l) => [...writes.map((w) => `${new Date().toISOString().slice(11, 19)}  ${w.rung}: ${w.kind} ${w.addr} := ${w.value ? 'TRUE' : 'FALSE'}`), ...l].slice(0, 40));
     publishSimToBus(st);
@@ -370,9 +371,7 @@ export function RungSimulator({
         <span className={`led ${conds.every(Boolean) ? 'on' : conds.some(Boolean) ? 'warn' : ''}`} title="Rung conduction" />
         <b className="small" style={{ letterSpacing: '.04em' }}>SCAN SIMULATOR</b>
         <span className="badge-num">scan #{scans}</span>
-        <span className="muted tiny" style={{ marginLeft: 4 }}>
-          {dt >= 1000 ? `${dt / 1000}s per scan` : `${dt}ms per scan`} · simulated wall clock {formatMs(scans * dt)}
-        </span>
+        <span className="badge-num">clock {formatMs(scans * dt)}</span>
         <div className="row" style={{ marginLeft: 'auto' }}>
           {SCAN_STEPS.map((s) => (
             <button key={s.v} className={`chip ${dt === s.v ? '' : ''}`} aria-pressed={dt === s.v} onClick={() => setDt(s.v)}>{s.label}</button>
@@ -384,6 +383,9 @@ export function RungSimulator({
         </div>
       </div>
 
+      <p className="tiny" style={{ margin: '8px 12px 0', maxWidth: '70ch' }}>
+        Each step adds {dt >= 1000 ? `${dt / 1000} s` : `${dt} ms`}. The default is 1 s. The rung editor adds 100 ms per step. This is simulated elapsed time, not a Logix task period.
+      </p>
       <div className="card-bd stack">
         {rungs.map((r, i) => (
           <div key={r.key}>
@@ -492,7 +494,9 @@ export function RungSimulator({
           <p className="tiny muted" style={{ margin: '6px 0 0' }}>
             Booleans evaluate as drawn; timers and counters advance one scan period per step;
             MOV/CPT/SEL/PID operands resolve when numeric or a named I/O tag.
-            LIM tests Low, Test, and High and does not write a clamped value. Real controllers also depend on
+            LIM tests Low, Test, and High and does not write a clamped value.
+            Count Up prescan matches the rung editor: the first scan after a fresh start or Reset sets .CU true, so an input that is already on does not count until it goes false and then true.
+            Output Energize prescan and postscan are not simulated. Real controllers also depend on
             scan overlap, I/O update points, task priority and firmware specifics.
             Shared sandbox values are browser-local teaching state — not live field I/O.
           </p>

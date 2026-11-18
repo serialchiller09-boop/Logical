@@ -251,8 +251,8 @@ function evalBlock(node, ctx, live) {
     if (live) {
       // Edge against the prior enable bit (.CU / .CD). Count Up (CTU): when rung-condition-in
       // is true and .CU is false, ACC increments by one; when rung-condition-in is false, .CU clears.
-      // Count Up prescan (.CU true before the first program scan) is applied by the editor
-      // on a fresh or Reset image, not inside this call.
+      // Count Up prescan (.CU true before the first program scan) is applyCtuPrescan, used by
+      // the lab and the editor on a fresh or Reset image. It is not inside this call.
       if (k === 'CTU') {
         if (enabled && !c.cu) c.acc += 1;
         c.cu = !!enabled;
@@ -557,6 +557,42 @@ export function fitRung(svgWidth, canvasWidth) {
 }
 
 /* ------------------------------------------------------------------ state helpers */
+/**
+ * 1756-RM003 CTU execution table (the prescan row is on p. 100): .CU is set true
+ * before the first program scan so an input that is already true does not count.
+ * Call once per fresh image. A later call does nothing. Reset starts a new image.
+ */
+export function applyCtuPrescan(state, tags) {
+  if (!state || state._ctuPrescan) return state;
+  for (const tag of tags || []) {
+    if (!tag) continue;
+    const counter = (state.counters[tag] ??= { acc: 0, dn: false, cu: false, cd: false, prevIn: false });
+    counter.cu = true;
+  }
+  state._ctuPrescan = true;
+  return state;
+}
+
+export function ctuTagsInLadder(ladder) {
+  const tags = [];
+  const walk = (node) => {
+    if (!node) return;
+    if (node.t === 'and' || node.t === 'or') (node.c || []).forEach(walk);
+    else if (node.t === 'blk' && String(node.k || '').toUpperCase() === 'CTU' && node.a) tags.push(String(node.a));
+  };
+  walk(ladder);
+  return tags;
+}
+
+/** Lab default. Kept at 1 s so a 120 s lockout and the other long lab timers still finish under Auto-scan. The editor uses 100 ms. */
+export const LAB_DEFAULT_SCAN_MS = 1000;
+
+/** One live pass over lab rungs. The first pass on a fresh or Reset image applies CTU prescan. */
+export function scanLadders(ladders, state) {
+  applyCtuPrescan(state, (ladders || []).flatMap(ctuTagsInLadder));
+  return (ladders || []).map((ladder) => analyze(ladder, state, { live: true }));
+}
+
 export function initialState(io = []) {
   const bits = {}, values = {}, timers = {}, counters = {}, prevEdges = {};
   for (const p of io) {
