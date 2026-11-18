@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout
+  analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout,
+  scanLadders, LAB_DEFAULT_SCAN_MS
 } from '../web/src/lib/ladder.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
@@ -647,6 +648,51 @@ test('CTU prescan leaves ACC at 0 when the input is already true, then counts th
   assert.equal(traces[2].counters.C_Parts.cu, false);
   assert.equal(traces[3].counters.C_Parts.acc, 1);
   assert.equal(traces[4].counters.C_Parts.acc, 1, 'holding the rung true after the edge does not count again');
+});
+
+test('lab and editor CTU counts match, including an input that is already true and after Reset', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Part' },
+    { kind: 'CTU', tag: 'C_Parts', pre: 3 }
+  ]);
+  const steps = [
+    { bits: { Part: 1 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 0 } },
+    { bits: { Part: 1 } },
+    { bits: { Part: 1 } }
+  ];
+  const editor = scanEditor(program, steps);
+  const labState = initialState([]);
+  const ladders = compileProgram(program);
+  const lab = [];
+  for (const step of steps) {
+    for (const [tag, value] of Object.entries(step.bits)) labState.bits[tag] = value ? 1 : 0;
+    scanLadders(ladders, labState);
+    lab.push({ acc: labState.counters.C_Parts.acc, cu: !!labState.counters.C_Parts.cu });
+  }
+  editor.traces.forEach((trace, index) => {
+    assert.equal(lab[index].acc, trace.counters.C_Parts.acc, `step ${index} acc`);
+    assert.equal(lab[index].cu, !!trace.counters.C_Parts.cu, `step ${index} cu`);
+  });
+  assert.equal(lab[0].acc, 0, 'already-true input does not count on the first scan');
+  assert.equal(lab[3].acc, 1, 'the next false-to-true edge counts');
+
+  const again = scanEditor(program, [{ bits: { Part: 1 } }]);
+  const resetLab = initialState([]);
+  resetLab.bits.Part = 1;
+  scanLadders(ladders, resetLab);
+  assert.equal(resetLab.counters.C_Parts.acc, 0);
+  assert.equal(resetLab.counters.C_Parts.acc, again.traces[0].counters.C_Parts.acc);
+});
+
+test('the lab default step stays 1 s and says so next to the controls', () => {
+  assert.equal(LAB_DEFAULT_SCAN_MS, 1000);
+  const page = readFileSync(new URL('../web/src/components/RungDiagram.jsx', import.meta.url), 'utf8');
+  assert.match(page, /Each step adds/);
+  assert.match(page, /The default is 1 s/);
+  assert.match(page, /rung editor adds 100 ms/);
+  assert.match(page, /Output Energize prescan and postscan are not simulated/);
 });
 
 test('a timer or counter block title stays inside the rung frame', () => {
