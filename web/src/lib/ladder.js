@@ -440,54 +440,101 @@ function shiftWire(wr, dx, dy) {
   return out;
 }
 
-export function layout(node, map, geo = GEO) {
-  const cond = (n) => (map && map.size ? !!map.get(n) : undefined);
+function joinWire(wires, x1, y1, x2, y2, c) {
+  if (Math.abs(y1 - y2) < 0.5) {
+    if (Math.abs(x1 - x2) >= 0.5) wires.push({ x1, x2, y: y1, c: !!c });
+    return;
+  }
+  const midX = (x1 + x2) / 2;
+  if (Math.abs(x1 - midX) >= 0.5) wires.push({ x1, x2: midX, y: y1, c: !!c });
+  wires.push({ vertical: true, x: midX, y1, y2, c: !!c });
+  if (Math.abs(midX - x2) >= 0.5) wires.push({ x1: midX, x2, y: y2, c: !!c });
+}
 
-  const box = (n) => {
-    if (!n) return { w: 0, h: geo.rowH, items: [], wires: [], c: false };
+export function layout(node, map, geo = GEO) {
+  const hasMap = !!(map && map.size);
+  const outOf = (n) => (hasMap ? !!map.get(n) : false);
+
+  const box = (n, incoming) => {
+    if (!n) {
+      const port = geo.rowH / 2;
+      return { w: 0, h: geo.rowH, items: [], wires: [], c: false, inX: 0, inY: port, outX: 0, outY: port };
+    }
     if (n.t === 'and') {
-      const kids = (n.c || []).map(box);
+      const nodes = n.c || [];
+      const kids = [];
+      let power = !!incoming;
+      for (const child of nodes) {
+        kids.push(box(child, power));
+        power = outOf(child);
+      }
       const gap = kids.length > 1 ? geo.gap : 0;
-      const w = kids.reduce((s, k) => s + k.w, 0) + gap * Math.max(0, kids.length - 1);
-      const h = Math.max(geo.rowH, ...kids.map((k) => k.h));
-      const items = [], wires = [];
+      const h = Math.max(geo.rowH, ...kids.map((k) => k.h), 1);
+      const items = [];
+      const wires = [];
       let x = 0;
       kids.forEach((k, idx) => {
         const yOff = (h - k.h) / 2;
         k.items.forEach((it) => items.push({ ...it, x: it.x + x, y: it.y + yOff }));
         k.wires.forEach((wr) => wires.push(shiftWire(wr, x, yOff)));
-        if (idx > 0) wires.push({ x1: x - gap, x2: x, y: h / 2, c: !!kids[idx - 1].c });
-        x += k.w + gap;
+        if (idx > 0) {
+          const prev = kids[idx - 1];
+          const y1 = (h - prev.h) / 2 + prev.outY;
+          const y2 = yOff + k.inY;
+          joinWire(wires, x - gap, y1, x, y2, outOf(nodes[idx - 1]));
+        }
+        x += k.w + (idx < kids.length - 1 ? gap : 0);
       });
-      // lead-in from the left rail. The right rail is added by frameLadder, at the last glyph.
-      wires.push({ x1: -geo.railPad, x2: 0, y: h / 2, c: cond(n.c?.[0]) ?? true, edge: 'in' });
-      return { w: Math.max(w, 60), h, items, wires, c: cond(n) };
+      const first = kids[0];
+      const last = kids[kids.length - 1];
+      const inY = first ? (h - first.h) / 2 + first.inY : h / 2;
+      const outY = last ? (h - last.h) / 2 + last.outY : h / 2;
+      return { w: Math.max(x, 1), h, items, wires, c: outOf(n), inX: 0, inY, outX: Math.max(x, 1), outY };
     }
     if (n.t === 'or') {
-      const kids = (n.c || []).map(box);
-      const innerW = Math.max(...kids.map((k) => k.w), geo.contactW);
-      const h = kids.reduce((s, k) => s + k.h, geo.branchGap * (kids.length + 1));
-      const items = [], wires = [];
-      const busL = 0, busR = innerW;
+      const nodes = n.c || [];
+      const kids = nodes.map((child) => box(child, incoming));
+      const innerW = Math.max(1, ...kids.map((k) => k.w));
+      const h = kids.reduce((s, k) => s + k.h, 0) + geo.branchGap * (kids.length + 1);
+      const items = [];
+      const wires = [];
       let y = geo.branchGap;
-      kids.forEach((k) => {
-        const midY = y + k.h / 2;
-        k.items.forEach((it) => items.push({ ...it, x: it.x + (k.w < innerW ? (innerW - k.w) / 2 : 0), y: it.y + y }));
-        k.wires.forEach((wr) => wires.push(shiftWire(wr, 8, y)));
-        wires.push({ x1: busL, x2: busL + 8, y: midY, c: true });
-        wires.push({ x1: busR - 8, x2: busR, y: midY, c: !!k.c });
+      const ports = [];
+      kids.forEach((k, idx) => {
+        k.items.forEach((it) => items.push({ ...it, x: it.x, y: it.y + y }));
+        k.wires.forEach((wr) => wires.push(shiftWire(wr, 0, y)));
+        const portY = y + k.inY;
+        ports.push(portY);
+        if (k.outX < innerW - 0.5) wires.push({ x1: k.outX, x2: innerW, y: portY, c: outOf(nodes[idx]) });
         y += k.h + geo.branchGap;
       });
-      wires.push({ vertical: true, x: busL, y1: geo.branchGap, y2: h - geo.branchGap, c: true, bus: true });
-      wires.push({ vertical: true, x: busR, y1: geo.branchGap, y2: h - geo.branchGap, c: kids.some((k) => k.c), bus: true });
-      return { w: innerW + 16, h, items, wires, c: cond(n) };
+      const mid = h / 2;
+      const y1 = Math.min(ports[0] ?? mid, mid);
+      const y2 = Math.max(ports[ports.length - 1] ?? mid, mid);
+      const any = nodes.some((child) => outOf(child));
+      if (Math.abs(y1 - y2) >= 0.5) {
+        wires.push({ vertical: true, x: 0, y1, y2, c: !!incoming, bus: true });
+        wires.push({ vertical: true, x: innerW, y1, y2, c: any, bus: true });
+      }
+      return { w: innerW, h, items, wires, c: outOf(n), inX: 0, inY: mid, outX: innerW, outY: mid };
     }
     const size = leafSize(n, geo);
-    return { w: size.w, h: size.h, items: [{ node: n, x: 0, y: 0, ...size, c: cond(n) }], wires: [], c: cond(n) };
+    const port = geo.rowH / 2;
+    return {
+      w: size.w,
+      h: size.h,
+      items: [{ node: n, x: 0, y: 0, ...size, c: outOf(n), inC: !!incoming }],
+      wires: [],
+      c: outOf(n),
+      inX: 0,
+      inY: port,
+      outX: size.w,
+      outY: port
+    };
   };
 
-  const root = box(node);
-  return { w: root.w + geo.railPad * 2 + 16, h: Math.max(root.h, geo.rowH + 24), items: root.items, wires: root.wires };
+  const root = box(node, true);
+  return { ...root, h: Math.max(root.h, geo.rowH) };
 }
 
 function leafSize(n, geo) {
@@ -516,16 +563,17 @@ export function blockBounds(it, geo = GEO) {
  * spare padding that is not part of the glyphs; using it as the wire start left a
  * gap and a short stub at a rail that floated to the right of the coil.
  */
-export function frameLadder(box, { geo = GEO, conducts = false } = {}) {
+export function frameLadder(box, { geo = GEO, conducts = false, inputHot = false } = {}) {
   const pad = geo.railPad;
   const shift = pad + 6;
   const contentH = Math.max(box.h, geo.rowH + 20);
-  const glyphRight = box.items.reduce((max, it) => Math.max(max, it.x + it.w), 0);
-  const contentRight = glyphRight + shift;
+  const inX = (box.inX ?? 0) + shift;
+  const inY = (box.inY ?? geo.rowH / 2) + 8;
+  const outX = (box.outX ?? 0) + shift;
+  const outY = (box.outY ?? geo.rowH / 2) + 8;
   const leftRail = pad;
-  const rightRail = contentRight + pad;
+  const rightRail = outX + pad;
   const w = rightRail + 6;
-  const outY = contentH / 2 + 8;
   const items = box.items.map((it) => ({ ...it, x: it.x + shift, y: it.y + 8 }));
   let h = contentH + 16;
   for (const it of items) {
@@ -534,9 +582,48 @@ export function frameLadder(box, { geo = GEO, conducts = false } = {}) {
   const wires = box.wires.map((wr) => (wr.vertical
     ? { ...wr, x: wr.x + shift, y1: wr.y1 + 8, y2: wr.y2 + 8 }
     : { ...wr, x1: wr.x1 + shift, x2: wr.x2 + shift, y: wr.y + 8 }));
-  const outputWire = { x1: contentRight, x2: rightRail, y: outY, c: !!conducts, edge: 'out' };
-  wires.push(outputWire);
-  return { w, h, items, wires, leftRail, rightRail, contentRight, outputWire };
+  const inputWire = { x1: leftRail, x2: inX, y: inY, c: !!inputHot, edge: 'in' };
+  const outputWire = { x1: outX, x2: rightRail, y: outY, c: !!conducts, edge: 'out' };
+  wires.push(inputWire, outputWire);
+  return { w, h, items, wires, leftRail, rightRail, contentRight: outX, inputWire, outputWire };
+}
+
+/** Largest distance from a wire end to the thing it should touch. 0 means the drawing is closed. */
+export function maxWireGap(frame, geo = GEO) {
+  const ports = [];
+  for (const it of frame.items || []) {
+    const y = it.y + geo.rowH / 2;
+    ports.push({ x: it.x, y }, { x: it.x + it.w, y });
+  }
+  const horiz = (frame.wires || []).filter((w) => !w.vertical);
+  const vert = (frame.wires || []).filter((w) => w.vertical);
+  const ends = [];
+  for (const w of horiz) ends.push({ x: w.x1, y: w.y }, { x: w.x2, y: w.y });
+  if (frame.inputWire) ports.push({ x: frame.leftRail, y: frame.inputWire.y });
+  if (frame.outputWire) ports.push({ x: frame.rightRail, y: frame.outputWire.y });
+  const hit = (x, y, skip) => {
+    if (ports.some((p) => Math.abs(p.x - x) < 0.6 && Math.abs(p.y - y) < 0.6)) return true;
+    if (vert.some((v) => Math.abs(v.x - x) < 0.6 && y + 0.6 >= Math.min(v.y1, v.y2) && y - 0.6 <= Math.max(v.y1, v.y2))) return true;
+    return ends.some((p, i) => i !== skip && Math.abs(p.x - x) < 0.6 && Math.abs(p.y - y) < 0.6);
+  };
+  let max = 0;
+  ends.forEach((p, i) => {
+    if (hit(p.x, p.y, i)) return;
+    const dist = [...ports, ...ends.filter((_, j) => j !== i)].reduce((best, q) => {
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      return d < best ? d : best;
+    }, Infinity);
+    if (dist > max) max = dist;
+  });
+  vert.forEach((v) => {
+    for (const y of [v.y1, v.y2]) {
+      const joined = horiz.some((w) => Math.abs(w.y - y) < 0.6 && (Math.abs(w.x1 - v.x) < 0.6 || Math.abs(w.x2 - v.x) < 0.6))
+        || ports.some((p) => Math.abs(p.x - v.x) < 0.6 && Math.abs(p.y - y) < 0.6)
+        || vert.some((other) => other !== v && Math.abs(other.x - v.x) < 0.6 && y + 0.6 >= Math.min(other.y1, other.y2) && y - 0.6 <= Math.max(other.y1, other.y2));
+      if (!joined) max = Math.max(max, 1);
+    }
+  });
+  return max;
 }
 
 /**

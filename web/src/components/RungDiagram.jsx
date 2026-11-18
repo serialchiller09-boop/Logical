@@ -65,14 +65,14 @@ function Wire({ w }) {
   return <line className={`ld-wire ${w.c ? 'hot' : ''}`} x1={w.x1} y1={w.y} x2={w.x2} y2={w.y} />;
 }
 
-function Contact({ it, hot }) {
+function Contact({ it, hot, inHot }) {
   const cx = it.x + it.w / 2;
   const mid = it.y + GEO.rowH / 2;
   const g = 9;
   const top = mid - 17, bot = mid + 17;
   return (
     <g>
-      <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={it.x} y1={mid} x2={cx - g} y2={mid} />
+      <line className={`ld-wire ${inHot ? 'hot' : ''}`} x1={it.x} y1={mid} x2={cx - g} y2={mid} />
       <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={cx + g} y1={mid} x2={it.x + it.w} y2={mid} />
       <line className={`ld-contact ${hot ? 'hot' : ''}`} x1={cx - g} y1={top} x2={cx - g} y2={bot} />
       <line className={`ld-contact ${hot ? 'hot' : ''}`} x1={cx + g} y1={top} x2={cx + g} y2={bot} />
@@ -86,12 +86,12 @@ function Contact({ it, hot }) {
   );
 }
 
-function Coil({ it, hot }) {
+function Coil({ it, hot, inHot }) {
   const cx = it.x + it.w / 2, mid = it.y + GEO.rowH / 2;
   const glyph = it.node.k === 'OTL' ? 'L' : it.node.k === 'OTU' ? 'U' : '';
   return (
     <g>
-      <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={it.x} y1={mid} x2={cx - 16} y2={mid} />
+      <line className={`ld-wire ${inHot ? 'hot' : ''}`} x1={it.x} y1={mid} x2={cx - 16} y2={mid} />
       <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={cx + 16} y1={mid} x2={it.x + it.w} y2={mid} />
       <circle className={`ld-coil ${hot ? 'hot' : ''}`} cx={cx} cy={mid} r={16} />
       {glyph && <text className="ld-title" x={cx} y={mid + 4} textAnchor="middle" style={{ fill: hot ? 'var(--power)' : 'var(--ink-2)', fontSize: 12 }}>{glyph}</text>}
@@ -102,7 +102,7 @@ function Coil({ it, hot }) {
   );
 }
 
-function Block({ it, hot, geo = GEO }) {
+function Block({ it, hot, inHot, geo = GEO }) {
   const { x, y, w } = it;
   const rows = it.node.p || [];
   const { boxY, bh } = blockBounds(it, geo);
@@ -119,7 +119,7 @@ function Block({ it, hot, geo = GEO }) {
           <rect x={innerX} y={boxY} width={innerW} height={bh} rx={5} />
         </clipPath>
       </defs>
-      <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={x} y1={mid} x2={x + 6} y2={mid} />
+      <line className={`ld-wire ${inHot ? 'hot' : ''}`} x1={x} y1={mid} x2={x + 6} y2={mid} />
       <line className={`ld-wire ${hot ? 'hot' : ''}`} x1={x + w - 6} y1={mid} x2={x + w} y2={mid} />
       <rect className={`ld-box ${hot ? 'hot' : ''} ${it.node._unresolved ? 'unresolved' : ''}`} x={innerX} y={boxY} width={innerW} height={bh} rx={5} />
       <text className="ld-title" x={x + w / 2} y={boxY + 15} textAnchor="middle">{it.node.k}{it.node.a ? ` ${it.node.a}` : ''}</text>
@@ -150,7 +150,7 @@ export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO 
   const model = useMemo(() => {
     if (!ladder) return null;
     const box = layout(ladder, map, geo);
-    return frameLadder(box, { geo, conducts: !!(live && map?.get(ladder)) });
+    return frameLadder(box, { geo, conducts: !!(live && map?.get(ladder)), inputHot: !!live });
   }, [ladder, map, live, geo]);
 
   useEffect(() => {
@@ -179,9 +179,10 @@ export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO 
         {model.wires.map((wr, i) => <Wire key={`w${i}`} w={wr} />)}
         {model.items.map((it, i) => {
           const hot = live ? !!map?.get(it.node) : false;
-          if (it.node.t === 'coil') return <Coil key={`i${i}`} it={it} hot={hot} />;
-          if (it.node.t === 'blk') return <Block key={`i${i}`} it={it} hot={hot} geo={geo} />;
-          return <Contact key={`i${i}`} it={it} hot={hot} />;
+          const inHot = live ? !!it.inC : false;
+          if (it.node.t === 'coil') return <Coil key={`i${i}`} it={it} hot={hot} inHot={inHot} />;
+          if (it.node.t === 'blk') return <Block key={`i${i}`} it={it} hot={hot} inHot={inHot} geo={geo} />;
+          return <Contact key={`i${i}`} it={it} hot={hot} inHot={inHot} />;
         })}
       </svg>
       {scrolls && (
