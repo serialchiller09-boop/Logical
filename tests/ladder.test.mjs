@@ -11,8 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  analyze, layout, frameLadder, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
-  memberRef, GEO
+  analyze, layout, frameLadder, maxWireGap, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
+  memberRef, GEO, EDITOR_GEO
 } from '../web/src/lib/ladder.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
 import { RUNGS2 } from '../server/src/seed/data/rungs2.js';
@@ -236,6 +236,74 @@ test('frameLadder runs the output wire from the coil to the right rail', () => {
   assert.equal(frame.rightRail - coilRight, GEO.railPad);
   assert.ok(frame.leftRail < coil.x);
   assert.ok(frame.rightRail < frame.w);
+});
+
+const SEAL = {
+  t: 'and',
+  c: [
+    { t: 'no', a: 'LUBE_PS_OK' },
+    { t: 'or', c: [
+      { t: 'and', c: [{ t: 'no', a: 'AUTO_MODE' }, { t: 'no', a: 'HMI_START' }] },
+      { t: 'and', c: [{ t: 'no', a: 'REMOTE_START' }, { t: 'no', a: 'AUTO_MODE' }] },
+      { t: 'no', a: 'LOP_RUN' }
+    ] },
+    { t: 'nc', a: 'HMI_STOP' },
+    { t: 'coil', k: 'OTE', a: 'LOP_RUN' }
+  ]
+};
+
+test('rung wires meet the rails, contacts, and branch legs', () => {
+  const nested = {
+    t: 'or',
+    c: [
+      { t: 'or', c: [{ t: 'no', a: 'A' }, { t: 'and', c: [{ t: 'no', a: 'B' }, { t: 'no', a: 'C' }] }] },
+      { t: 'and', c: [{ t: 'no', a: 'D' }, { t: 'no', a: 'E' }, { t: 'no', a: 'F' }] },
+      { t: 'no', a: 'G' }
+    ]
+  };
+  for (const geo of [GEO, EDITOR_GEO]) {
+    for (const ladder of [SEAL, nested]) {
+      const frame = frameLadder(layout(ladder, null, geo), { geo });
+      assert.equal(maxWireGap(frame, geo), 0, `gap ${maxWireGap(frame, geo)} with rail pad ${geo.railPad}`);
+      if (ladder === SEAL) {
+        const xs = ['AUTO_MODE', 'REMOTE_START', 'LOP_RUN'].map((tag) => frame.items.find((it) => it.node.a === tag && it.node.t === 'no').x);
+        assert.equal(xs[0], xs[1]);
+        assert.equal(xs[1], xs[2]);
+      } else {
+        const xs = ['A', 'D', 'G'].map((tag) => frame.items.find((it) => it.node.a === tag).x);
+        assert.equal(xs[0], xs[1]);
+        assert.equal(xs[1], xs[2]);
+      }
+    }
+  }
+  for (const r of ALL) {
+    for (const lad of ladsOf(r)) {
+      const frame = frameLadder(layout(lad, null, GEO), { geo: GEO });
+      assert.equal(maxWireGap(frame, GEO), 0, `${r.id} wire gap ${maxWireGap(frame, GEO)}`);
+    }
+  }
+});
+
+test('a false contact leaves the downstream wire cold and the upstream wire hot', () => {
+  const ladder = {
+    t: 'and',
+    c: [
+      { t: 'no', a: 'LUBE_PS_OK' },
+      { t: 'no', a: 'HMI_START' },
+      { t: 'coil', k: 'OTE', a: 'LOP_RUN' }
+    ]
+  };
+  const st = initialState([]);
+  st.bits.LUBE_PS_OK = 0;
+  st.bits.HMI_START = 1;
+  const map = analyze(ladder, st, { live: false }).map;
+  const frame = frameLadder(layout(ladder, map, GEO), { geo: GEO, inputHot: true });
+  assert.equal(frame.inputWire.c, true);
+  const lube = frame.items.find((it) => it.node.a === 'LUBE_PS_OK');
+  assert.equal(lube.inC, true);
+  assert.equal(map.get(lube.node), false);
+  const after = frame.wires.find((w) => !w.vertical && w.x1 === lube.x + lube.w);
+  assert.equal(after.c, false);
 });
 
 test('every authored rung: all elements placed, geometry finite, description non-empty', () => {
