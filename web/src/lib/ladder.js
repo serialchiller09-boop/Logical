@@ -17,9 +17,12 @@ export const GEO = { contactW: 108, coilW: 126, blockW: 186, rowH: 76, gap: 10, 
  */
 export const EDITOR_GEO = { contactW: 78, coilW: 90, blockW: 168, rowH: GEO.rowH, gap: 8, branchGap: 18, railPad: 16 };
 
-/** Address text size in .ld-addr. fitRung will not scale a rung below the minimum. */
+/** Address text size in .ld-addr. On a narrow canvas fitRung will not scale a rung below the minimum. */
 export const LADDER_TAG_FONT_PX = 12.5;
-export const LADDER_MIN_TAG_FONT_PX = 11;
+/** 12 CSS px keeps the tag name readable on a phone. The designed size is 12.5px, so this floor barely shrinks a rung that already fits. */
+export const LADDER_MIN_TAG_FONT_PX = 12;
+/** Below this canvas width, a rung that would shrink tags under the floor scrolls instead. Wider canvases keep the old fit-to-width scale. */
+export const LADDER_NARROW_PX = 640;
 
 /** Keep block pin values inside the box so long placeholders cannot cover contacts. */
 export function fitPinText(raw, maxChars = 16) {
@@ -627,20 +630,20 @@ export function maxWireGap(frame, geo = GEO) {
 }
 
 /**
- * Shrink a rung into the canvas, but not so far that the tag name drops below
- * LADDER_MIN_TAG_FONT_PX. Wider rungs scroll, and the editor shows a cue.
- * Does not scale up: a short rung stays at its drawn size with the rail against the coil.
+ * Fit a rung to the canvas.
+ * At 640px and wider, shrink to the canvas and do not scroll, which is the desktop drawing.
+ * Below 640px, do not shrink the 12.5px tag name under 12px. A wider rung scrolls in its box.
+ * Does not scale up: a short rung stays at its drawn size.
  */
 export function fitRung(svgWidth, canvasWidth) {
   const width = Math.max(1, svgWidth);
   const canvas = Math.max(0, canvasWidth);
-  const minScale = LADDER_MIN_TAG_FONT_PX / LADDER_TAG_FONT_PX;
   const natural = canvas > 0 ? Math.min(1, canvas / width) : 1;
-  if (natural + 1e-9 >= minScale) {
-    const scale = natural;
-    return { scale, scrolls: false, renderWidth: width * scale, tagFontPx: LADDER_TAG_FONT_PX * scale };
-  }
-  return { scale: minScale, scrolls: true, renderWidth: width * minScale, tagFontPx: LADDER_MIN_TAG_FONT_PX };
+  const narrow = canvas > 0 && canvas < LADDER_NARROW_PX;
+  const minScale = LADDER_MIN_TAG_FONT_PX / LADDER_TAG_FONT_PX;
+  const scale = narrow ? Math.max(natural, minScale) : natural;
+  const scrolls = narrow && natural + 1e-9 < minScale;
+  return { scale, scrolls, renderWidth: width * scale, tagFontPx: LADDER_TAG_FONT_PX * scale };
 }
 
 /* ------------------------------------------------------------------ state helpers */
