@@ -36,6 +36,7 @@ export default function Home() {
           </Link>
           <span className="pill">search <kbd>⌘K</kbd></span>
           <Link className="pill" to="/editor">rung editor</Link>
+          <Link className="pill" to="/exercises">exercises</Link>
           <Link className="pill" to="/tools?tab=gallery">printable gallery</Link>
         </div>
       </section>
@@ -58,8 +59,8 @@ export default function Home() {
                 to={pathLevelHref(l)}
                 className="rung-lab-card rung-lab-card-panel"
               >
-                <span className="rung-lab-kicker">Level {l.level} · {l.levelTitle}</span>
-                <span className="rung-lab-title">{l.entry.title}</span>
+                <span className="rung-lab-kicker">Level {l.level}</span>
+                <span className="rung-lab-title">{l.levelTitle}</span>
                 <span className="rung-lab-goal">{l.goal || l.entry.subtitle}</span>
                 <span className="rung-lab-go">open level →</span>
               </Link>

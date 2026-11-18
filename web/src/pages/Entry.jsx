@@ -27,19 +27,23 @@ function NoteEditor({ id, initial = '' }) {
     try {
       await api.state.saveNote(id, body);
       setSaved(body);
-      toast(body.trim() ? 'note saved on this device' : 'note cleared', 'ok');
+      toast(body.trim() ? 'note saved for this browser session' : 'note cleared', 'ok');
     } catch (e) { toast(`could not save note: ${e.message}`, 'bad'); } finally { setBusy(false); }
   };
 
   return (
     <div className="card">
       <div className="card-hd">
-        <h3>Your note</h3>
-        <span className="hd-note">{dirty ? 'unsaved' : saved ? 'saved' : 'private to this install'}</span>
+        <h3 id="entry-note-heading">Your note</h3>
+        <span className="hd-note">{dirty ? 'unsaved' : saved ? 'saved for this browser session' : 'not saved'}</span>
       </div>
       <div className="card-bd">
         <textarea
-          className="note-area" value={body} placeholder="Plant-specific note for this entry (local SQLite only)."
+          id="entry-note"
+          className="note-area"
+          value={body}
+          aria-labelledby="entry-note-heading"
+          placeholder="Kept on this site for this browser session."
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(); }}
         />
