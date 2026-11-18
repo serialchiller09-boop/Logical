@@ -11,6 +11,7 @@ import {
   analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout,
   scanLadders, LAB_DEFAULT_SCAN_MS
 } from '../web/src/lib/ladder.js';
+import { panelPointsFromRoles, toggledBit } from '../web/src/lib/ioSandbox.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
   EDITOR_STORAGE_KEY,
@@ -18,6 +19,7 @@ import {
   addParallelBranch,
   addRung,
   applyEditorScan,
+  imageFromBits,
   compileProgram,
   compileRung,
   createProgram,
@@ -684,6 +686,28 @@ test('lab and editor CTU counts match, including an input that is already true a
   scanLadders(ladders, resetLab);
   assert.equal(resetLab.counters.C_Parts.acc, 0);
   assert.equal(resetLab.counters.C_Parts.acc, again.traces[0].counters.C_Parts.acc);
+});
+
+test('a switch toggle feeds the next editor scan and the lamp follows OTE', () => {
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Switch' },
+    { kind: 'OTE', tag: 'Lamp' }
+  ]);
+  const points = panelPointsFromRoles(tagRoles(program));
+  assert.deepEqual(points.inputs.map((point) => point.tag), ['Switch']);
+  assert.equal(points.inputs[0].type, 'switch');
+  assert.deepEqual(points.outputs.map((point) => point.tag), ['Lamp']);
+  assert.equal(points.outputs[0].type, 'led');
+
+  const state = imageFromBits({});
+  state.bits.Switch = toggledBit(state.bits, 'Switch');
+  applyEditorScan(program, state);
+  assert.equal(state.bits.Switch, 1);
+  assert.equal(state.bits.Lamp, 1);
+  state.bits.Switch = toggledBit(state.bits, 'Switch');
+  applyEditorScan(program, state);
+  assert.equal(state.bits.Switch, 0);
+  assert.equal(state.bits.Lamp, 0);
 });
 
 test('the lab default step stays 1 s and says so next to the controls', () => {

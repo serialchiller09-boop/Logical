@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RungDiagram } from '../components/RungDiagram.jsx';
 import { EDITOR_GEO } from '../lib/ladder.js';
 import { useTitle } from '../lib/store.jsx';
+import { panelPointsFromRoles, toggledBit } from '../lib/ioSandbox.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
   EDITOR_SCAN_MS,
@@ -79,13 +80,7 @@ export default function RungEditor({
   programRef.current = program;
 
   const errors = useMemo(() => validateProgram(program), [program]);
-  const roles = useMemo(() => {
-    const base = tagRoles(program);
-    if (!pinned) return base;
-    const outputs = [...new Set([...(pinned.outputs || []), ...base.outputs])];
-    const inputs = [...new Set([...(pinned.inputs || []), ...base.inputs])].filter((tag) => !outputs.includes(tag));
-    return { ...base, inputs, outputs };
-  }, [program, pinned]);
+  const points = useMemo(() => panelPointsFromRoles(tagRoles(program), pinned), [program, pinned]);
   const preview = useMemo(() => previewEditor(program, stateRef.current), [program, scanRev]);
   const live = mode === 'run' && errors.length === 0;
   const target = targetLabel(program, selection);
@@ -201,7 +196,7 @@ export default function RungEditor({
 
   function toggleInput(tag) {
     const state = stateRef.current;
-    state.bits[tag] = state.bits[tag] ? 0 : 1;
+    state.bits[tag] = toggledBit(state.bits, tag);
     bumpScan();
   }
 
@@ -250,6 +245,11 @@ export default function RungEditor({
       </div>
 
       <div role="tabpanel" id="re-panel" aria-labelledby={mode === 'edit' ? 're-tab-edit' : 're-tab-run'} className="re-panel">
+        <IoPanel
+          points={points}
+          bits={stateRef.current.bits}
+          onToggle={toggleInput}
+        />
         {mode === 'edit' && (
           <div className="re-palette" role="group" aria-label="Add instructions">
             <p className="re-adding">
@@ -330,14 +330,6 @@ export default function RungEditor({
             />
           ))}
         </ol>
-
-        {mode === 'run' && (
-          <IoPanel
-            roles={roles}
-            bits={stateRef.current.bits}
-            onToggle={toggleInput}
-          />
-        )}
 
         <div className="re-reset">
           {confirmReset ? (
@@ -632,27 +624,27 @@ function onRowKey(event, onDelete) {
   }
 }
 
-function IoPanel({ roles, bits, onToggle }) {
+function IoPanel({ points, bits, onToggle }) {
   const bitOn = (tag) => !!bits[tag];
   return (
     <section className="card re-io-card" aria-label="Inputs and outputs">
       <div className="card-hd"><h2>Inputs and outputs</h2></div>
       <div className="card-bd">
         <h3>Inputs</h3>
-        <p className="re-io-note">Tags an XIC or XIO reads, and no OTE writes. These switches are the only bits you force.</p>
-        {roles.inputs.length === 0 ? <p className="re-empty">No input tags yet.</p> : (
+        <p className="re-io-note">Maintained switches for tags an XIC or XIO reads. Outputs change on the next Step, or while Start is running. The switch itself does not scan.</p>
+        {points.inputs.length === 0 ? <p className="re-empty">No input tags yet.</p> : (
           <div className="re-io">
-            {roles.inputs.map((tag) => {
-              const on = bitOn(tag);
+            {points.inputs.map((point) => {
+              const on = bitOn(point.tag);
               return (
-                <div key={tag} className="re-io-cell">
-                  <div className="re-io-tag">{tag}</div>
+                <div key={point.tag} className="re-io-cell">
+                  <div className="re-io-tag">{point.tag}</div>
                   <button
                     type="button"
                     className={`re-toggle ${on ? 'is-on' : ''}`}
                     aria-pressed={on}
-                    aria-label={`${tag} input, ${on ? 'on' : 'off'}`}
-                    onClick={() => onToggle(tag)}
+                    aria-label={`${point.tag} switch, ${on ? 'on' : 'off'}`}
+                    onClick={() => onToggle(point.tag)}
                   >
                     <span className="re-toggle-knob" aria-hidden="true" />
                     <span>{on ? 'On' : 'Off'}</span>
@@ -663,21 +655,21 @@ function IoPanel({ roles, bits, onToggle }) {
           </div>
         )}
         <h3>Outputs</h3>
-        <p className="re-io-note">Written by OTE. A tag that is also read, such as a seal-in, stays here and is not a switch.</p>
-        {roles.duplicateOutputs.length > 0 && (
+        <p className="re-io-note">Indicator lamps for tags an output writes. A tag that is also read, such as a seal-in, stays a lamp and is not a switch.</p>
+        {points.duplicateOutputs.length > 0 && (
           <p className="callout callout-warn">
-            {roles.duplicateOutputs.join(', ')} {roles.duplicateOutputs.length === 1 ? 'is' : 'are'} written by more than one OTE.
+            {points.duplicateOutputs.join(', ')} {points.duplicateOutputs.length === 1 ? 'is' : 'are'} written by more than one output.
             1756-RM003 says unexpected operation may occur if an output tag is overwritten. This page keeps the write from the lower rung.
           </p>
         )}
-        {roles.outputs.length === 0 ? <p className="re-empty">No output tags yet.</p> : (
+        {points.outputs.length === 0 ? <p className="re-empty">No output tags yet.</p> : (
           <div className="re-io">
-            {roles.outputs.map((tag) => {
-              const on = bitOn(tag);
+            {points.outputs.map((point) => {
+              const on = bitOn(point.tag);
               return (
-                <div key={tag} className="re-io-cell">
-                  <div className="re-io-tag">{tag}</div>
-                  <div className="re-lamp" role="status" aria-label={`${tag} output ${on ? 'on' : 'off'}`}>
+                <div key={point.tag} className="re-io-cell">
+                  <div className="re-io-tag">{point.tag}</div>
+                  <div className="re-lamp" role="status" aria-label={`${point.tag} lamp ${on ? 'on' : 'off'}`}>
                     <span className={`re-led ${on ? 'is-on' : ''}`} aria-hidden="true" />
                     <span>{on ? 'On' : 'Off'}</span>
                   </div>

@@ -1632,4 +1632,5 @@ button.lab-dock-led {
 @media (max-width: 420px) {
   .re-instr, .re-instr:has(.re-tag + .re-tag) { grid-template-columns: minmax(0, 1fr) auto; }
   .re-kind { grid-column: 1 / -1; line-height: 1.2; }
+  .re-io { grid-template-columns: minmax(0, 1fr); }
 }

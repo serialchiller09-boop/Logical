@@ -9,9 +9,11 @@ import {
   createTrainerPanel,
   lampTest,
   normalizePanel,
+  panelPointsFromRoles,
   panelToCsv,
   removeWidget,
-  setTag
+  setTag,
+  toggledBit
 } from '../web/src/lib/ioSandbox.js';
 
 test('starter blank panel ships at least 10 LEDs plus switches, PBs and pots', () => {
@@ -73,6 +75,24 @@ test('add / remove / setTag / lampTest keep the local tag table coherent', () =>
   panel = removeWidget(panel, extra.id);
   assert.equal(countByType(panel).led, before);
   assert.equal(panel.tags[extra.tag], undefined);
+});
+
+test('editor tags map to sandbox switches and lamps, and a seal-in stays a lamp', () => {
+  const points = panelPointsFromRoles({
+    inputs: ['Start', 'Motor', 'Stop'],
+    outputs: ['Motor'],
+    duplicateOutputs: []
+  }, { inputs: ['Start', 'Stop'], outputs: ['Motor'] });
+  assert.deepEqual(points.inputs.map((point) => point.tag), ['Start', 'Stop']);
+  assert.deepEqual(points.inputs.map((point) => point.type), ['switch', 'switch']);
+  assert.deepEqual(points.outputs, [{ tag: 'Motor', type: 'led', kind: 'output' }]);
+  assert.equal(points.inputs.every((point) => point.kind === 'input'), true);
+});
+
+test('a maintained switch toggles 0 and 1 and does not invent a third state', () => {
+  assert.equal(toggledBit({}, 'Start'), 1);
+  assert.equal(toggledBit({ Start: 1 }, 'Start'), 0);
+  assert.equal(toggledBit({ Start: 0 }, 'Start'), 1);
 });
 
 test('normalizePanel recovers a usable starter from empty or broken storage', () => {
