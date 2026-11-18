@@ -9,10 +9,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
-  analyze, layout, frameLadder, maxWireGap, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
-  memberRef, GEO, EDITOR_GEO
+  analyze, layout, frameLadder, maxWireGap, fitRung, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
+  memberRef, GEO, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, LADDER_TAG_FONT_PX, LADDER_NARROW_PX
 } from '../web/src/lib/ladder.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
 import { RUNGS2 } from '../server/src/seed/data/rungs2.js';
@@ -251,6 +252,26 @@ const SEAL = {
     { t: 'coil', k: 'OTE', a: 'LOP_RUN' }
   ]
 };
+
+test('a narrow canvas keeps tag text at 12px and scrolls; a wide canvas still shrinks to fit', () => {
+  assert.equal(LADDER_MIN_TAG_FONT_PX, 12);
+  assert.equal(LADDER_NARROW_PX, 640);
+  const phone = fitRung(906, 320);
+  assert.equal(phone.scrolls, true);
+  assert.equal(phone.tagFontPx, 12);
+  assert.ok(phone.renderWidth > 320);
+  const desktop = fitRung(906, 734);
+  assert.equal(desktop.scrolls, false);
+  assert.ok(Math.abs(desktop.renderWidth - 734) < 0.01);
+  assert.ok(desktop.tagFontPx < LADDER_TAG_FONT_PX);
+  const fits = fitRung(400, 800);
+  assert.equal(fits.scrolls, false);
+  assert.equal(fits.scale, 1);
+  assert.equal(fits.tagFontPx, LADDER_TAG_FONT_PX);
+  const page = readFileSync(new URL('../web/src/components/RungDiagram.jsx', import.meta.url), 'utf8');
+  assert.match(page, /tabIndex=\{scrolls \? 0 : undefined\}/);
+  assert.match(page, /Scroll sideways to see the rest/);
+});
 
 test('rung wires meet the rails, contacts, and branch legs', () => {
   const nested = {

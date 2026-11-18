@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { GEO, layout, frameLadder, fitRung, blockBounds, analyze, initialState, collectElements, collectRefs, fitPinText, scanLadders, LAB_DEFAULT_SCAN_MS } from '../lib/ladder.js';
 import {
@@ -144,7 +144,7 @@ function Block({ it, hot, inHot, geo = GEO }) {
   );
 }
 
-export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO }) {
+export function RungDiagram({ ladder, map, live, height, fit = true, geo = GEO }) {
   const wrapRef = useRef(null);
   const [canvasW, setCanvasW] = useState(0);
   const model = useMemo(() => {
@@ -153,7 +153,7 @@ export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO 
     return frameLadder(box, { geo, conducts: !!(live && map?.get(ladder)), inputHot: !!live });
   }, [ladder, map, live, geo]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!fit) return undefined;
     const el = wrapRef.current;
     if (!el) return undefined;
@@ -170,10 +170,18 @@ export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO 
   const renderW = fitted ? fitted.renderWidth : model.w;
   const renderH = height ?? (fitted ? model.h * (renderW / model.w) : model.h);
   const scrolls = !!fitted?.scrolls;
+  const described = describeRung(ladder);
   return (
-    <div className={`ladder-wrap ${scrolls ? 'is-scrollable' : ''}`} ref={wrapRef}>
+    <div className="ladder-frame">
+    <div
+      className={`ladder-wrap ${scrolls ? 'is-scrollable' : ''}`}
+      ref={wrapRef}
+      tabIndex={scrolls ? 0 : undefined}
+      aria-label={scrolls ? `Ladder rung. Scroll sideways to see the rest. ${described}` : undefined}
+    >
       <svg className="ladder" width={renderW} height={renderH} viewBox={`0 0 ${model.w} ${model.h}`} preserveAspectRatio="xMinYMid meet" role="img"
-        aria-label={`Ladder rung: ${describeRung(ladder)}`}>
+        aria-hidden={scrolls ? true : undefined}
+        aria-label={scrolls ? undefined : `Ladder rung: ${described}`}>
         <line className="ld-rail" x1={model.leftRail} y1={4} x2={model.leftRail} y2={model.h - 4} />
         <line className="ld-rail" x1={model.rightRail} y1={4} x2={model.rightRail} y2={model.h - 4} />
         {model.wires.map((wr, i) => <Wire key={`w${i}`} w={wr} />)}
@@ -185,9 +193,10 @@ export function RungDiagram({ ladder, map, live, height, fit = false, geo = GEO 
           return <Contact key={`i${i}`} it={it} hot={hot} inHot={inHot} />;
         })}
       </svg>
-      {scrolls && (
-        <div className="ladder-more" role="note">Scroll right for the coil and the right rail</div>
-      )}
+    </div>
+    {scrolls && (
+      <p className="ladder-more">Scroll sideways to see the rest of the rung.</p>
+    )}
     </div>
   );
 }
