@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { TRAINER_IO } from '../web/src/data/substationProject.js';
 import {
   PANEL_VERSION,
@@ -9,6 +10,10 @@ import {
   createTrainerPanel,
   lampTest,
   normalizePanel,
+  formatDint,
+  normalizeLampColor,
+  normalizeNumberView,
+  numberViewLabel,
   panelPointsFromRoles,
   panelToCsv,
   removeWidget,
@@ -111,6 +116,48 @@ test('input keys default to 1-9, and a custom key belongs to one input', () => {
   assert.equal(isTextEntryTarget({ tagName: 'BUTTON' }), false);
   assert.deepEqual(releaseMomentaryBits({ Start: 1, Stop: 1 }, { Start: 'pb', Stop: 'switch' }), { Start: 0, Stop: 1 });
 });
+
+test('a DINT is decimal, 32-bit hex, or 32-bit binary, including the max and a negative', () => {
+  assert.deepEqual(formatDint(0, 'decimal'), { view: 'decimal', text: '0' });
+  assert.deepEqual(formatDint(0, 'hex'), { view: 'hex', text: '16#0000_0000' });
+  assert.deepEqual(formatDint(0, 'binary'), { view: 'binary', text: '2#0000_0000_0000_0000_0000_0000_0000_0000' });
+  assert.deepEqual(formatDint(5, 'decimal'), { view: 'decimal', text: '5' });
+  assert.deepEqual(formatDint(5, 'hex'), { view: 'hex', text: '16#0000_0005' });
+  assert.deepEqual(formatDint(5, 'binary'), { view: 'binary', text: '2#0000_0000_0000_0000_0000_0000_0000_0101' });
+  assert.equal(formatDint(2147483647, 'decimal').text, '2147483647');
+  assert.equal(formatDint(2147483647, 'hex').text, '16#7FFF_FFFF');
+  assert.equal(formatDint(2147483647, 'binary').text, '2#0111_1111_1111_1111_1111_1111_1111_1111');
+  assert.equal(formatDint(-1, 'decimal').text, '-1');
+  assert.equal(formatDint(-1, 'hex').text, '16#FFFF_FFFF');
+  assert.equal(formatDint(-1, 'binary').text, '2#1111_1111_1111_1111_1111_1111_1111_1111');
+  assert.equal(formatDint(-2147483648, 'hex').text, '16#8000_0000');
+  assert.equal(normalizeNumberView('float'), 'decimal');
+  assert.equal(normalizeLampColor('amber'), 'amber');
+  assert.equal(numberViewLabel('hex'), 'Hex');
+
+  const css = readFileSync(new URL('../web/src/styles.css', import.meta.url), 'utf8');
+  const ink = css.match(/--ink:\s*(#[0-9a-fA-F]{6})/)[1];
+  const face = css.match(/\.re-lamp[\s\S]*?background:\s*(#[0-9a-fA-F]{6})/)[1];
+  const button = css.match(/--panel-3:\s*(#[0-9a-fA-F]{6})/)[1];
+  assert.ok(contrast(ink, face) >= 4.5, `value text contrast ${contrast(ink, face)}`);
+  assert.ok(contrast(ink, button) >= 4.5, `view button contrast ${contrast(ink, button)}`);
+});
+
+function contrast(fg, bg) {
+  const lum = (hex) => {
+    const n = hex.replace('#', '');
+    const ch = [0, 2, 4].map((i) => {
+      const c = parseInt(n.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const a = lum(fg);
+  const b = lum(bg);
+  const hi = Math.max(a, b);
+  const lo = Math.min(a, b);
+  return (hi + 0.05) / (lo + 0.05);
+}
 
 test('a maintained switch toggles 0 and 1 and does not invent a third state', () => {
   assert.equal(toggledBit({}, 'Start'), 1);

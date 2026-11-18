@@ -7,6 +7,12 @@ import {
   inputKeyAction,
   isTextEntryTarget,
   nextInputBit,
+  LED_COLORS,
+  NUMBER_VIEWS,
+  formatDint,
+  normalizeLampColor,
+  normalizeNumberView,
+  numberViewLabel,
   panelPointsFromRoles,
   releaseMomentaryBits,
   resolveInputSetup,
@@ -20,6 +26,7 @@ import {
   addParallelBranch,
   addRung,
   applyEditorScan,
+  editorNumberValues,
   editStepControl,
   deleteInstruction,
   deleteLeg,
@@ -96,6 +103,8 @@ export default function RungEditor({
   const [inputModes, setInputModes] = useState({});
   const [customKeys, setCustomKeys] = useState({});
   const [captureTag, setCaptureTag] = useState(null);
+  const [outputColors, setOutputColors] = useState({});
+  const [numberViews, setNumberViews] = useState({});
   const inputTags = useMemo(() => points.inputs.map((point) => point.tag), [points]);
   const inputSetup = useMemo(() => resolveInputSetup(inputTags, inputModes, customKeys), [inputTags, inputModes, customKeys]);
   const setupRef = useRef(inputSetup);
@@ -336,6 +345,11 @@ export default function RungEditor({
           scanDisabled={scanControl.disabled}
           scanReason={scanControl.reason}
           momentaryNote={MOMENTARY_NOTE}
+          numbers={editorNumberValues(program, stateRef.current)}
+          numberViews={numberViews}
+          outputColors={outputColors}
+          onNumberView={(tag, view) => setNumberViews((current) => ({ ...current, [tag]: normalizeNumberView(view) }))}
+          onOutputColor={(tag, color) => setOutputColors((current) => ({ ...current, [tag]: normalizeLampColor(color) }))}
         />
         {mode === 'edit' && (
           <div className="re-palette" role="group" aria-label="Add instructions">
@@ -796,9 +810,70 @@ function InputCell({ tag, on, kind, binding, capturing, onToggle, onPress, onRel
   );
 }
 
+function OutputCell({ tag, bit, color, onColor }) {
+  const text = bit ? 'On' : 'Off';
+  return (
+    <div className="re-io-cell">
+      <div className="re-io-tag">{tag}</div>
+      <div className="re-io-kinds" role="group" aria-label={`${tag} lamp color`}>
+        {LED_COLORS.map((name) => (
+          <button
+            key={name}
+            type="button"
+            className={`btn ${color === name ? 'btn-on' : ''}`}
+            aria-pressed={color === name}
+            aria-label={`${tag} lamp color ${name}`}
+            onClick={() => onColor(tag, name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="re-lamp" role="status" aria-label={`${tag} lamp ${color}, ${text}`}>
+        <span className={`re-led is-${color} ${bit ? 'is-on' : ''}`} aria-hidden="true" />
+        <span className="re-out-value">{text}</span>
+      </div>
+    </div>
+  );
+}
+
+function NumberBlock({ item, view, onView }) {
+  const id = normalizeNumberView(view);
+  const pre = formatDint(item.pre, id);
+  const acc = formatDint(item.acc, id);
+  return (
+    <div className="re-io-cell">
+      <div className="re-io-tag">{item.tag} {item.kind}</div>
+      <div className="re-io-kinds" role="group" aria-label={`${item.tag} number view`}>
+        {NUMBER_VIEWS.map((name) => (
+          <button
+            key={name}
+            type="button"
+            className={`btn ${id === name ? 'btn-on' : ''}`}
+            aria-pressed={id === name}
+            aria-label={`${item.tag} ${numberViewLabel(name)} view`}
+            onClick={() => onView(item.tag, name)}
+          >
+            {numberViewLabel(name)}
+          </button>
+        ))}
+      </div>
+      <div className="re-num" role="status" aria-label={`${item.tag}.PRE ${numberViewLabel(id)} ${pre.text}`}>
+        <span className="re-num-name">PRE</span>
+        <span className="re-num-value">{pre.text}</span>
+      </div>
+      <div className="re-num" role="status" aria-label={`${item.tag}.ACC ${numberViewLabel(id)} ${acc.text}`}>
+        <span className="re-num-name">ACC</span>
+        <span className="re-num-value">{acc.text}</span>
+      </div>
+    </div>
+  );
+}
+
 function IoPanel({
   points, bits, setup, captureTag, onToggle, onPress, onRelease, onMode, onCapture,
-  mode, open, onOpenChange, onStep, scanDisabled, scanReason, momentaryNote
+  mode, open, onOpenChange, onStep, scanDisabled, scanReason, momentaryNote,
+  numbers, numberViews, outputColors, onNumberView, onOutputColor
 }) {
   const bitOn = (tag) => !!bits[tag];
   const inputNote = mode === 'run'
@@ -850,7 +925,7 @@ function IoPanel({
           )}
         </div>
         <h3>Outputs</h3>
-        <p className="re-io-note">Indicator lamps for tags an output writes. A tag that is also read, such as a seal-in, stays a lamp and is not a switch.</p>
+        <p className="re-io-note">Lamps for tags an output writes. Pick green, amber, or red. On means the bit is 1. Off means it is 0. A seal-in stays a lamp.</p>
         {points.duplicateOutputs.length > 0 && (
           <p className="callout callout-warn">
             {points.duplicateOutputs.join(', ')} {points.duplicateOutputs.length === 1 ? 'is' : 'are'} written by more than one output.
@@ -859,19 +934,32 @@ function IoPanel({
         )}
         {points.outputs.length === 0 ? <p className="re-empty">No output tags yet.</p> : (
           <div className="re-io">
-            {points.outputs.map((point) => {
-              const on = bitOn(point.tag);
-              return (
-                <div key={point.tag} className="re-io-cell">
-                  <div className="re-io-tag">{point.tag}</div>
-                  <div className="re-lamp" role="status" aria-label={`${point.tag} lamp ${on ? 'on' : 'off'}`}>
-                    <span className={`re-led ${on ? 'is-on' : ''}`} aria-hidden="true" />
-                    <span>{on ? 'On' : 'Off'}</span>
-                  </div>
-                </div>
-              );
-            })}
+            {points.outputs.map((point) => (
+              <OutputCell
+                key={point.tag}
+                tag={point.tag}
+                bit={bitOn(point.tag)}
+                color={normalizeLampColor(outputColors[point.tag])}
+                onColor={onOutputColor}
+              />
+            ))}
           </div>
+        )}
+        {numbers.length > 0 && (
+          <>
+            <h3>Timers and counters</h3>
+            <p className="re-io-note">Preset and accumulated value for each timer or counter. Decimal, hex, and binary are three ways to write that same number. The number updates on the next scan.</p>
+            <div className="re-io">
+              {numbers.map((item) => (
+                <NumberBlock
+                  key={item.tag}
+                  item={item}
+                  view={numberViews[item.tag]}
+                  onView={onNumberView}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </details>

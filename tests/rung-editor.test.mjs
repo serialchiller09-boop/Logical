@@ -11,14 +11,17 @@ import {
   analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout,
   scanLadders, LAB_DEFAULT_SCAN_MS
 } from '../web/src/lib/ladder.js';
-import { panelPointsFromRoles, toggledBit, inputKeyAction, nextInputBit, resolveInputSetup } from '../web/src/lib/ioSandbox.js';
+import { panelPointsFromRoles, toggledBit, inputKeyAction, nextInputBit, resolveInputSetup, formatDint } from '../web/src/lib/ioSandbox.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
+  EDITOR_RUN_INTERVAL_MS,
+  EDITOR_SCAN_MS,
   EDITOR_STORAGE_KEY,
   addInstruction,
   addParallelBranch,
   addRung,
   applyEditorScan,
+  editorNumberValues,
   editStepControl,
   imageFromBits,
   compileProgram,
@@ -687,6 +690,54 @@ test('lab and editor CTU counts match, including an input that is already true a
   scanLadders(ladders, resetLab);
   assert.equal(resetLab.counters.C_Parts.acc, 0);
   assert.equal(resetLab.counters.C_Parts.acc, again.traces[0].counters.C_Parts.acc);
+});
+
+test('an output view does not change the scan time, the prescan path, or a key toggle', () => {
+  assert.equal(EDITOR_SCAN_MS, 100);
+  assert.equal(EDITOR_RUN_INTERVAL_MS, 500);
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Switch' },
+    { kind: 'OTE', tag: 'Lamp' }
+  ]);
+  const state = imageFromBits({});
+  state.bits.Switch = toggledBit(state.bits, 'Switch');
+  applyEditorScan(program, state);
+  assert.equal(state.bits.Lamp, 1);
+  assert.equal(formatDint(state.bits.Lamp, 'hex').text, '16#0000_0001');
+  assert.equal(state.bits.Lamp, 1);
+  const page = readFileSync(new URL('../web/src/pages/RungEditor.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /This is not a Logix DINT/);
+  assert.match(page, /On means the bit is 1/);
+  assert.match(page, /applyEditorScan/);
+  assert.match(page, /inputKeyAction/);
+  assert.match(page, /min-width: 421px/);
+});
+
+test('timer and counter .PRE and .ACC are the values the number view formats', () => {
+  let program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Start' },
+    { kind: 'TON', tag: 'T_Delay', pre: 2000 }
+  ]);
+  const rungId = program.rungs[0].id;
+  program = must(addRung(program, { afterRungId: rungId })).program;
+  program = addSeries(program, 1, [
+    { kind: 'XIC', tag: 'Part' },
+    { kind: 'CTU', tag: 'C_Parts', pre: 5 }
+  ]);
+  const before = editorNumberValues(program, imageFromBits({}));
+  assert.deepEqual(before.map((item) => [item.tag, item.kind, item.pre, item.acc]), [
+    ['T_Delay', 'TON', 2000, 0],
+    ['C_Parts', 'CTU', 5, 0]
+  ]);
+  const state = imageFromBits({ Start: 1 });
+  for (let n = 0; n < 5; n += 1) applyEditorScan(program, state);
+  const after = editorNumberValues(program, state);
+  const timer = after.find((item) => item.tag === 'T_Delay');
+  assert.equal(timer.acc, 500);
+  assert.equal(timer.pre, 2000);
+  assert.equal(formatDint(timer.acc, 'hex').text, '16#0000_01F4');
+  assert.equal(formatDint(timer.pre, 'decimal').text, '2000');
+  assert.ok(timer.acc >= 0);
 });
 
 test('a switch toggle feeds the next editor scan and the lamp follows OTE', () => {

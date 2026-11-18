@@ -15,6 +15,7 @@ import {
   EXERCISE_PROGRESS_KEY
 } from '../web/src/lib/exercises.js';
 import { addInstruction, addParallelBranch, addRung, createProgram } from '../web/src/lib/rungEditor.js';
+import { formatDint } from '../web/src/lib/ioSandbox.js';
 
 function must(result) {
   assert.equal(result.ok, true, result.error?.message || 'editor operation failed');
@@ -64,6 +65,18 @@ test('exercises are the six tasks in order', () => {
     'motor-delay'
   ]);
   assert.equal(exerciseById('nope'), null);
+});
+
+test('a lamp color or a timer number view does not change how an exercise is graded', () => {
+  const program = xicOte('Switch', 'Lamp');
+  const before = gradeExercise(program, byId['lamp-follows']);
+  const shown = formatDint(500, 'hex').text;
+  const after = gradeExercise(program, byId['lamp-follows']);
+  assert.equal(before.ok, true);
+  assert.deepEqual(after, before);
+  assert.equal(shown, '16#0000_01F4');
+  const source = readFileSync(new URL('../web/src/lib/exercises.js', import.meta.url), 'utf8');
+  assert.equal(source.includes('formatDint'), false);
 });
 
 test('lamp follows a switch: XIC passes, XIO fails', () => {

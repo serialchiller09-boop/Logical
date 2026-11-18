@@ -20,6 +20,15 @@ export const WIDGET_TYPES = {
 
 export const LED_COLORS = ['green', 'amber', 'red'];
 
+/** Ways to write a timer or counter DINT. The BOOL lamp is separate. */
+export const NUMBER_VIEWS = ['decimal', 'hex', 'binary'];
+
+const NUMBER_VIEW_LABELS = { decimal: 'Decimal', hex: 'Hex', binary: 'Binary' };
+
+/** Logix DINT limits. 1756-RM003 COUNTER structure, p. 93: .OV past 2,147,483,647 and .UN past -2,147,483,648. */
+export const DINT_MAX = 2147483647;
+export const DINT_MIN = -2147483648;
+
 function uid(prefix = 'w') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -544,6 +553,44 @@ export function panelPointsFromRoles(roles, pinned) {
     outputs: outputs.map((tag) => ({ tag, type: 'led', kind: WIDGET_TYPES.led.kind })),
     duplicateOutputs: duplicates
   };
+}
+
+export function normalizeLampColor(color) {
+  return LED_COLORS.includes(color) ? color : 'green';
+}
+
+export function normalizeNumberView(view) {
+  return NUMBER_VIEWS.includes(view) ? view : 'decimal';
+}
+
+export function numberViewLabel(view) {
+  return NUMBER_VIEW_LABELS[normalizeNumberView(view)];
+}
+
+/**
+ * Write a 32-bit signed DINT.
+ * Decimal is the signed number.
+ * Hex and binary use the 16# and 2# prefixes and groups of four from 1756-RM003
+ * (mask prefixes, p. 327; examples such as 2#1111_1111_1111_1111 and 16#0001_0081).
+ * A negative value is the 32-bit two's-complement pattern. Page 845 shows 32 one-bits as -1.
+ * Page 847 says a DINT uses 32 bits, one for the sign.
+ */
+export function formatDint(value, view) {
+  const id = normalizeNumberView(view);
+  const signed = toDint(value);
+  if (id === 'decimal') return { view: id, text: String(signed) };
+  const bits = (signed >>> 0).toString(2).padStart(32, '0');
+  if (id === 'binary') {
+    return { view: id, text: `2#${bits.match(/.{4}/g).join('_')}` };
+  }
+  const hex = (signed >>> 0).toString(16).toUpperCase().padStart(8, '0');
+  return { view: id, text: `16#${hex.slice(0, 4)}_${hex.slice(4)}` };
+}
+
+function toDint(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.trunc(n) | 0;
 }
 
 /** Maintained switch. 1 is on, 0 is off. Does not scan by itself. */

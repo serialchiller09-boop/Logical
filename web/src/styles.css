@@ -1635,6 +1635,17 @@ button.lab-dock-led {
   width: 18px; height: 18px; border-radius: 50%; background: #243140; flex: 0 0 18px;
 }
 .re-toggle.is-on .re-toggle-knob, .re-led.is-on { background: var(--power); box-shadow: 0 0 8px rgba(240, 120, 40, .7); }
+.re-led.is-on.is-green { background: #43c96b; box-shadow: 0 0 8px rgba(67, 201, 107, .7); }
+.re-led.is-on.is-amber { background: #f0b429; box-shadow: 0 0 8px rgba(240, 180, 41, .7); }
+.re-led.is-on.is-red { background: #ff5d55; box-shadow: 0 0 8px rgba(255, 93, 85, .7); }
+.re-out-value { font: 700 16px/1 var(--mono); }
+.re-num {
+  display: flex; flex-direction: column; gap: 4px; min-height: 44px; min-width: 0;
+  padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--line-2);
+  background: #0a1017; color: var(--ink);
+}
+.re-num-name { font: 650 11px/1.2 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+.re-num-value { font: 700 14px/1.35 var(--mono); overflow-wrap: anywhere; }
 .re-rules { border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); padding: 0; }
 .re-rules summary { min-height: 44px; display: flex; align-items: center; padding: 10px 12px; cursor: pointer; font-weight: 650; }
 .re-rules summary:focus-visible { outline: 2px solid rgba(79, 209, 224, .85); outline-offset: 2px; }
