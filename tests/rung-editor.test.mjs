@@ -11,9 +11,11 @@ import {
   analyze, initialState, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, blockBounds, frameLadder, fitRung, layout,
   scanLadders, LAB_DEFAULT_SCAN_MS
 } from '../web/src/lib/ladder.js';
-import { panelPointsFromRoles, toggledBit, inputKeyAction, nextInputBit, resolveInputSetup } from '../web/src/lib/ioSandbox.js';
+import { panelPointsFromRoles, toggledBit, inputKeyAction, nextInputBit, resolveInputSetup, formatOutputBit } from '../web/src/lib/ioSandbox.js';
 import {
   EDITOR_BRANCH_LIMIT_TEXT,
+  EDITOR_RUN_INTERVAL_MS,
+  EDITOR_SCAN_MS,
   EDITOR_STORAGE_KEY,
   addInstruction,
   addParallelBranch,
@@ -687,6 +689,25 @@ test('lab and editor CTU counts match, including an input that is already true a
   scanLadders(ladders, resetLab);
   assert.equal(resetLab.counters.C_Parts.acc, 0);
   assert.equal(resetLab.counters.C_Parts.acc, again.traces[0].counters.C_Parts.acc);
+});
+
+test('an output view does not change the scan time, the prescan path, or a key toggle', () => {
+  assert.equal(EDITOR_SCAN_MS, 100);
+  assert.equal(EDITOR_RUN_INTERVAL_MS, 500);
+  const program = addSeries(createProgram(), 0, [
+    { kind: 'XIC', tag: 'Switch' },
+    { kind: 'OTE', tag: 'Lamp' }
+  ]);
+  const state = imageFromBits({});
+  state.bits.Switch = toggledBit(state.bits, 'Switch');
+  applyEditorScan(program, state);
+  assert.equal(state.bits.Lamp, 1);
+  assert.equal(formatOutputBit(state.bits.Lamp, 'hex').text, '1');
+  assert.equal(state.bits.Lamp, 1);
+  const page = readFileSync(new URL('../web/src/pages/RungEditor.jsx', import.meta.url), 'utf8');
+  assert.match(page, /applyCtuPrescan|applyEditorScan/);
+  assert.match(page, /inputKeyAction/);
+  assert.match(page, /min-width: 421px/);
 });
 
 test('a switch toggle feeds the next editor scan and the lamp follows OTE', () => {

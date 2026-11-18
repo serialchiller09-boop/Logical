@@ -20,6 +20,11 @@ export const WIDGET_TYPES = {
 
 export const LED_COLORS = ['green', 'amber', 'red'];
 
+/** Views named in rungs-dev/community issue #47. A BOOL is one bit, not a DINT or REAL. */
+export const OUTPUT_VIEWS = ['lamp', 'decimal', 'hex', 'binary'];
+
+const OUTPUT_VIEW_LABELS = { lamp: 'Lamp', decimal: 'Decimal', hex: 'Hex', binary: 'Binary' };
+
 function uid(prefix = 'w') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -544,6 +549,29 @@ export function panelPointsFromRoles(roles, pinned) {
     outputs: outputs.map((tag) => ({ tag, type: 'led', kind: WIDGET_TYPES.led.kind })),
     duplicateOutputs: duplicates
   };
+}
+
+export function outputViewLabel(view) {
+  return OUTPUT_VIEW_LABELS[normalizeOutputView(view)];
+}
+
+export function normalizeOutputView(view) {
+  return OUTPUT_VIEWS.includes(view) ? view : 'lamp';
+}
+
+export function normalizeLampColor(color) {
+  return LED_COLORS.includes(color) ? color : 'green';
+}
+
+/**
+ * Show one editor output bit. Decimal, hex, and binary are that same 0 or 1.
+ * This is not a Logix DINT width and not a REAL. 1756-RM003 does not define these glyphs.
+ */
+export function formatOutputBit(bit, view) {
+  const on = bit ? 1 : 0;
+  const id = normalizeOutputView(view);
+  if (id === 'lamp') return { view: id, text: on ? 'On' : 'Off' };
+  return { view: id, text: String(on) };
 }
 
 /** Maintained switch. 1 is on, 0 is off. Does not scan by itself. */
