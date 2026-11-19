@@ -852,6 +852,7 @@ test('the lab default step stays 1 s and says so next to the controls', () => {
   assert.match(page, /The default is 1 s/);
   assert.match(page, /rung editor adds 100 ms/);
   assert.match(page, /Output Energize prescan and postscan are not simulated/);
+  assert.match(page, /Count Down prescan sets \.CD true/);
 });
 
 test('a timer or counter block title stays inside the rung frame', () => {
