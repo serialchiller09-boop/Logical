@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  analyze, layout, frameLadder, maxWireGap, fitRung, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText,
+  analyze, layout, frameLadder, maxWireGap, fitRung, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText, scanLadders,
   memberRef, GEO, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, LADDER_TAG_FONT_PX, LADDER_NARROW_PX
 } from '../web/src/lib/ladder.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
@@ -522,6 +522,26 @@ test('member references expose .EN on timers and .CU/.CD on counters', () => {
   assert.equal(st.bits.SEEN_CD, 1);
 });
 
+test('CTD prescan sets .CD so an input that is already true does not decrement', () => {
+  const ladder = series(
+    { t: 'no', a: 'IN' },
+    { t: 'blk', k: 'CTD', a: 'C', p: [{ k: 'PRE', v: '3' }] }
+  );
+  const st = initialState([]);
+  st.counters.C = { acc: 5, dn: true, cu: false, cd: false, prevIn: false };
+  st.bits.IN = 1;
+  scanLadders([ladder], st);
+  assert.equal(st.counters.C.acc, 5, 'prescan .CD blocks a decrement on the first scan');
+  assert.equal(st.counters.C.cd, true);
+  st.bits.IN = 0;
+  scanLadders([ladder], st);
+  assert.equal(st.counters.C.acc, 5);
+  assert.equal(st.counters.C.cd, false);
+  st.bits.IN = 1;
+  scanLadders([ladder], st);
+  assert.equal(st.counters.C.acc, 4, 'the next false-to-true transition decrements once');
+});
+
 test('TON with PRE=0 goes DN immediately when enabled', () => {
   const st = initialState([]);
   st.dt = 1000;
@@ -667,4 +687,9 @@ test('changed Logix entries cite 1756-RM003 and drop the old names', () => {
   assert.match(byMnemonic['in-xic'].gotcha, /p\. 64/);
   assert.match(byMnemonic['in-ote'].function, /postscan/);
   assert.match(byMnemonic['in-ote'].function, /p\. 84/);
+  assert.match(byMnemonic['in-ton'].function, /pp\. 130 and 132/);
+  assert.match(byMnemonic['in-tof'].function, /sets \.ACC equal to \.PRE/);
+  assert.match(byMnemonic['in-ctu'].gotcha, /While the rung stays true/);
+  assert.doesNotMatch(`${byMnemonic['in-ton'].gotcha} ${byMnemonic['in-tof'].gotcha} ${byMnemonic['in-rto'].function} ${byMnemonic['in-rto'].gotcha} ${byMnemonic['in-ctd'].gotcha}`, /this extract|does not remove|does not clear \.PRE/i);
+  assert.doesNotMatch(byMnemonic['in-rto'].function, /power cycle/i);
 });

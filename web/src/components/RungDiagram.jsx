@@ -470,7 +470,7 @@ export function RungSimulator({
           <div className="row" style={{ gap: 14 }}>
             {timers.map(([k, v]) => (
               <span key={k} className="state-line">
-                <b>{k}</b> TON/RTO: acc {Math.round(v.acc)}/{v.pre ? Math.round(v.pre) : '—'} ms{v.pre ? ` (${Math.round(v.acc / v.pre * 100)}%)` : ''} · DN {v.dn ? 'TRUE' : 'false'}
+                <b>{k}</b> {v.instr || 'Timer'}: acc {Math.round(v.acc)}/{v.pre ? Math.round(v.pre) : '—'} ms{v.pre ? ` (${Math.round(v.acc / v.pre * 100)}%)` : ''} · DN {v.dn ? 'TRUE' : 'false'}
               </span>
             ))}
             {counters.map(([k, v]) => (
@@ -506,6 +506,7 @@ export function RungSimulator({
             MOV/CPT/SEL/PID operands resolve when numeric or a named I/O tag.
             LIM tests Low, Test, and High and does not write a clamped value.
             Count Up prescan matches the rung editor: the first scan after a fresh start or Reset sets .CU true, so an input that is already on does not count until it goes false and then true.
+            Count Down prescan sets .CD true on that same first scan. The next false-to-true transition decrements .ACC.
             Output Energize prescan and postscan are not simulated. Real controllers also depend on
             scan overlap, I/O update points, task priority and firmware specifics.
             Shared sandbox values are browser-local teaching state — not live field I/O.

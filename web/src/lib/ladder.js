@@ -34,8 +34,9 @@ export function fitPinText(raw, maxChars = 16) {
 /**
  * Blocks that publish a state bit (.DN / .Q) as their *local* evaluation result for drawing,
  * but must NOT redefine Logix rung-condition-out. Logix TON/TOF/RTO/CTU/CTD set
- * rung-condition-out = rung-condition-in (Studio 5000 Logix Designer instruction help;
- * also summarized in publication 1756-RM003). Only non-Logix / IEC-style blocks (TP, CTUD)
+ * rung-condition-out = rung-condition-in (1756-RM003T-EN-P, November 2018:
+ * TON p. 132, TOF p. 122, RTO p. 112, CTU p. 100, CTD p. 94).
+ * Only non-Logix / IEC-style blocks (TP, CTUD)
  * and custom helpers keep "state bit as conduction" semantics here.
  */
 const STATE_BLOCKS = new Set(['TP', 'CTUD', 'HPA', 'LINT']);
@@ -206,10 +207,11 @@ function evalBlock(node, ctx, live) {
   if (['TON', 'TOF', 'RTO'].includes(k)) {
     const key = node.a || node.l;
     const t = (st.timers[key] ??= { acc: 0, dn: false, running: false, en: false, prevEn: false });
+    t.instr = k;
     const preMs = presetMs(node, st.values);
     t.pre = preMs;
     if (live) {
-      // TOF Logix prescan (Studio 5000 TOF help): ACC=PRE, DN=0, TT=0, EN=0 — once, before first scan work.
+      // TOF prescan (1756-RM003 p. 122): ACC=PRE, DN=0, TT=0, EN=0 — once, before first scan work.
       if (k === 'TOF' && !t._tofPrescanDone) {
         t.acc = preMs;
         t.dn = false;
@@ -252,10 +254,12 @@ function evalBlock(node, ctx, live) {
     const pre = num(operandValue(param(node, 'Target') ?? param(node, 'PRE'), st));
     c.pre = pre;
     if (live) {
-      // Edge against the prior enable bit (.CU / .CD). Count Up (CTU): when rung-condition-in
-      // is true and .CU is false, ACC increments by one; when rung-condition-in is false, .CU clears.
-      // Count Up prescan (.CU true before the first program scan) is applyCtuPrescan, used by
-      // the lab and the editor on a fresh or Reset image. It is not inside this call.
+      // Edge against the prior enable bit (.CU / .CD). Count Up (CTU), p. 99: when
+      // rung-condition-in is true and .CU is false, ACC increments by one; when
+      // rung-condition-in is false, .CU clears. Count Down (CTD), p. 93: the same
+      // edge decrements .ACC, and a false rung clears .CD.
+      // Prescan is applyCtuPrescan (.CU true, p. 100; .CD true, p. 94), used by the
+      // lab and the editor on a fresh or Reset image. It is not inside this call.
       if (k === 'CTU') {
         if (enabled && !c.cu) c.acc += 1;
         c.cu = !!enabled;
@@ -265,8 +269,12 @@ function evalBlock(node, ctx, live) {
         c.cd = !!enabled;
         c.prevIn = !!enabled;
       }
-      // Logix: .DN is true when ACC >= PRE for BOTH CTU and CTD (same COUNTER member).
-      // IEC CTD Q is CV <= 0 — different rule; this engine follows Logix.
+      // .DN stays set once .ACC has reached .PRE and the count keeps moving.
+      // CTU example, p. 101: after the preset count, .DN is set and remains set
+      // while the counter keeps incrementing. The shared buffer example, p. 97,
+      // calls counter.DN true at the preset. The CTD structure line in this extract
+      // says "when clear"; that disagrees with the example, so this engine follows
+      // the example and the CTU wording ("when set"). IEC CTD Q at CV <= 0 is different.
       c.dn = c.acc >= pre;
     }
     node._state = c;
@@ -648,39 +656,55 @@ export function fitRung(svgWidth, canvasWidth) {
 
 /* ------------------------------------------------------------------ state helpers */
 /**
- * 1756-RM003 CTU execution table (the prescan row is on p. 100): .CU is set true
- * before the first program scan so an input that is already true does not count.
- * Call once per fresh image. A later call does nothing. Reset starts a new image.
+ * 1756-RM003 counter prescan, once per fresh image. A later call does nothing.
+ * Reset starts a new image. CTU (p. 100): .CU is set true so an input that is
+ * already true does not increment. CTD (p. 94): .CD is set true so an input that
+ * is already true does not decrement. Pass CTD tags as the third argument.
  */
-export function applyCtuPrescan(state, tags) {
+export function applyCtuPrescan(state, tags, ctdTags = []) {
   if (!state || state._ctuPrescan) return state;
+  const blank = () => ({ acc: 0, dn: false, cu: false, cd: false, prevIn: false });
   for (const tag of tags || []) {
     if (!tag) continue;
-    const counter = (state.counters[tag] ??= { acc: 0, dn: false, cu: false, cd: false, prevIn: false });
+    const counter = (state.counters[tag] ??= blank());
     counter.cu = true;
+  }
+  for (const tag of ctdTags || []) {
+    if (!tag) continue;
+    const counter = (state.counters[tag] ??= blank());
+    counter.cd = true;
   }
   state._ctuPrescan = true;
   return state;
 }
 
-export function ctuTagsInLadder(ladder) {
+function counterTagsInLadder(ladder, kind) {
   const tags = [];
   const walk = (node) => {
     if (!node) return;
     if (node.t === 'and' || node.t === 'or') (node.c || []).forEach(walk);
-    else if (node.t === 'blk' && String(node.k || '').toUpperCase() === 'CTU' && node.a) tags.push(String(node.a));
+    else if (node.t === 'blk' && String(node.k || '').toUpperCase() === kind && node.a) tags.push(String(node.a));
   };
   walk(ladder);
   return tags;
 }
 
+export function ctuTagsInLadder(ladder) {
+  return counterTagsInLadder(ladder, 'CTU');
+}
+
+export function ctdTagsInLadder(ladder) {
+  return counterTagsInLadder(ladder, 'CTD');
+}
+
 /** Lab default. Kept at 1 s so a 120 s lockout and the other long lab timers still finish under Auto-scan. The editor uses 100 ms. */
 export const LAB_DEFAULT_SCAN_MS = 1000;
 
-/** One live pass over lab rungs. The first pass on a fresh or Reset image applies CTU prescan. */
+/** One live pass over lab rungs. The first pass on a fresh or Reset image applies CTU and CTD prescan. */
 export function scanLadders(ladders, state) {
-  applyCtuPrescan(state, (ladders || []).flatMap(ctuTagsInLadder));
-  return (ladders || []).map((ladder) => analyze(ladder, state, { live: true }));
+  const rungs = ladders || [];
+  applyCtuPrescan(state, rungs.flatMap(ctuTagsInLadder), rungs.flatMap(ctdTagsInLadder));
+  return rungs.map((ladder) => analyze(ladder, state, { live: true }));
 }
 
 export function initialState(io = []) {
@@ -690,9 +714,12 @@ export function initialState(io = []) {
     const init = p.initial ?? 0;
     if (['DI', 'DO', 'BIT'].includes(p.type)) bits[p.tag] = init ? 1 : 0;
     else if (p.type === 'TIMER') {
-      // TON/RTO power-up: ACC=0, DN=0, TT=0, EN=0. TOF Logix prescan sets ACC=PRE (applied on
-      // first live TOF evaluation once PRE is known from the instruction). Optional
-      // instruction:'TOF' + preMs on the I/O row can pre-load ACC=PRE for tests.
+      // A new teaching image starts timers at ACC=0. Logix TON prescan also clears
+      // ACC (p. 132). Logix RTO prescan clears .EN and .TT and does not list .ACC
+      // (p. 112); this image still starts at 0 because it is a new program, not a
+      // retained RTO. TOF prescan sets ACC=PRE (p. 122), applied on the first live
+      // TOF evaluation once PRE is known. Optional instruction:'TOF' + preMs on the
+      // I/O row can pre-load ACC=PRE for tests.
       const instr = String(p.instruction || p.kind || '').toUpperCase();
       const preMs = Number(p.preMs ?? p.pre ?? 0) || 0;
       const isTof = instr === 'TOF';

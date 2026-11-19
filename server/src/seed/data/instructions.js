@@ -159,32 +159,35 @@ export const INSTRUCTIONS = [
     id: 'in-ton', mnemonic: 'TON', name: 'Timer On-Delay', category: 'Timer',
     symbol: '-[TON]-', ascii: '-[TON .PRE .ACC .DN EN TT]-',
     iec: 'TON (IN, PT, Q, ET)', siemens: 'TON / TP family (IEC timers)',
-    function: 'Accumulates time while the rung is true. .DN (Q) goes true when .ACC (ET) reaches .PRE (PT). .ACC resets to zero when the rung goes false (non-retentive).',
+    function: '1756-RM003 pp. 130 and 132: a non-retentive timer that accumulates time while rung-condition-in is true. .EN contains that rung from the last execution. .TT is set while timing is in process. .DN is set when timing is complete, which is when .ACC reaches .PRE. When the rung is false, .EN, .TT, and .DN clear and .ACC clears to 0. Rung-condition-out follows rung-condition-in. .PRE and .ACC are DINT values in milliseconds.',
     members: [
-      { name: '.PRE / PT', desc: 'preset duration (Logix timers: milliseconds in .PRE, or T# literals)' },
-      { name: '.ACC / ET', desc: 'accumulated elapsed time' },
-      { name: '.EN / .TT / .DN', desc: 'enable / timer-timing / done. IEC exposes IN, Q, ET.' }
+      { name: '.PRE', desc: 'DINT preset in milliseconds. A 2 second timer uses 2000 (p. 91 and p. 130).' },
+      { name: '.ACC', desc: 'DINT milliseconds elapsed since the TON was enabled (p. 130).' },
+      { name: '.EN / .TT / .DN', desc: '.EN contains rung-condition-in from the last execution. .TT is set while timing is in process. .DN is set when timing is complete (p. 130).' }
     ],
     usage: 'Restart lockout after trip (a real compressor requirement), delayed auto-initiate after a permissive clears, proven-open delay before you declare a valve failed, run-up delay before loading a machine, pump-off delay on low level to ride through a dip.',
-    gotcha: 'Confirm the time base of the preset. "5" in a Logix .PRE is 5 ms. And a TON used as an "off delay" will silently reset its accumulator the moment the rung drops - that is what TOF is for.',
+    gotcha: 'A 5 in .PRE is 5 ms (p. 91). A 2 second timer uses 2000 in .PRE (p. 130). When the rung is false, .ACC clears to 0 (p. 132).',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Timer On Delay (TON), pp. 129-133, and the timer time base on p. 91' }],
     status: 'standard'
   },
   {
     id: 'in-tof', mnemonic: 'TOF', name: 'Timer Off-Delay', category: 'Timer',
     symbol: '-[TOF]-', ascii: '-[TOF]-',
     iec: 'TOF', siemens: 'TOF',
-    function: 'Output (done) is true while the rung is true, and stays true for the preset after the rung goes false, timing out and then dropping.',
+    function: '1756-RM003 pp. 119-122: a non-retentive timer that accumulates time while rung-condition-in is false. While the rung is true, .EN and .DN are set, .TT is cleared, and .ACC is 0. After the rung goes false, .ACC accumulates and .DN stays set until .ACC reaches .PRE, when .DN clears. Prescan clears .EN, .TT, and .DN and sets .ACC equal to .PRE. Rung-condition-out follows rung-condition-in.',
     usage: 'Cool-down fan run-on after a heater stops, purge blower after flame loss, keeping a lube pump running after machine stop, alarm hold-off so a transient does not clear an annunciation instantly.',
-    gotcha: 'Some legacy platforms warn against resetting a TOF with RES because the semantics are confusing. Read done as "output still commanded", not "time elapsed".',
+    gotcha: 'RES clears a TIMER .ACC to 0 and the control status bits to false (p. 108). TOF prescan sets .ACC equal to .PRE and clears .EN, .TT, and .DN (p. 122). When TOFR Reset is set, the instruction clears EN, TT, and DN and sets ACC equal to PRE (p. 125). .DN is set while the rung is true, and .DN clears when .ACC reaches .PRE (p. 121).',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Timer Off Delay (TOF), pp. 119-123; Reset (RES) clear table, pp. 107-108; TOFR Reset note, p. 125' }],
     status: 'standard'
   },
   {
     id: 'in-rto', mnemonic: 'RTO', name: 'Retentive Timer On', category: 'Timer',
     symbol: '-[RTO]-', ascii: '-[RTO]-',
     iec: 'TONR', siemens: 'TONR',
-    function: 'Accumulates while the rung is true and HOLDS .ACC when it goes false. Resumes on the next true. Only an explicit reset (RES) clears it, and the accumulated value typically survives a power cycle.',
+    function: '1756-RM003 pp. 111-112: a retentive timer that accumulates time while enabled, until the timer is disabled or the timer completes. .EN contains rung-condition-in from the last execution. .TT is set while timing is in process. .DN is set when timing is complete. When the rung is false, .EN and .TT clear, and .ACC holds the milliseconds already accumulated. Prescan clears .EN and .TT (p. 112). RES clears .ACC to 0 and the control status bits to false (p. 108). .PRE and .ACC are DINT milliseconds.',
     usage: 'Run-hours for maintenance scheduling, accumulated "flowed-through" time, freeze-protection duration, heat-tracing runtime.',
-    gotcha: 'Forget the RES and it counts forever - which is exactly what you want for run-hours and exactly what you do not want for a delay. Every RTO needs a documented reset condition.',
+    gotcha: '.ACC holds the time already accumulated while the rung is false (p. 112). RES clears .ACC to 0 and the status bits (p. 108, example p. 113).',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Retentive Timer On (RTO), pp. 110-113; Reset (RES), pp. 107-108' }],
     status: 'standard'
   },
   {
@@ -200,9 +203,10 @@ export const INSTRUCTIONS = [
     id: 'in-res', mnemonic: 'RES', name: 'Reset', category: 'Timer / Counter',
     symbol: '-[RES]-', ascii: '-[RES]-',
     iec: 'R input on the timer/counter', siemens: 'reset input',
-    function: 'Clears a timer or counter: .ACC to 0 and status bits cleared.',
+    function: '1756-RM003 pp. 107-108: when its rung is true, clears a TIMER or COUNTER .ACC to 0 and the control status bits to false. .PRE keeps its value. Rung-condition-out follows rung-condition-in. When the rung is false, .ACC and the status bits keep their values.',
     usage: 'End of batch, shift change, after an acknowledged trip, at the start of a new initiate sequence.',
-    gotcha: 'Order matters: a RES executed after the timer or counter in the same scan (or in a later file) resets the accumulation you just made. Put resets before the timed or counted element, or in a clearly-later rung, and label why. On a CTU, RES clears that COUNTER .ACC and status bits (.CU, .DN, .OV) — it does not rewrite .PRE (Studio 5000 Logix Designer RES and CTU instruction help). If the CTU rung is still true after RES, the next scan counts 1, because RES cleared .CU and the instruction sees a fresh rising edge.',
+    gotcha: 'RES clears .CU with the other control status bits (p. 108). CTU adds one when its rung is true and .CU is false (p. 99). With that CTU rung still true, the add happens on the CTU execution after the RES: the same scan when RES is earlier, the next scan when RES is later.',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Reset (RES), pp. 107-108; Count Up (CTU), pp. 98-101' }],
     status: 'standard'
   },
 
@@ -211,30 +215,33 @@ export const INSTRUCTIONS = [
     id: 'in-ctu', mnemonic: 'CTU', name: 'Count Up', category: 'Counter',
     symbol: '-[CTU]-', ascii: '-[CTU .CU .ACC .PRE .DN .OV]',
     iec: 'CTU (CU, R, PV, Q, CV)', siemens: 'CTU',
-    function: 'Increments .ACC on each false-to-true transition of its rung; .DN true when .ACC >= .PRE.',
+    function: '1756-RM003 pp. 98-101: counts upward each time rung-condition-in goes from false to true. When the rung is true and .CU is false, .ACC increments by one. When the rung is false, .CU clears and .ACC keeps its value. .DN is set when .ACC reaches .PRE and remains set as the count continues. .PRE and .ACC are DINT. Prescan sets .CU true (p. 100). Rung-condition-out follows rung-condition-in.',
     members: [
-      { name: '.ACC / CV', desc: 'accumulated count (retentive on many platforms)' },
-      { name: '.PRE / PV', desc: 'preset' },
-      { name: '.DN / Q', desc: 'done' },
-      { name: '.CU / .CD / .OV / .UN', desc: 'count-up / count-down / overflow / underflow status bits (Logix and legacy)' }
+      { name: '.ACC', desc: 'DINT count of false-to-true transitions. RES clears it to 0 (pp. 101 and 108).' },
+      { name: '.PRE', desc: 'DINT value .ACC reaches before .DN is set (p. 99).' },
+      { name: '.DN', desc: 'Set when the count has reached .PRE. Remains set as the count continues (p. 101).' },
+      { name: '.CU', desc: 'Count-up enable. Contains rung-condition-in from the last execution (p. 99).' },
+      { name: '.OV / .UN', desc: '.OV is set when the count increments past 2,147,483,647. .UN is set when the count decrements past -2,147,483,648 (p. 99).' }
     ],
     usage: 'Chemical injection pump strokes vs. target, filter-backwash cycle count, starts-per-day on a reciprocator, batch stages, cycles-for-maintenance.',
-    gotcha: 'The count happens on the EDGE, so a bouncing contact double-counts: put an ONS in front of it. And a counter whose reset never fires just saturates and stops being a process variable. Clear the count with RES on that COUNTER tag (Studio 5000 CTU / RES help) — usually on a separate, labeled reset rung. If the CTU rung is still true after RES, the next scan counts 1, because RES cleared .CU and the instruction sees a fresh rising edge.',
+    gotcha: 'Each false-to-true transition adds one to .ACC (p. 98). While the rung stays true, .CU stays true and .ACC holds (p. 99). After RES clears .CU, a CTU rung that is still true adds one on the next execution of that CTU.',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Up (CTU), pp. 98-101' }],
     status: 'standard'
   },
   {
     id: 'in-ctd', mnemonic: 'CTD / CTUD', name: 'Count Down / Up-Down', category: 'Counter',
     symbol: '-[CTD]-', ascii: '-[CTD .CD .ACC .DN]',
     iec: 'CTD (CD, LD, PV, Q, CV) / CTUD', siemens: 'CTD / CTUD',
-    function: 'Logix CTD decrements .ACC on each false-to-true transition. .DN is true when .ACC >= .PRE — the same rule as CTU (Studio 5000 CTD help; 1756-RM003). Pair CTU+CTD on one COUNTER so .ACC is live inventory and .DN means "at or above preset". IEC 61131-3 CTD is different: Q is true when CV <= 0. CTUD is one block with separate up and down inputs into a single accumulator.',
+    function: '1756-RM003 pp. 92-94: counts downward each time rung-condition-in goes from false to true. When the rung is true and .CD is false, .ACC decrements by one. When the rung is false, .CD clears. Prescan sets .CD true (p. 94). In the buffer example, .DN is true when the count is at the preset (p. 97). .PRE and .ACC are DINT. Rung-condition-out follows rung-condition-in. IEC 61131-3 CTD sets Q when CV is at or below 0.',
     members: [
-      { name: '.ACC / CV', desc: 'accumulated count (shared with a paired CTU on Logix)' },
-      { name: '.PRE / PV', desc: 'preset used for the .DN comparison' },
-      { name: '.DN', desc: 'Logix: ACC >= PRE (not "reached zero")' },
-      { name: '.CD', desc: 'count-down enable — holds rung-condition-in from the last scan' }
+      { name: '.ACC', desc: 'DINT count. A CTU and a CTD on the same COUNTER share it (p. 93).' },
+      { name: '.PRE', desc: 'DINT value the accumulated count reaches before the instruction is done (p. 93).' },
+      { name: '.DN', desc: 'True when the count is at the preset in the p. 97 buffer example.' },
+      { name: '.CD', desc: 'Countdown enable. Contains rung-condition-in from the last execution (p. 93).' }
     ],
     usage: 'Buffer zone in/out on one accumulator (CTU on entry, CTD on exit), remaining-strokes patterns that compare ACC explicitly, inventory tracking.',
-    gotcha: 'Do not wait on CTD.DN to mean empty — in Logix that bit is ACC >= PRE. To detect empty, compare .ACC to 0 with LEQ/EQU. Sharing one COUNTER between CTU and CTD is the intended Logix idiom (and what .DN is built for); label both rungs clearly. IEC CTD Q-at-zero is a different rule on a different platform.',
+    gotcha: 'In the buffer example, .DN is true when the count is at the preset of 100 (p. 97). .ACC holds the current count (p. 93).',
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Down (CTD), pp. 92-97' }],
     status: 'standard'
   },
 

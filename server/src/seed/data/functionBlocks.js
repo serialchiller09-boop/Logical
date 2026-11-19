@@ -8,7 +8,7 @@ export const FUNCTION_BLOCKS = [
     pins: [{ p: 'IN', d: 'enable / rung power' }, { p: 'PT', d: 'preset duration' }, { p: 'Q', d: 'done' }, { p: 'ET', d: 'elapsed' }],
     behaviour: 'Accumulates while IN is TRUE; Q when ET >= PT; ET resets on IN falling (non-retentive).',
     gasPlant: 'Restart lockout, valve-stroke supervision, purge dwell, delayed auto-initiate after a permissive returns.',
-    gotcha: 'PT units. On Logix a TON preset is milliseconds unless you use a T# literal.',
+    gotcha: 'On a Logix TON, .PRE is a DINT in milliseconds. A 2 second preset is 2000 (1756-RM003 p. 91 and p. 130).',
     status: 'standard'
   },
   {
@@ -16,7 +16,7 @@ export const FUNCTION_BLOCKS = [
     pins: [{ p: 'IN', d: 'enable' }, { p: 'PT', d: 'off-delay' }, { p: 'Q', d: 'output, stays true after IN falls' }, { p: 'ET', d: 'elapsed during the delay' }],
     behaviour: 'Q is TRUE while IN is TRUE and for PT after IN goes FALSE.',
     gasPlant: 'Cooling-water and lube run-on, fan run-on after burner shutdown, keeping an alarm displayed after the cause clears.',
-    gotcha: 'A TOF restarts its delay on the next rising edge - so a rapidly cycling input holds Q true forever, which looks like a stuck output.',
+    gotcha: '1756-RM003 p. 122: a true rung sets .EN and .DN, clears .TT, and sets .ACC to 0. While the rung is false, .ACC accumulates. .DN clears when .ACC reaches .PRE (p. 121).',
     status: 'standard'
   },
   {
@@ -31,7 +31,7 @@ export const FUNCTION_BLOCKS = [
     pins: [{ p: 'IN', d: 'enable' }, { p: 'PT', d: 'preset' }, { p: 'Q', d: 'done' }, { p: 'ET', d: 'accumulated (retained)' }, { p: 'R', d: 'reset' }],
     behaviour: 'Accumulates across interruptions; only reset clears ET.',
     gasPlant: 'Run-hours, maintenance intervals, cumulative dry-run exposure, freeze-window duration.',
-    gotcha: 'Retentivity across a power cycle is a separate configuration (Logix: retentive vs non-retentive on the instruction/data). Do not assume.',
+    gotcha: '1756-RM003 p. 112: RTO prescan clears .EN and .TT. When the rung is false, .ACC keeps the time already accumulated. RES clears .ACC to 0 and the status bits (p. 108).',
     status: 'standard'
   },
   {
@@ -42,7 +42,7 @@ export const FUNCTION_BLOCKS = [
     status: 'standard'
   },
   {
-    id: 'fb-ctud', block: 'CTUD', family: 'Counter', logix: 'CTU + CTD pair on one address',
+    id: 'fb-ctud', block: 'CTUD', family: 'Counter', logix: 'Function block CTUD (1756-RM003 p. 102). Ladder uses a CTU and a CTD on one COUNTER (p. 93).',
     pins: [{ p: 'CU / CD', d: 'count up / down' }, { p: 'R', d: 'reset to 0' }, { p: 'LD', d: 'load PV into CV' }, { p: 'PV', d: 'preset' }, { p: 'QU / QD', d: 'upper / lower limit reached' }, { p: 'CV', d: 'current value' }],
     behaviour: 'Bidirectional counter with both limit outputs.',
     gasPlant: 'Inventory in/out on one accumulator, drum count tracking, tank fill cycles.',
