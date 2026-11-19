@@ -113,7 +113,7 @@ export const EXERCISES = [
       'Hold Start, and Motor stays off for 2 seconds, then turns on. Release Start, and Motor turns off.'
     ],
     hint: 'Use a timer on delay (TON). Each step on this page is 100 ms, so a 2 second preset is 2000.',
-    reference: '1756-RM003T-EN-P, November 2018, Timer On Delay (TON), pp. 130 and 132, and the timer chapter p. 91: the time base is 1 millisecond, so a 2 second preset is 2000. .DN is set when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. This page adds 100 ms of elapsed time on every step, in place of the manual’s (current time minus last time scanned) on p. 131. That 100 ms step is not a Logix task period.',
+    reference: '1756-RM003T-EN-P, November 2018, Timer On Delay (TON), pp. 130 and 132, and p. 91: the time base is 1 millisecond, so a 2 second preset is 2000. .DN is set when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. This page adds 100 ms of elapsed time on every step. The manual adds (current time minus last time scanned) (p. 131).',
     steps: [
       {
         bits: { Start: 1 },

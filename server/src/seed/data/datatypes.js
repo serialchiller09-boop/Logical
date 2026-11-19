@@ -89,7 +89,7 @@ export const DATA_TYPES = [
   },
   {
     id: 'dt-time', name: 'TIME', group: 'Time', bits: 32, range: '-24d 20h 31m 23.648s to +24d 20h 31m 23.647s', default: 'T#0s',
-    logix: 'Logix timers use .PRE and .ACC as DINT values in milliseconds (1756-RM003 p. 91 and p. 111). That timer chapter does not show a T# literal or a standalone TIME tag.',
+    logix: 'Logix timers use .PRE and .ACC as DINT values in milliseconds (1756-RM003 p. 91 and p. 111).',
     siemens: 'TIME (T#5s)',
     use: 'Timer presets and durations; literals like T#2s, T#500ms.',
     gotcha: 'The units are the #1 source of wrong delays: is .PRE in ms (Logix) or s (an IEC timer instance)? A "5" typed into a ms preset is 5 ms, not 5 s. Read the manual for the instruction in front of you, not the last controller you worked on.',

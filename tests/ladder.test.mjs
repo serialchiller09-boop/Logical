@@ -689,6 +689,7 @@ test('changed Logix entries cite 1756-RM003 and drop the old names', () => {
   assert.match(byMnemonic['in-ote'].function, /p\. 84/);
   assert.match(byMnemonic['in-ton'].function, /pp\. 130 and 132/);
   assert.match(byMnemonic['in-tof'].function, /sets \.ACC equal to \.PRE/);
-  assert.match(byMnemonic['in-ctu'].gotcha, /does not remove bounce/);
+  assert.match(byMnemonic['in-ctu'].gotcha, /While the rung stays true/);
+  assert.doesNotMatch(`${byMnemonic['in-ton'].gotcha} ${byMnemonic['in-tof'].gotcha} ${byMnemonic['in-rto'].function} ${byMnemonic['in-rto'].gotcha} ${byMnemonic['in-ctd'].gotcha}`, /this extract|does not remove|does not clear \.PRE/i);
   assert.doesNotMatch(byMnemonic['in-rto'].function, /power cycle/i);
 });
