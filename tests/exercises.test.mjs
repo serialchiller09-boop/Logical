@@ -248,7 +248,7 @@ test('motor delay: either rung order passes; a latch, an immediate coil, and a 1
   assert.equal(held.actual.Motor, 1);
 
   const immediate = fail('motor-delay', xicOte('Start', 'Motor'));
-  assert.match(immediate.message, /1\.9 seconds/);
+  assert.match(immediate.message, /19 steps/);
   assert.equal(immediate.expected.Motor, 0);
   assert.equal(immediate.actual.Motor, 1);
 
@@ -262,7 +262,7 @@ test('motor delay: either rung order passes; a latch, an immediate coil, and a 1
     { kind: 'OTE', tag: 'Motor' }
   ]);
   const tooSoon = fail('motor-delay', early);
-  assert.match(tooSoon.message, /1\.9 seconds/);
+  assert.match(tooSoon.message, /19 steps/);
   assert.equal(tooSoon.actual.Motor, 1);
 });
 
@@ -300,14 +300,14 @@ test('the exercise page names Check and the list', () => {
   assert.match(tasks, /Stop is TRUE when the button is not pressed/);
   for (const exercise of EXERCISES) {
     assert.ok(exercise.hint && !/rung-condition-in|BOOL/.test(exercise.hint), exercise.id);
-    assert.match(exercise.reference, /1756-RM003/);
+    assert.match(exercise.reference, exercise.id === 'motor-delay' ? /1756-RM018A/ : /1756-RM003/);
     for (const paragraph of exercise.task) {
       assert.doesNotMatch(paragraph, /rung-condition-in|BOOL/);
     }
   }
   assert.deepEqual(byId['start-stop'].steps.map((step) => step.expect.Motor), [1, 1, 0, 0, 0]);
   assert.deepEqual(byId['start-stop'].steps[2].bits, { Start: 1, Stop: 0 });
-  assert.equal(byId['motor-delay'].steps[1].repeat, 2);
+  assert.equal(byId['motor-delay'].steps[1].repeat, 3);
   assert.equal(byId['motor-delay'].steps[2].expect.Motor, 0);
 });
 

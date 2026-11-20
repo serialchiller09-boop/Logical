@@ -34,8 +34,8 @@ export function fitPinText(raw, maxChars = 16) {
 /**
  * Blocks that publish a state bit (.DN / .Q) as their *local* evaluation result for drawing,
  * but must NOT redefine Logix rung-condition-out. Logix TON/TOF/RTO/CTU/CTD set
- * rung-condition-out = rung-condition-in (1756-RM003T-EN-P, November 2018:
- * TON p. 132, TOF p. 122, RTO p. 112, CTU p. 100, CTD p. 94).
+ * rung-condition-out = rung-condition-in (1756-RM018A-EN-P, September 2025,
+ * execution tables for TON, TOF, RTO, CTU, and CTD).
  * Only non-Logix / IEC-style blocks (TP, CTUD)
  * and custom helpers keep "state bit as conduction" semantics here.
  */
@@ -184,6 +184,59 @@ function bitOf(st, addr) {
   return 0;
 }
 
+const DINT_MAX = 2147483647;
+
+/**
+ * 1756-RM018A-EN-P, September 2025.
+ * TON Flow Chart (True) p. 135 and RTO Flow Chart (True) p. 114:
+ * once .DN is set, later scans add no time. The first scan .EN is false records
+ * the time and adds none. Later scans add the whole delta. At .ACC >= .PRE, .TT
+ * clears and .DN sets. Nothing writes .ACC back down to .PRE.
+ * TOF Flow Chart (False) p. 125 is that shape with the rung false: no time once
+ * .DN is clear; the scan .EN is still true records the time; at .ACC >= .PRE,
+ * .TT and .DN clear. The chart ends by clearing .EN.
+ */
+function applyTimerChart(t, k, enabled, dt, preMs) {
+  const timing = k === 'TOF' ? !enabled : !!enabled;
+  if (!timing) {
+    if (k === 'TON') {
+      t.acc = 0;
+      t.dn = false;
+      t.en = false;
+      t.running = false;
+    } else if (k === 'TOF') {
+      t.acc = 0;
+      t.dn = true;
+      t.en = true;
+      t.running = false;
+    } else {
+      t.en = false;
+      t.running = false;
+    }
+    return;
+  }
+  t.running = true;
+  const finished = k === 'TOF' ? !t.dn : !!t.dn;
+  const opening = k === 'TOF' ? !!t.en : !t.en;
+  if (finished) {
+    t.running = false;
+  } else if (!opening) {
+    const sum = t.acc + dt;
+    if (sum > DINT_MAX) {
+      t.acc = DINT_MAX;
+      t.running = false;
+      t.dn = k !== 'TOF';
+    } else {
+      t.acc = sum;
+      if (t.acc >= preMs) {
+        t.running = false;
+        t.dn = k !== 'TOF';
+      }
+    }
+  }
+  t.en = k !== 'TOF';
+}
+
 function evalBlock(node, ctx, live) {
   const st = ctx.state;
   const k = node.k;
@@ -211,7 +264,8 @@ function evalBlock(node, ctx, live) {
     const preMs = presetMs(node, st.values);
     t.pre = preMs;
     if (live) {
-      // TOF prescan (1756-RM003 p. 122): ACC=PRE, DN=0, TT=0, EN=0 — once, before first scan work.
+      // TOF prescan, 1756-RM018A Timer Off Delay (TOF): ACC=PRE, DN=0, TT=0, EN=0 once,
+      // before the first scan. The prescan row's page is not in the contents list we have.
       if (k === 'TOF' && !t._tofPrescanDone) {
         t.acc = preMs;
         t.dn = false;
@@ -219,22 +273,8 @@ function evalBlock(node, ctx, live) {
         t.en = false;
         t._tofPrescanDone = true;
       }
-      if (k === 'TON') {
-        // PRE=0 → ACC stays 0 and DN is true as soon as enabled (ACC >= PRE).
-        t.acc = enabled ? Math.min(preMs, t.acc + st.dt) : 0;
-      } else if (k === 'TOF') {
-        if (enabled) t.acc = 0;
-        else t.acc = Math.min(preMs, t.acc + st.dt);
-      } else if (enabled) {
-        t.acc = Math.min(preMs, t.acc + st.dt);
-      }
-      t.en = !!enabled;
+      applyTimerChart(t, k, enabled, Number(st.dt) || 0, preMs);
     }
-    if (k === 'TON') t.dn = !!enabled && t.acc >= preMs;
-    else if (k === 'TOF') t.dn = !!enabled || t.acc < preMs;
-    else t.dn = t.acc >= preMs;
-    // TON/RTO time while enabled and not yet done; TOF times only while input is FALSE.
-    t.running = (k === 'TOF' ? !enabled : !!enabled) && t.acc < preMs;
     node._state = t;
     // Logix: Set Rung-condition-out to Rung-condition-in (status is .EN/.TT/.DN, not RCO).
     return !!enabled;
@@ -291,9 +331,9 @@ function evalBlock(node, ctx, live) {
   }
 
   if (k === 'LIM') {
-    // 1756-RM003 pp. 314, 318-319, 321: LIM tests Test against Low and High.
-    // It does not write a clamped number. NAN, or an operand this simulator
-    // cannot read as a number, does not pass.
+    // 1756-RM018A Limit (LIM): LIM tests Test against Low and High.
+    // The Test value keeps its number. Not a Number, or an operand this
+    // simulator cannot read as a number, leaves the test false.
     const low = operandValue(param(node, 'LO') ?? param(node, 'LowLimit'), st);
     const testValue = operandValue(param(node, 'IN') ?? param(node, 'Test'), st);
     const high = operandValue(param(node, 'HI') ?? param(node, 'HighLimit'), st);
@@ -656,10 +696,10 @@ export function fitRung(svgWidth, canvasWidth) {
 
 /* ------------------------------------------------------------------ state helpers */
 /**
- * 1756-RM003 counter prescan, once per fresh image. A later call does nothing.
- * Reset starts a new image. CTU (p. 100): .CU is set true so an input that is
- * already true does not increment. CTD (p. 94): .CD is set true so an input that
- * is already true does not decrement. Pass CTD tags as the third argument.
+ * 1756-RM018A counter prescan, once per fresh image. A later call does nothing.
+ * Reset starts a new image. Count Up (CTU), prescan: .CU is set true so an input
+ * that is already true does not increment. Count Down (CTD), prescan: .CD is set
+ * true so an input that is already true does not decrement. Pass CTD tags third.
  */
 export function applyCtuPrescan(state, tags, ctdTags = []) {
   if (!state || state._ctuPrescan) return state;
@@ -715,9 +755,9 @@ export function initialState(io = []) {
     if (['DI', 'DO', 'BIT'].includes(p.type)) bits[p.tag] = init ? 1 : 0;
     else if (p.type === 'TIMER') {
       // A new teaching image starts timers at ACC=0. Logix TON prescan also clears
-      // ACC (p. 132). Logix RTO prescan clears .EN and .TT and does not list .ACC
-      // (p. 112); this image still starts at 0 because it is a new program, not a
-      // retained RTO. TOF prescan sets ACC=PRE (p. 122), applied on the first live
+      // ACC (Timer On Delay (TON), prescan). Logix RTO prescan clears .EN and .TT
+      // (Retentive Timer On (RTO), prescan); this image still starts at 0 because
+      // it is a new program, not a retained RTO. TOF prescan sets ACC=PRE, applied on the first live
       // TOF evaluation once PRE is known. Optional instruction:'TOF' + preMs on the
       // I/O row can pre-load ACC=PRE for tests.
       const instr = String(p.instruction || p.kind || '').toUpperCase();

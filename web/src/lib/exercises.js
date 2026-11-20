@@ -2,7 +2,8 @@
  * Graded rung exercises. A solution passes if its outputs match the checkpoints
  * when scanned with applyEditorScan / analyze. The drawing is not compared.
  *
- * Instruction claims in the task text cite 1756-RM003T-EN-P (November 2018).
+ * Bit-instruction claims in the task text cite 1756-RM003T-EN-P (November 2018).
+ * The motor-delay timer cites 1756-RM018A-EN-P (September 2025).
  * The wiring note for Stop is an exercise assumption, not a manual rule.
  */
 
@@ -113,21 +114,22 @@ export const EXERCISES = [
       'Hold Start, and Motor stays off for 2 seconds, then turns on. Release Start, and Motor turns off.'
     ],
     hint: 'Use a timer on delay (TON). Each step on this page is 100 ms, so a 2 second preset is 2000.',
-    reference: '1756-RM003T-EN-P, November 2018, Timer On Delay (TON), pp. 130 and 132, and p. 91: the time base is 1 millisecond, so a 2 second preset is 2000. .DN is set when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. This page adds 100 ms of elapsed time on every step. The manual adds (current time minus last time scanned) (p. 131).',
+    reference: '1756-RM018A-EN-P, September 2025, Timer On Delay (TON), p. 130, and TON Flow Chart (True), p. 135: the time base is 1 millisecond, so a 2 second preset is 2000. .DN is set when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. The first scan the rung is true records the time. Each later scan on this page adds 100 ms, the whole time since the last scan. On the scan the timer finishes, .ACC can read slightly above .PRE.',
     steps: [
       {
         bits: { Start: 1 },
         repeat: 19,
         expect: { Motor: 0 },
-        situation: 'After Start has been held for 1.9 seconds (19 steps of 100 ms)'
+        situation: 'After Start has been held for 19 steps (1.8 s accumulated, before 2 seconds)'
       },
       {
-        // The motor rung may sit above the TON. That rung reads .DN before this scan's
-        // timer update, so Motor can turn on one scan later. Off at 1.9 s, on by 2.1 s.
+        // The first enabled scan records the time and adds none (TON Flow Chart (True), p. 135).
+        // A motor rung above the TON reads .DN from the previous scan. 19 steps stay off.
+        // 22 steps covers the scan that sets .DN and one more scan for the reversed order.
         bits: { Start: 1 },
-        repeat: 2,
+        repeat: 3,
         expect: { Motor: 1 },
-        situation: 'By the time Start has been held for 2.1 seconds (21 steps of 100 ms)'
+        situation: 'By the time Start has been held for 22 steps of 100 ms'
       },
       {
         // Same one-scan lag on the way down: the motor rung can still see the old .DN

@@ -25,7 +25,7 @@ export const NUMBER_VIEWS = ['decimal', 'hex', 'binary'];
 
 const NUMBER_VIEW_LABELS = { decimal: 'Decimal', hex: 'Hex', binary: 'Binary' };
 
-/** Logix DINT limits. 1756-RM003 COUNTER structure, p. 93: .OV past 2,147,483,647 and .UN past -2,147,483,648. */
+/** Logix DINT limits. 1756-RM018A Count Up (CTU), COUNTER structure: .OV past 2,147,483,647 and .UN past -2,147,483,648. */
 export const DINT_MAX = 2147483647;
 export const DINT_MIN = -2147483648;
 

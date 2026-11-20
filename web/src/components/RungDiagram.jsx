@@ -394,7 +394,7 @@ export function RungSimulator({
       </div>
 
       <p className="tiny" style={{ margin: '8px 12px 0', maxWidth: '70ch' }}>
-        Each step adds {dt >= 1000 ? `${dt / 1000} s` : `${dt} ms`}. The default is 1 s. The rung editor adds 100 ms per step. This is simulated elapsed time, not a Logix task period.
+        Each step adds {dt >= 1000 ? `${dt / 1000} s` : `${dt} ms`} after a timer's opening scan. The default is 1 s. The rung editor adds 100 ms per step. This is simulated elapsed time, not a Logix task period.
       </p>
       <div className="card-bd stack">
         {rungs.map((r, i) => (
@@ -504,7 +504,7 @@ export function RungSimulator({
           <p className="tiny muted" style={{ margin: '6px 0 0' }}>
             Booleans evaluate as drawn; timers and counters advance one scan period per step;
             MOV/CPT/SEL/PID operands resolve when numeric or a named I/O tag.
-            LIM tests Low, Test, and High and does not write a clamped value.
+            LIM tests Low, Test, and High. The Test value keeps its number (1756-RM018A Limit (LIM)).
             Count Up prescan matches the rung editor: the first scan after a fresh start or Reset sets .CU true, so an input that is already on does not count until it goes false and then true.
             Count Down prescan sets .CD true on that same first scan. The next false-to-true transition decrements .ACC.
             Output Energize prescan and postscan are not simulated. Real controllers also depend on
