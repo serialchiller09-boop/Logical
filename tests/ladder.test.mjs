@@ -542,6 +542,62 @@ test('CTD prescan sets .CD so an input that is already true does not decrement',
   assert.equal(st.counters.C.acc, 4, 'the next false-to-true transition decrements once');
 });
 
+test('timers hold .ACC at .PRE after completion; counters keep counting past .PRE', () => {
+  // v37 TON/TOF/RTO text: the timer accumulates until it completes. The flow-chart
+  // images on those pages did not load here, so this pins the trainer: .ACC is held at .PRE.
+  const timer = (kind, enable) => {
+    const st = initialState([]);
+    st.dt = 250;
+    st.bits.IN = enable ? 1 : 0;
+    const rung = series({ t: 'no', a: 'IN' }, { t: 'blk', k: kind, a: 'T', p: [{ k: 'PRE', v: '100' }] });
+    analyze(rung, st, { live: true });
+    analyze(rung, st, { live: true });
+    return st.timers.T;
+  };
+  for (const kind of ['TON', 'RTO']) {
+    const done = timer(kind, true);
+    assert.equal(done.acc, 100, `${kind} .ACC holds at .PRE`);
+    assert.equal(done.dn, true, `${kind} .DN is set at .PRE`);
+  }
+  const tof = timer('TOF', false);
+  assert.equal(tof.acc, 100, 'TOF .ACC holds at .PRE');
+  assert.equal(tof.dn, false, 'TOF .DN clears when .ACC reaches .PRE');
+
+  // v37 CTU example: after the preset count, the counter continues to increment and .DN remains set.
+  const up = initialState([]);
+  up.bits.IN = 0;
+  const ctu = series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTU', a: 'C', p: [{ k: 'PRE', v: '2' }] });
+  const edge = () => {
+    up.bits.IN = 0;
+    analyze(ctu, up, { live: true });
+    up.bits.IN = 1;
+    analyze(ctu, up, { live: true });
+  };
+  edge();
+  edge();
+  assert.equal(up.counters.C.acc, 2);
+  assert.equal(up.counters.C.dn, true);
+  edge();
+  assert.equal(up.counters.C.acc, 3, 'CTU .ACC keeps counting past .PRE');
+  assert.equal(up.counters.C.dn, true, 'CTU .DN stays set');
+
+  // v37 CTD: each true rung with .CD false decrements .ACC by one, with no stop at .PRE.
+  const down = initialState([]);
+  down.counters.C = { acc: 2, dn: true, cu: false, cd: false, prevIn: false };
+  const ctd = series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTD', a: 'C', p: [{ k: 'PRE', v: '2' }] });
+  const fall = () => {
+    down.bits.IN = 0;
+    analyze(ctd, down, { live: true });
+    down.bits.IN = 1;
+    analyze(ctd, down, { live: true });
+  };
+  fall();
+  assert.equal(down.counters.C.acc, 1);
+  assert.equal(down.counters.C.dn, false, 'CTD .DN clears once .ACC is below .PRE');
+  fall();
+  assert.equal(down.counters.C.acc, 0, 'CTD .ACC keeps counting past .PRE');
+});
+
 test('TON with PRE=0 goes DN immediately when enabled', () => {
   const st = initialState([]);
   st.dt = 1000;

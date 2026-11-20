@@ -215,7 +215,7 @@ export const INSTRUCTIONS = [
     id: 'in-ctu', mnemonic: 'CTU', name: 'Count Up', category: 'Counter',
     symbol: '-[CTU]-', ascii: '-[CTU .CU .ACC .PRE .DN .OV]',
     iec: 'CTU (CU, R, PV, Q, CV)', siemens: 'CTU',
-    function: '1756-RM003 pp. 98-101: counts upward each time rung-condition-in goes from false to true. When the rung is true and .CU is false, .ACC increments by one. When the rung is false, .CU clears and .ACC keeps its value. .DN is set when .ACC reaches .PRE and remains set as the count continues. .PRE and .ACC are DINT. Prescan sets .CU true (p. 100). Rung-condition-out follows rung-condition-in.',
+    function: '1756-RM003 pp. 98-101: counts upward each time rung-condition-in goes from false to true. When the rung is true and .CU is false, .ACC increments by one. When the rung is false, .CU clears and .ACC keeps its value. .ACC keeps counting past .PRE, and .DN stays set. .PRE and .ACC are DINT. Prescan sets .CU true (p. 100). Rung-condition-out follows rung-condition-in.',
     members: [
       { name: '.ACC', desc: 'DINT count of false-to-true transitions. RES clears it to 0 (pp. 101 and 108).' },
       { name: '.PRE', desc: 'DINT value .ACC reaches before .DN is set (p. 99).' },
@@ -225,14 +225,14 @@ export const INSTRUCTIONS = [
     ],
     usage: 'Chemical injection pump strokes vs. target, filter-backwash cycle count, starts-per-day on a reciprocator, batch stages, cycles-for-maintenance.',
     gotcha: 'Each false-to-true transition adds one to .ACC (p. 98). While the rung stays true, .CU stays true and .ACC holds (p. 99). After RES clears .CU, a CTU rung that is still true adds one on the next execution of that CTU.',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Up (CTU), pp. 98-101' }],
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Up (CTU), pp. 98-101' }, { label: 'Studio 5000 Logix Designer v37, Count Up (CTU) example: the count continues and .DN remains set', url: 'https://www.rockwellautomation.com/en-se/docs/studio-5000-logix-designer/37-00/contents-ditamap/instruction-set/timer-and-counter-instructions/count-up--ctu-.html' }],
     status: 'standard'
   },
   {
     id: 'in-ctd', mnemonic: 'CTD / CTUD', name: 'Count Down / Up-Down', category: 'Counter',
     symbol: '-[CTD]-', ascii: '-[CTD .CD .ACC .DN]',
     iec: 'CTD (CD, LD, PV, Q, CV) / CTUD', siemens: 'CTD / CTUD',
-    function: '1756-RM003 pp. 92-94: counts downward each time rung-condition-in goes from false to true. When the rung is true and .CD is false, .ACC decrements by one. When the rung is false, .CD clears. Prescan sets .CD true (p. 94). In the buffer example, .DN is true when the count is at the preset (p. 97). .PRE and .ACC are DINT. Rung-condition-out follows rung-condition-in. IEC 61131-3 CTD sets Q when CV is at or below 0.',
+    function: '1756-RM003 pp. 92-94: counts downward each time rung-condition-in goes from false to true. When the rung is true and .CD is false, .ACC decrements by one, including after .ACC has passed .PRE. When the rung is false, .CD clears. Prescan sets .CD true (p. 94). In the buffer example, .DN is true when the count is at the preset (p. 97). .PRE and .ACC are DINT. Rung-condition-out follows rung-condition-in. IEC 61131-3 CTD sets Q when CV is at or below 0.',
     members: [
       { name: '.ACC', desc: 'DINT count. A CTU and a CTD on the same COUNTER share it (p. 93).' },
       { name: '.PRE', desc: 'DINT value the accumulated count reaches before the instruction is done (p. 93).' },
@@ -241,7 +241,7 @@ export const INSTRUCTIONS = [
     ],
     usage: 'Buffer zone in/out on one accumulator (CTU on entry, CTD on exit), remaining-strokes patterns that compare ACC explicitly, inventory tracking.',
     gotcha: 'In the buffer example, .DN is true when the count is at the preset of 100 (p. 97). .ACC holds the current count (p. 93).',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Down (CTD), pp. 92-97' }],
+    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Down (CTD), pp. 92-97' }, { label: 'Studio 5000 Logix Designer v37, Count Down (CTD): .ACC decrements by one when the rung is true and .CD is false', url: 'https://www.rockwellautomation.com/en-se/docs/studio-5000-logix-designer/37-00/contents-ditamap/instruction-set/timer-and-counter-instructions/count-down--ctd-.html' }],
     status: 'standard'
   },
 
