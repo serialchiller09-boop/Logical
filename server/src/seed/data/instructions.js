@@ -159,35 +159,35 @@ export const INSTRUCTIONS = [
     id: 'in-ton', mnemonic: 'TON', name: 'Timer On-Delay', category: 'Timer',
     symbol: '-[TON]-', ascii: '-[TON .PRE .ACC .DN EN TT]-',
     iec: 'TON (IN, PT, Q, ET)', siemens: 'TON / TP family (IEC timers)',
-    function: '1756-RM003 pp. 130 and 132: a non-retentive timer that accumulates time while rung-condition-in is true. .EN contains that rung from the last execution. .TT is set while timing is in process. .DN is set when timing is complete, which is when .ACC reaches .PRE. When the rung is false, .EN, .TT, and .DN clear and .ACC clears to 0. Rung-condition-out follows rung-condition-in. .PRE and .ACC are DINT values in milliseconds.',
+    function: '1756-RM018A-EN-P, September 2025, Timer On Delay (TON), p. 130: a non-retentive timer that accumulates time while rung-condition-in is true. .EN contains that rung from the last execution. .TT is set while timing is in process. .DN is set when timing is complete. When the rung is false, .EN, .TT, and .DN clear and .ACC clears to 0. Rung-condition-out follows rung-condition-in. .PRE and .ACC are DINT values in milliseconds. .ACC stops adding time when the timer is done. On the scan it finishes, .ACC can read slightly above .PRE, because the timer adds the whole time since the last scan (TON Flow Chart (True), p. 135).',
     members: [
-      { name: '.PRE', desc: 'DINT preset in milliseconds. A 2 second timer uses 2000 (p. 91 and p. 130).' },
-      { name: '.ACC', desc: 'DINT milliseconds elapsed since the TON was enabled (p. 130).' },
-      { name: '.EN / .TT / .DN', desc: '.EN contains rung-condition-in from the last execution. .TT is set while timing is in process. .DN is set when timing is complete (p. 130).' }
+      { name: '.PRE', desc: 'DINT preset in milliseconds. A 2 second timer uses 2000 (Timer On Delay (TON)).' },
+      { name: '.ACC', desc: 'DINT milliseconds elapsed since the TON was enabled (Timer On Delay (TON)).' },
+      { name: '.EN / .TT / .DN', desc: '.EN contains rung-condition-in from the last execution. .TT is set while timing is in process. .DN is set when timing is complete (Timer On Delay (TON)).' }
     ],
     usage: 'Restart lockout after trip (a real compressor requirement), delayed auto-initiate after a permissive clears, proven-open delay before you declare a valve failed, run-up delay before loading a machine, pump-off delay on low level to ride through a dip.',
-    gotcha: 'A 5 in .PRE is 5 ms (p. 91). A 2 second timer uses 2000 in .PRE (p. 130). When the rung is false, .ACC clears to 0 (p. 132).',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Timer On Delay (TON), pp. 129-133, and the timer time base on p. 91' }],
+    gotcha: 'A 5 in .PRE is 5 ms. A 2 second timer uses 2000 in .PRE (Timer On Delay (TON)). When the rung is false, .ACC clears to 0 (Timer On Delay (TON), execution table).',
+    sources: [{ label: '1756-RM018A-EN-P, September 2025, Timer On Delay (TON), p. 130, and TON Flow Chart (True), p. 135' }],
     status: 'standard'
   },
   {
     id: 'in-tof', mnemonic: 'TOF', name: 'Timer Off-Delay', category: 'Timer',
     symbol: '-[TOF]-', ascii: '-[TOF]-',
     iec: 'TOF', siemens: 'TOF',
-    function: '1756-RM003 pp. 119-122: a non-retentive timer that accumulates time while rung-condition-in is false. While the rung is true, .EN and .DN are set, .TT is cleared, and .ACC is 0. After the rung goes false, .ACC accumulates and .DN stays set until .ACC reaches .PRE, when .DN clears. Prescan clears .EN, .TT, and .DN and sets .ACC equal to .PRE. Rung-condition-out follows rung-condition-in.',
+    function: '1756-RM018A-EN-P, September 2025, Timer Off Delay (TOF), p. 120: a non-retentive timer that accumulates time while rung-condition-in is false. While the rung is true, .EN and .DN are set, .TT is cleared, and .ACC is 0. After the rung goes false, .ACC accumulates and .DN stays set until .ACC reaches .PRE, when .DN clears. Prescan clears .EN, .TT, and .DN and sets .ACC equal to .PRE (Timer Off Delay (TOF), prescan). Rung-condition-out follows rung-condition-in. .ACC stops adding time when the off-delay is done. On the scan it finishes, .ACC can read slightly above .PRE, because the timer adds the whole time since the last scan (TOF Flow Chart (False), p. 125).',
     usage: 'Cool-down fan run-on after a heater stops, purge blower after flame loss, keeping a lube pump running after machine stop, alarm hold-off so a transient does not clear an annunciation instantly.',
-    gotcha: 'RES clears a TIMER .ACC to 0 and the control status bits to false (p. 108). TOF prescan sets .ACC equal to .PRE and clears .EN, .TT, and .DN (p. 122). When TOFR Reset is set, the instruction clears EN, TT, and DN and sets ACC equal to PRE (p. 125). .DN is set while the rung is true, and .DN clears when .ACC reaches .PRE (p. 121).',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Timer Off Delay (TOF), pp. 119-123; Reset (RES) clear table, pp. 107-108; TOFR Reset note, p. 125' }],
+    gotcha: 'RES clears a TIMER .ACC to 0 and the control status bits to false (Reset (RES), p. 106). TOF prescan sets .ACC equal to .PRE and clears .EN, .TT, and .DN (Timer Off Delay (TOF), prescan). When TOFR Reset is set, the instruction clears EN, TT, and DN and sets ACC equal to PRE (Timer Off Delay with Reset (TOFR), p. 126). .DN is set while the rung is true, and .DN clears when .ACC reaches .PRE (TOF Flow Chart (False), p. 125).',
+    sources: [{ label: '1756-RM018A-EN-P, September 2025, Timer Off Delay (TOF), p. 120, and TOF Flow Chart (False), p. 125' }],
     status: 'standard'
   },
   {
     id: 'in-rto', mnemonic: 'RTO', name: 'Retentive Timer On', category: 'Timer',
     symbol: '-[RTO]-', ascii: '-[RTO]-',
     iec: 'TONR', siemens: 'TONR',
-    function: '1756-RM003 pp. 111-112: a retentive timer that accumulates time while enabled, until the timer is disabled or the timer completes. .EN contains rung-condition-in from the last execution. .TT is set while timing is in process. .DN is set when timing is complete. When the rung is false, .EN and .TT clear, and .ACC holds the milliseconds already accumulated. Prescan clears .EN and .TT (p. 112). RES clears .ACC to 0 and the control status bits to false (p. 108). .PRE and .ACC are DINT milliseconds.',
+    function: '1756-RM018A-EN-P, September 2025, Retentive Timer On (RTO), p. 110: a retentive timer that accumulates time while enabled, until the timer is disabled or the timer completes. .EN contains rung-condition-in from the last execution. .TT is set while timing is in process. .DN is set when timing is complete. When the rung is false, .EN and .TT clear, and .ACC holds the milliseconds already accumulated (Retentive Timer On (RTO), execution table). Prescan clears .EN and .TT (Retentive Timer On (RTO), prescan). RES clears .ACC to 0 and the control status bits to false (Reset (RES), p. 106). .PRE and .ACC are DINT milliseconds. .ACC stops adding time when the timer is done. On the scan it finishes, .ACC can read slightly above .PRE, because the timer adds the whole time since the last scan (RTO Flow Chart (True), p. 114).',
     usage: 'Run-hours for maintenance scheduling, accumulated "flowed-through" time, freeze-protection duration, heat-tracing runtime.',
-    gotcha: '.ACC holds the time already accumulated while the rung is false (p. 112). RES clears .ACC to 0 and the status bits (p. 108, example p. 113).',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Retentive Timer On (RTO), pp. 110-113; Reset (RES), pp. 107-108' }],
+    gotcha: '.ACC holds the time already accumulated while the rung is false (Retentive Timer On (RTO), execution table). RES clears .ACC to 0 and the status bits (Reset (RES), p. 106).',
+    sources: [{ label: '1756-RM018A-EN-P, September 2025, Retentive Timer On (RTO), p. 110, and RTO Flow Chart (True), p. 114' }],
     status: 'standard'
   },
   {
@@ -203,10 +203,10 @@ export const INSTRUCTIONS = [
     id: 'in-res', mnemonic: 'RES', name: 'Reset', category: 'Timer / Counter',
     symbol: '-[RES]-', ascii: '-[RES]-',
     iec: 'R input on the timer/counter', siemens: 'reset input',
-    function: '1756-RM003 pp. 107-108: when its rung is true, clears a TIMER or COUNTER .ACC to 0 and the control status bits to false. .PRE keeps its value. Rung-condition-out follows rung-condition-in. When the rung is false, .ACC and the status bits keep their values.',
+    function: '1756-RM018A-EN-P, September 2025, Reset (RES), p. 106: when its rung is true, clears a TIMER or COUNTER .ACC to 0 and the control status bits to false. .PRE keeps its value. Rung-condition-out follows rung-condition-in. When the rung is false, .ACC and the status bits keep their values.',
     usage: 'End of batch, shift change, after an acknowledged trip, at the start of a new initiate sequence.',
-    gotcha: 'RES clears .CU with the other control status bits (p. 108). CTU adds one when its rung is true and .CU is false (p. 99). With that CTU rung still true, the add happens on the CTU execution after the RES: the same scan when RES is earlier, the next scan when RES is later.',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Reset (RES), pp. 107-108; Count Up (CTU), pp. 98-101' }],
+    gotcha: 'RES clears .CU with the other control status bits (Reset (RES), p. 106). CTU adds one when its rung is true and .CU is false (Count Up (CTU), p. 97). With that CTU rung still true, the add happens on the CTU execution after the RES: the same scan when RES is earlier, the next scan when RES is later.',
+    sources: [{ label: '1756-RM018A-EN-P, September 2025, Reset (RES), p. 106, and Count Up (CTU), p. 97' }],
     status: 'standard'
   },
 
@@ -215,33 +215,33 @@ export const INSTRUCTIONS = [
     id: 'in-ctu', mnemonic: 'CTU', name: 'Count Up', category: 'Counter',
     symbol: '-[CTU]-', ascii: '-[CTU .CU .ACC .PRE .DN .OV]',
     iec: 'CTU (CU, R, PV, Q, CV)', siemens: 'CTU',
-    function: '1756-RM003 pp. 98-101: counts upward each time rung-condition-in goes from false to true. When the rung is true and .CU is false, .ACC increments by one. When the rung is false, .CU clears and .ACC keeps its value. .DN is set when .ACC reaches .PRE and remains set as the count continues. .PRE and .ACC are DINT. Prescan sets .CU true (p. 100). Rung-condition-out follows rung-condition-in.',
+    function: '1756-RM018A-EN-P, September 2025, Count Up (CTU), p. 97: counts upward each time rung-condition-in goes from false to true. When the rung is true and .CU is false, .ACC increments by one (CTU Flow Chart (True), p. 101). When the rung is false, .CU clears and .ACC keeps its value. .ACC keeps counting past .PRE, and .DN stays set (CTU Flow Chart (True), p. 101). .PRE and .ACC are DINT. Prescan sets .CU true (Count Up (CTU), prescan). Rung-condition-out follows rung-condition-in.',
     members: [
-      { name: '.ACC', desc: 'DINT count of false-to-true transitions. RES clears it to 0 (pp. 101 and 108).' },
-      { name: '.PRE', desc: 'DINT value .ACC reaches before .DN is set (p. 99).' },
-      { name: '.DN', desc: 'Set when the count has reached .PRE. Remains set as the count continues (p. 101).' },
-      { name: '.CU', desc: 'Count-up enable. Contains rung-condition-in from the last execution (p. 99).' },
-      { name: '.OV / .UN', desc: '.OV is set when the count increments past 2,147,483,647. .UN is set when the count decrements past -2,147,483,648 (p. 99).' }
+      { name: '.ACC', desc: 'DINT count of false-to-true transitions. RES clears it to 0 (Reset (RES), p. 106).' },
+      { name: '.PRE', desc: 'DINT value .ACC reaches before .DN is set (Count Up (CTU), COUNTER structure).' },
+      { name: '.DN', desc: 'Set when .ACC is at or above .PRE, while .OV and .UN are clear (CTU Flow Chart (True), p. 101).' },
+      { name: '.CU', desc: 'Count-up enable. Contains rung-condition-in from the last execution (Count Up (CTU), COUNTER structure).' },
+      { name: '.OV / .UN', desc: '.OV is set when the count increments past 2,147,483,647. .UN is set when the count decrements past -2,147,483,648 (Count Up (CTU), COUNTER structure).' }
     ],
     usage: 'Chemical injection pump strokes vs. target, filter-backwash cycle count, starts-per-day on a reciprocator, batch stages, cycles-for-maintenance.',
     gotcha: 'Each false-to-true transition adds one to .ACC (p. 98). While the rung stays true, .CU stays true and .ACC holds (p. 99). After RES clears .CU, a CTU rung that is still true adds one on the next execution of that CTU.',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Up (CTU), pp. 98-101' }],
+    sources: [{ label: '1756-RM018A-EN-P, September 2025, Count Up (CTU), p. 97, and CTU Flow Chart (True), p. 101' }],
     status: 'standard'
   },
   {
     id: 'in-ctd', mnemonic: 'CTD / CTUD', name: 'Count Down / Up-Down', category: 'Counter',
     symbol: '-[CTD]-', ascii: '-[CTD .CD .ACC .DN]',
     iec: 'CTD (CD, LD, PV, Q, CV) / CTUD', siemens: 'CTD / CTUD',
-    function: '1756-RM003 pp. 92-94: counts downward each time rung-condition-in goes from false to true. When the rung is true and .CD is false, .ACC decrements by one. When the rung is false, .CD clears. Prescan sets .CD true (p. 94). In the buffer example, .DN is true when the count is at the preset (p. 97). .PRE and .ACC are DINT. Rung-condition-out follows rung-condition-in. IEC 61131-3 CTD sets Q when CV is at or below 0.',
+    function: '1756-RM018A-EN-P, September 2025, Count Down (CTD), p. 92: counts downward each time rung-condition-in goes from false to true. When the rung is true and .CD is false, .ACC decrements by one, including after .ACC has passed .PRE (CTD Flow Chart (True), p. 96). When the rung is false, .CD clears. Prescan sets .CD true (Count Down (CTD), prescan). In the buffer example, .DN is true when the count is at the preset (Count Down (CTD), example). .PRE and .ACC are DINT. Rung-condition-out follows rung-condition-in. IEC 61131-3 CTD sets Q when CV is at or below 0.',
     members: [
-      { name: '.ACC', desc: 'DINT count. A CTU and a CTD on the same COUNTER share it (p. 93).' },
-      { name: '.PRE', desc: 'DINT value the accumulated count reaches before the instruction is done (p. 93).' },
-      { name: '.DN', desc: 'True when the count is at the preset in the p. 97 buffer example.' },
-      { name: '.CD', desc: 'Countdown enable. Contains rung-condition-in from the last execution (p. 93).' }
+      { name: '.ACC', desc: 'DINT count. A CTU and a CTD on the same COUNTER share it (Count Down (CTD), description).' },
+      { name: '.PRE', desc: 'DINT value the accumulated count reaches before the instruction is done (Count Down (CTD), COUNTER structure).' },
+      { name: '.DN', desc: 'True when the count is at the preset in the Count Down (CTD) buffer example.' },
+      { name: '.CD', desc: 'Countdown enable. Contains rung-condition-in from the last execution (Count Down (CTD), COUNTER structure).' }
     ],
     usage: 'Buffer zone in/out on one accumulator (CTU on entry, CTD on exit), remaining-strokes patterns that compare ACC explicitly, inventory tracking.',
-    gotcha: 'In the buffer example, .DN is true when the count is at the preset of 100 (p. 97). .ACC holds the current count (p. 93).',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Count Down (CTD), pp. 92-97' }],
+    gotcha: 'In the buffer example, .DN is true when the count is at the preset of 100 (Count Down (CTD), example). .ACC holds the current count (Count Down (CTD), COUNTER structure).',
+    sources: [{ label: '1756-RM018A-EN-P, September 2025, Count Down (CTD), p. 92, and CTD Flow Chart (True), p. 96' }],
     status: 'standard'
   },
 
@@ -316,10 +316,10 @@ export const INSTRUCTIONS = [
     id: 'in-lim', mnemonic: 'LIM', name: 'Limit (test)', category: 'Compare',
     symbol: '-[LIM Low Test High]-', ascii: '-[LIM]-',
     iec: 'A compare, not the IEC LIMIT clamp', siemens: 'Not the LIMIT clamp',
-    function: '1756-RM003 p. 314: LIM tests whether Test is within Low Limit and High Limit. It does not write a clamped value. When Low Limit is less than or equal to High Limit, the test is true if Test is equal to either limit or between them (pp. 318-319 and Example 1 on p. 321). When Low Limit is greater than High Limit, the test is true if Test is equal to either limit or outside the open interval between them (pp. 318-319). If any operand is Not a Number, the result is false (pp. 314 and 319). On a true rung, rung-condition-out follows that test; on a false rung, rung-condition-out is false (p. 319).',
-    usage: 'Permit a step only while a measurement is inside a band. A value outside the band stays outside; this instruction does not pull it back in.',
-    gotcha: 'Do not use LIM where you need a clamped output. High/Low Limit (HLL) is a different instruction in the same manual. The LIM flow-chart figure was not readable in the text extract; the rules above are from the operation table and Example 1. Example 2’s numbers were not readable.',
-    sources: [{ label: '1756-RM003T-EN-P, November 2018, Limit (LIM), pp. 314-321' }],
+    function: '1756-RM018A-EN-P, September 2025, Limit (LIM): LIM tests whether Test is within Low Limit and High Limit. The Test value keeps the number it already has. When Low Limit is less than or equal to High Limit, the test is true if Test is equal to either limit or between them. When Low Limit is greater than High Limit, the test is true if Test is equal to either limit or outside the open interval between them. If any operand is Not a Number, the result is false. On a true rung, rung-condition-out follows that test. On a false rung, rung-condition-out is false.',
+    usage: 'Permit a step only while a measurement is inside a band. A value outside the band keeps the number it already has.',
+    gotcha: 'High/Low Limit (HLL) is the instruction that writes a clamped output. LIM is the range test in Limit (LIM).',
+    sources: [{ label: '1756-RM018A-EN-P, September 2025, Limit (LIM). Operand and operation-table page numbers are not in the contents list used here.' }],
     status: 'standard'
   },
   {

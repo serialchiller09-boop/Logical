@@ -42,7 +42,7 @@ export const RUNGS2 = [
     ],
     readThisWay: [
       'The PID block is shown with structure names from 1756-RM003 pp. 675-677 (.PV, .SP, .KP, .OUT). The lab does not run the Logix PID equation.',
-      'LIM tests whether LCV_AO is from 5 through 95, inclusive (1756-RM003 pp. 314 and 319). It does not pull an out-of-range command back inside that band. 5 and 95 are placeholders, not a valve spec.',
+      'LIM tests whether LCV_AO is from 5 through 95, inclusive (1756-RM018A-EN-P, September 2025, Limit (LIM)). An out-of-range command keeps its value. 5 and 95 are placeholders, not a valve spec.',
       'The override rung is an exclusive OR of two MOV paths - exactly one writes the AO each scan. Anything that lets two rungs write the same AO produces a valve that jitters between them.'
     ],
     defects: [
@@ -53,7 +53,7 @@ export const RUNGS2 = [
     ],
     status: 'illustrative-example',
     mnemonics: ['XIC', 'XIO', 'PID', 'LIM', 'MOV', 'OTE'],
-    note: 'Pins use 1756-RM003 PID structure names (.PV, .SP, .KP, .OUT), pp. 675-677. The 5 and 95 limits are placeholders, not design values. LIM tests the band; it does not clamp.'
+    note: 'Pins use 1756-RM003 PID structure names (.PV, .SP, .KP, .OUT), pp. 675-677. The 5 and 95 limits are placeholders, not design values. LIM tests the band. The command value keeps its number (1756-RM018A Limit (LIM)).'
   },
 
   {

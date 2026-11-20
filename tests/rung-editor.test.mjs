@@ -532,14 +532,14 @@ test('TON reaches DN in 100 ms steps and clears when the rung is false', () => {
     { kind: 'XIC', tag: 'Run' },
     { kind: 'TON', tag: 'T_Delay', pre: 500 }
   ]);
-  const on = scanEditor(program, Array.from({ length: 5 }, () => ({ bits: { Run: 1 } })));
-  assert.equal(on.traces[0].timers.T_Delay.acc, 100);
+  const on = scanEditor(program, Array.from({ length: 6 }, () => ({ bits: { Run: 1 } })));
+  assert.equal(on.traces[0].timers.T_Delay.acc, 0);
   assert.equal(on.traces[0].timers.T_Delay.en, true);
   assert.equal(on.traces[0].timers.T_Delay.running, true);
   assert.equal(on.traces[0].timers.T_Delay.dn, false);
-  assert.equal(on.traces[4].timers.T_Delay.acc, 500);
-  assert.equal(on.traces[4].timers.T_Delay.dn, true);
-  assert.equal(on.traces[4].timers.T_Delay.running, false);
+  assert.equal(on.traces[5].timers.T_Delay.acc, 500);
+  assert.equal(on.traces[5].timers.T_Delay.dn, true);
+  assert.equal(on.traces[5].timers.T_Delay.running, false);
   const cleared = scanEditor(program, [
     { bits: { Run: 1 } },
     { bits: { Run: 1 } },
@@ -560,19 +560,22 @@ test('TOF times while the rung is false and clears DN when ACC reaches PRE', () 
     { bits: { Run: 1 } },
     { bits: { Run: 0 } },
     { bits: { Run: 0 } },
+    { bits: { Run: 0 } },
+    { bits: { Run: 0 } },
     { bits: { Run: 0 } }
   ]);
   assert.equal(traces[0].timers.T_Off.acc, 0);
   assert.equal(traces[0].timers.T_Off.en, true);
   assert.equal(traces[0].timers.T_Off.dn, true);
   assert.equal(traces[0].timers.T_Off.running, false);
-  assert.equal(traces[1].timers.T_Off.acc, 100);
+  assert.equal(traces[1].timers.T_Off.acc, 0);
   assert.equal(traces[1].timers.T_Off.dn, true);
   assert.equal(traces[1].timers.T_Off.running, true);
   assert.equal(traces[1].timers.T_Off.en, false);
-  assert.equal(traces[3].timers.T_Off.acc, 300);
-  assert.equal(traces[3].timers.T_Off.dn, false);
-  assert.equal(traces[3].timers.T_Off.running, false);
+  assert.equal(traces[4].timers.T_Off.acc, 300);
+  assert.equal(traces[4].timers.T_Off.dn, false);
+  assert.equal(traces[4].timers.T_Off.running, false);
+  assert.equal(traces[5].timers.T_Off.acc, 300);
 });
 
 test('CTU counts one rising edge when the input is held, and RES clears it', () => {
@@ -629,11 +632,12 @@ test('CTU counts one rising edge when the input is held, and RES clears it', () 
   ]);
   const lit = scanEditor(followed, [
     { bits: { Run: 1 } },
+    { bits: { Run: 1 } },
     { bits: { Run: 1 } }
   ]);
   assert.equal(lit.traces[0].bits.Done, 0);
-  assert.equal(lit.traces[1].timers.T_Delay.dn, true);
-  assert.equal(lit.traces[1].bits.Done, 1);
+  assert.equal(lit.traces[2].timers.T_Delay.dn, true);
+  assert.equal(lit.traces[2].bits.Done, 1);
 });
 
 test('CTU prescan leaves ACC at 0 when the input is already true, then counts the next rising edge', () => {
@@ -733,9 +737,9 @@ test('timer and counter .PRE and .ACC are the values the number view formats', (
   for (let n = 0; n < 5; n += 1) applyEditorScan(program, state);
   const after = editorNumberValues(program, state);
   const timer = after.find((item) => item.tag === 'T_Delay');
-  assert.equal(timer.acc, 500);
+  assert.equal(timer.acc, 400);
   assert.equal(timer.pre, 2000);
-  assert.equal(formatDint(timer.acc, 'hex').text, '16#0000_01F4');
+  assert.equal(formatDint(timer.acc, 'hex').text, '16#0000_0190');
   assert.equal(formatDint(timer.pre, 'decimal').text, '2000');
   assert.ok(timer.acc >= 0);
 });

@@ -24,11 +24,14 @@
  *         When rung-condition-in is false, leaves the BOOL unchanged.
  *         (Output Unlatch (OTU))
  *   TON — Timer On Delay. TIMER .PRE/.ACC are milliseconds (time base 1 ms).
- *         Enabled: ACC increases by the scan's elapsed time, .EN is true,
- *         .DN when ACC >= PRE, .TT while timing. Disabled: ACC, EN, TT, DN clear.
- *         (Timer On Delay (TON))
+ *         1756-RM018A TON Flow Chart (True), p. 135: the first true scan records
+ *         the time and adds none. Later scans add the whole elapsed time. .DN
+ *         sets and .TT clears when ACC >= PRE. Later scans add none. ACC can
+ *         finish above PRE. Disabled: ACC, EN, TT, DN clear.
  *   TOF — Timer Off Delay. Rung true: ACC=0, EN true, TT false, DN true.
- *         Rung false: ACC increases, DN stays true until ACC reaches PRE, then DN clears.
+ *         1756-RM018A TOF Flow Chart (False), p. 125: the first false scan records
+ *         the time. Later scans add the whole elapsed time until ACC >= PRE,
+ *         then DN and TT clear and later scans add none. ACC can finish above PRE.
  *         Prescan: ACC=PRE, EN/TT/DN false. (Timer Off Delay (TOF))
  *   CTU — Count Up. ACC increments by one when rung-condition-in is true and .CU
  *         was false. .CU then follows rung-condition-in. .DN when ACC >= PRE.
@@ -455,7 +458,7 @@ function presetError(label, rungId, instr) {
   const n = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim());
   const unitNote = instr.kind === 'CTU'
     ? 'CTU preset is a count.'
-    : 'Timer preset is milliseconds. 1756-RM003 says the timer time base is 1 ms.';
+    : 'Timer preset is milliseconds. 1756-RM018A Timer On Delay (TON) uses a 1 ms time base.';
   if (raw === '' || raw == null || Number.isNaN(n) || !Number.isInteger(n) || n < 0) {
     return {
       code: 'bad-preset',

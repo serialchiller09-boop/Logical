@@ -386,8 +386,8 @@ export default function RungEditor({
             </div>
             <p className="re-scan-status" role="status">
               Scan {scans}. {running ? 'Running' : 'Stopped'}.
-              {' '}Each step adds {EDITOR_SCAN_MS} ms, including while Start is running.
-              {' '}1756-RM003 adds the time since a timer was last scanned. This page uses {EDITOR_SCAN_MS} ms for that elapsed time. It is not a Logix task period.
+              {' '}The first scan a timer starts records the time. Each later step adds {EDITOR_SCAN_MS} ms, including while Start is running.
+              {' '}1756-RM018A adds the whole time since the timer was last scanned. This page uses {EDITOR_SCAN_MS} ms for that elapsed time. It is not a Logix task period.
             </p>
           </div>
         )}
@@ -460,13 +460,13 @@ export default function RungEditor({
               <li>The same manual says unexpected operation may occur if an output tag is overwritten. This page scans rungs from the top of the list downward, and each rung from left to right. When two OTE instructions use the same tag, the lower rung’s write is the value that remains.</li>
             </ul>
             <p>
-              Not simulated from that manual: OTE prescan and postscan both clear the data bit. TON and TOF postscan, and the TON/TOF flow-chart pause that forces .DN, are not simulated. Counter .OV past 2,147,483,647 is not simulated. A timer here adds {EDITOR_SCAN_MS} ms per step instead of a controller's wall-clock delta. CTU prescan is simulated: the first scan after a fresh start or Reset sets .CU true, so an input that is already on does not count until it goes false and then true.
+              OTE prescan and postscan both clear the data bit. TON and TOF postscan are not simulated here. Once .DN is set, later scans add no more time, and the finishing scan can leave .ACC above .PRE (1756-RM018A TON Flow Chart (True), p. 135). Counter .OV past 2,147,483,647 is not simulated. A timer here adds {EDITOR_SCAN_MS} ms on each scan after the opening one. CTU prescan is simulated: the first scan after a fresh start or Reset sets .CU true, so an input that is already on does not count until it goes false and then true.
             </p>
             <ul>
               <li>OTL (Output Latch) sets the BOOL when rung-condition-in is true and leaves it unchanged when rung-condition-in is false.</li>
               <li>OTU (Output Unlatch) clears the BOOL when rung-condition-in is true and leaves it unchanged when rung-condition-in is false.</li>
-              <li>TON (Timer On Delay) accumulates while the rung is true. .DN is true when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. Time base is 1 ms.</li>
-              <li>TOF (Timer Off Delay): a true rung sets .EN and .DN and clears .ACC and .TT. A false rung accumulates. .DN stays true until .ACC reaches .PRE, then .DN clears. Prescan sets .ACC equal to .PRE and clears .EN, .TT, and .DN.</li>
+              <li>TON (Timer On Delay) accumulates while the rung is true. .DN is true when .ACC reaches .PRE. A false rung clears .ACC, .EN, .TT, and .DN. Time base is 1 ms. .ACC stops adding time when the timer is done. On the scan it finishes, .ACC can read slightly above .PRE, because the timer adds the whole time since the last scan (1756-RM018A p. 135).</li>
+              <li>TOF (Timer Off Delay): a true rung sets .EN and .DN and clears .ACC and .TT. A false rung accumulates. .DN stays true until .ACC reaches .PRE, then .DN clears. Prescan sets .ACC equal to .PRE and clears .EN, .TT, and .DN. .ACC stops adding time when the off-delay is done. On the scan it finishes, .ACC can read slightly above .PRE (1756-RM018A p. 125).</li>
               <li>CTU (Count Up) adds one to .ACC only when the rung goes from false to true. .DN is true when .ACC is at least .PRE. Holding the rung true does not count again.</li>
               <li>RES (Reset), when the rung is true, clears a TIMER or COUNTER .ACC and its control bits. A false rung does not.</li>
               <li>XIC and XIO may read .DN, .EN, .TT, or .CU on the tag those instructions use.</li>

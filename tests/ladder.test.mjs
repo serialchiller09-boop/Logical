@@ -118,7 +118,7 @@ test('2oo3 output rung: de-energize to close', () => {
 test('alarm deadband: on-delay, saturation, and clearing only on the low limit', () => {
   assert.equal(scan('rung-alarm-deadbnd', { bits: {} }).st.bits.LSHH_ALM, 0);
   const hot = scan('rung-alarm-deadbnd', { scans: 6, values: { LEVEL_PV: 101.2 } });
-  assert.equal(hot.st.timers.T_ALARM.acc, 5000, 'accumulation saturates at the preset');
+  assert.equal(hot.st.timers.T_ALARM.acc, 5000, 'five added seconds reach the 5 s preset');
   assert.equal(hot.st.timers.T_ALARM.dn, true);
   assert.equal(hot.st.bits.LSHH_ALM, 1);
   const back = scan('rung-alarm-deadbnd', { scans: 3, values: { LEVEL_PV: 99.8 }, bits: { LSHH_ALM: 1 } });
@@ -130,7 +130,7 @@ test('alarm deadband: on-delay, saturation, and clearing only on the low limit',
 
 test('restart lockout: asserted for the whole delay, released when it completes', () => {
   const mid = scan('rung-ton-lockout', { scans: 60, bits: { TRIP_LAT: 1 } });
-  assert.equal(mid.st.timers.T_LOCK.acc, 60000);
+  assert.equal(mid.st.timers.T_LOCK.acc, 59000);
   assert.equal(mid.st.bits.RESTART_BLOCK, 1, 'blocked while the delay runs');
   const done = scan('rung-ton-lockout', { scans: 130, bits: { TRIP_LAT: 1 } });
   assert.equal(done.st.timers.T_LOCK.dn, true);
@@ -180,7 +180,7 @@ test('purge: the timer only runs with the permissives healthy, and the valve sta
   assert.equal(blocked.st.timers.T_PURGE.running, false);
   assert.equal(blocked.st.bits.FG_SAFETY_OPEN, 0);
   const running = scan('rung-purge', { scans: 4 });
-  assert.equal(running.st.timers.T_PURGE.acc, 4000);
+  assert.equal(running.st.timers.T_PURGE.acc, 3000);
   assert.equal(running.st.bits.PURGE_OK, 0, 'no short-circuiting the purge');
 });
 
@@ -542,15 +542,88 @@ test('CTD prescan sets .CD so an input that is already true does not decrement',
   assert.equal(st.counters.C.acc, 4, 'the next false-to-true transition decrements once');
 });
 
-test('TON with PRE=0 goes DN immediately when enabled', () => {
+test('a finishing scan can leave .ACC above .PRE, and later scans add none', () => {
+  // 1756-RM018A TON/RTO Flow Chart (True) and TOF Flow Chart (False): the opening
+  // scan adds none; the next scan adds the whole 250 ms, which is above .PRE 100.
+  const timer = (kind, enable, steps) => {
+    const st = initialState([]);
+    st.dt = 250;
+    st.bits.IN = enable ? 1 : 0;
+    const rung = series({ t: 'no', a: 'IN' }, { t: 'blk', k: kind, a: 'T', p: [{ k: 'PRE', v: '100' }] });
+    for (let i = 0; i < steps; i++) analyze(rung, st, { live: true });
+    return st.timers.T;
+  };
+  for (const kind of ['TON', 'RTO']) {
+    const done = timer(kind, true, 2);
+    assert.equal(done.acc, 250, `${kind} .ACC keeps the whole last step`);
+    assert.equal(done.dn, true, `${kind} .DN is set`);
+    assert.equal(done.running, false, `${kind} .TT clears when done`);
+    const later = timer(kind, true, 3);
+    assert.equal(later.acc, 250, `${kind} later scans add none`);
+    assert.equal(later.dn, true);
+  }
+  const st = initialState([]);
+  st.dt = 250;
+  const rung = series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'TOF', a: 'T', p: [{ k: 'PRE', v: '100' }] });
+  st.bits.IN = 1;
+  analyze(rung, st, { live: true });
+  st.bits.IN = 0;
+  analyze(rung, st, { live: true });
+  analyze(rung, st, { live: true });
+  assert.equal(st.timers.T.acc, 250, 'TOF .ACC keeps the whole last step');
+  assert.equal(st.timers.T.dn, false, 'TOF .DN clears when .ACC reaches .PRE');
+  analyze(rung, st, { live: true });
+  assert.equal(st.timers.T.acc, 250, 'TOF later scans add none');
+
+  // v37 CTU example: after the preset count, the counter continues to increment and .DN remains set.
+  const up = initialState([]);
+  up.bits.IN = 0;
+  const ctu = series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTU', a: 'C', p: [{ k: 'PRE', v: '2' }] });
+  const edge = () => {
+    up.bits.IN = 0;
+    analyze(ctu, up, { live: true });
+    up.bits.IN = 1;
+    analyze(ctu, up, { live: true });
+  };
+  edge();
+  edge();
+  assert.equal(up.counters.C.acc, 2);
+  assert.equal(up.counters.C.dn, true);
+  edge();
+  assert.equal(up.counters.C.acc, 3, 'CTU .ACC keeps counting past .PRE');
+  assert.equal(up.counters.C.dn, true, 'CTU .DN stays set');
+
+  // v37 CTD: each true rung with .CD false decrements .ACC by one, with no stop at .PRE.
+  const down = initialState([]);
+  down.counters.C = { acc: 2, dn: true, cu: false, cd: false, prevIn: false };
+  const ctd = series({ t: 'no', a: 'IN' }, { t: 'blk', k: 'CTD', a: 'C', p: [{ k: 'PRE', v: '2' }] });
+  const fall = () => {
+    down.bits.IN = 0;
+    analyze(ctd, down, { live: true });
+    down.bits.IN = 1;
+    analyze(ctd, down, { live: true });
+  };
+  fall();
+  assert.equal(down.counters.C.acc, 1);
+  assert.equal(down.counters.C.dn, false, 'CTD .DN clears once .ACC is below .PRE');
+  fall();
+  assert.equal(down.counters.C.acc, 0, 'CTD .ACC keeps counting past .PRE');
+});
+
+test('TON with PRE=0 sets DN on the scan that adds time', () => {
   const st = initialState([]);
   st.dt = 1000;
   st.bits.EN = 1;
-  analyze(series(
+  const rung = series(
     { t: 'no', a: 'EN' },
     { t: 'blk', k: 'TON', a: 'T0', p: [{ k: 'PRE', v: '0' }] }
-  ), st, { live: true });
+  );
+  analyze(rung, st, { live: true });
   assert.equal(st.timers.T0.acc, 0);
+  assert.equal(st.timers.T0.dn, false);
+  assert.equal(st.timers.T0.en, true);
+  analyze(rung, st, { live: true });
+  assert.equal(st.timers.T0.acc, 1000);
   assert.equal(st.timers.T0.dn, true);
   assert.equal(st.timers.T0.running, false);
   assert.equal(st.timers.T0.en, true);
@@ -604,7 +677,7 @@ test('reworked labs still teach delay-then-act via .DN follow-on rungs', () => {
   assert.equal(blocked.st.bits.PURGE_OK, 0);
   const midPurge = scan('rung-purge', { scans: 4 });
   assert.equal(midPurge.st.bits.PURGE_OK, 0, 'purge must wait for TON.DN');
-  assert.equal(midPurge.st.timers.T_PURGE.acc, 4000);
+  assert.equal(midPurge.st.timers.T_PURGE.acc, 3000);
 
   // ESD: confirm delay must elapse before GAS_TRIP
   const early = scan('rung-esd-fg', { scans: 3, bits: { GD_A_ALM: 1 } });
@@ -679,15 +752,16 @@ test('changed Logix entries cite 1756-RM003 and drop the old names', () => {
   assert.match(byMnemonic['in-gsv'].name, /Get System Value/);
   assert.match(byMnemonic['in-gsv'].function, /p\. 173/);
   assert.doesNotMatch(`${byMnemonic['in-gsv'].mnemonic} ${byMnemonic['in-gsv'].name}`, /GSF/);
-  assert.match(byMnemonic['in-lim'].function, /p\. 314/);
-  assert.match(byMnemonic['in-lim'].function, /does not write a clamped value/);
+  assert.match(byMnemonic['in-lim'].function, /1756-RM018A/);
+  assert.match(byMnemonic['in-lim'].function, /Test value keeps the number/);
   assert.match(byMnemonic['in-pid'].function, /pp\. 672-677/);
   assert.doesNotMatch(JSON.stringify(byMnemonic['in-pid'].members), /\.Kc|\.Mode|\.DBNDBND|\.INDEP/);
   assert.match(byMnemonic['in-xic'].gotcha, /BOOL bit/);
   assert.match(byMnemonic['in-xic'].gotcha, /p\. 64/);
   assert.match(byMnemonic['in-ote'].function, /postscan/);
   assert.match(byMnemonic['in-ote'].function, /p\. 84/);
-  assert.match(byMnemonic['in-ton'].function, /pp\. 130 and 132/);
+  assert.match(byMnemonic['in-ton'].function, /1756-RM018A/);
+  assert.match(byMnemonic['in-ton'].function, /p\. 135/);
   assert.match(byMnemonic['in-tof'].function, /sets \.ACC equal to \.PRE/);
   assert.match(byMnemonic['in-ctu'].gotcha, /While the rung stays true/);
   assert.doesNotMatch(`${byMnemonic['in-ton'].gotcha} ${byMnemonic['in-tof'].gotcha} ${byMnemonic['in-rto'].function} ${byMnemonic['in-rto'].gotcha} ${byMnemonic['in-ctd'].gotcha}`, /this extract|does not remove|does not clear \.PRE/i);
