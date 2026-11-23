@@ -12,6 +12,8 @@ import {
   subscribeTagBus
 } from '../lib/tagBus.js';
 import { IoLabDock, loadDockLayout, saveDockLayout } from './IoLabDock.jsx';
+import CapBankHmi from './CapBankHmi.jsx';
+import { apply891AField, settle891A } from '../lib/capBankField.js';
 import { isBusyDock, resolveDockLayout } from '../lib/dockLayout.js';
 
 function dockLayoutFromSearch(searchParams) {
@@ -324,6 +326,7 @@ export function RungSimulator({
   const doScan = useCallback(() => {
     const st = stRef.current;
     st.dt = dt;
+    if (entry?.id === 'rungs:rung-cap-close') settle891A(st.bits);
     const writes = [];
     const results = scanLadders(rungs.map((r) => r.ladder), st);
     results.forEach((res, index) => {
@@ -333,7 +336,7 @@ export function RungSimulator({
     setScans((n) => n + 1);
     if (writes.length) setLog((l) => [...writes.map((w) => `${new Date().toISOString().slice(11, 19)}  ${w.rung}: ${w.kind} ${w.addr} := ${w.value ? 'TRUE' : 'FALSE'}`), ...l].slice(0, 40));
     publishSimToBus(st);
-  }, [dt, rungs, publishSimToBus]);
+  }, [dt, rungs, publishSimToBus, entry?.id]);
 
   useEffect(() => {
     if (!auto) return;
@@ -397,6 +400,16 @@ export function RungSimulator({
         Each step adds {dt >= 1000 ? `${dt / 1000} s` : `${dt} ms`} after a timer's opening scan. The default is 1 s. The rung editor adds 100 ms per step. This is simulated elapsed time, not a Logix task period.
       </p>
       <div className="card-bd stack">
+        {entry?.id === 'rungs:rung-cap-close' && (
+          <CapBankHmi
+            bits={stRef.current.bits}
+            onAction={(action) => {
+              apply891AField(stRef.current.bits, action);
+              publishSimToBus(stRef.current);
+              rerender();
+            }}
+          />
+        )}
         {rungs.map((r, i) => (
           <div key={r.key}>
             <div className="row spread" style={{ marginBottom: 4 }}>

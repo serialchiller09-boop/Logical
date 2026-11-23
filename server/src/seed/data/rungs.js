@@ -460,8 +460,8 @@ export const RUNGS = [
     category: 'Capacitor banks / switchgear',
     level: 'Intermediate',
     oneLine: 'Close 52C1 after it has been proven open for 20 seconds.',
-    purpose: 'Part 1 of a fictional substation capacitor bank. Breaker 52C1 closes after proven open has been true for 20 seconds, with the bank relay healthy and the lockout clear. The wait lets residual charge decay.',
-    boolean: 'P_52C1_ProvenOpen = 52b on and 52a off. The close button sets REQ_52C1_Close on its rising edge. T_52C1_MinOff is a TON at 20000 ms from proven open alone. The open button writes CMD_52C1_Trip and clears REQ_52C1_Close in that scan. P_52C1_Close is the accepted request with relay healthy, lockout clear, proven open, min-off done, and the two switch placeholders. CMD_52C1_Close follows the close-pulse timing bit. C_52C1_Operations counts 52a rising edges.',
+    purpose: 'Fictional substation capacitor bank. 891A is the disconnect ahead of breaker 52C1. Key A stays on the 891A lock while 891A is closed, and locking 891A open frees key A. 52C1 closes after proven open has been true for 20 seconds, with the bank relay healthy and the lockout clear. The wait lets residual charge decay.',
+    boolean: 'P_52C1_ProvenOpen = 52b on and 52a off. P_891A_Operate follows that proven-open bit. The one-line moves 891A and key A, and the ladder reads those positions. The close button sets REQ_52C1_Close on its rising edge. T_52C1_MinOff is a TON at 20000 ms from proven open alone. The open button writes CMD_52C1_Trip and clears REQ_52C1_Close in that scan. P_52C1_Close is the accepted request with relay healthy, lockout clear, proven open, min-off done, 891A closed, and the ground-switch placeholder. CMD_52C1_Close follows the close-pulse timing bit. C_52C1_Operations counts 52a rising edges.',
     ladder: {
       t: 'and',
       c: [
@@ -512,7 +512,7 @@ export const RUNGS = [
           { t: 'nc', a: 'L_86Lockout', l: 'Lockout clear' },
           { t: 'no', a: 'P_52C1_ProvenOpen', l: 'Proven open' },
           { t: 'no', a: 'T_52C1_MinOff.DN', l: 'Wait done' },
-          { t: 'no', a: 'SIM_891A_Closed', l: 'Switch closed' },
+          { t: 'no', a: 'DI_891A_Closed', l: '891A closed' },
           { t: 'no', a: 'SIM_891G_Open', l: 'Ground open' },
           { t: 'coil', k: 'OTE', a: 'P_52C1_Close', l: 'Close permissive' }
         ]
@@ -550,6 +550,26 @@ export const RUNGS = [
         ]
       }
     },
+    operateRung: {
+      note: 'P_891A_Operate follows proven open. Why: 52C1 is open before 891A moves.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'P_52C1_ProvenOpen', l: '52C1 proven open' },
+          { t: 'coil', k: 'OTE', a: 'P_891A_Operate', l: 'Operate 891A' }
+        ]
+      }
+    },
+    reason891ARung: {
+      note: 'While operate permission is clear, the HMI shows the reason. Why: 52C1 must be open to operate 891A.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'nc', a: 'P_891A_Operate', l: 'Operate clear' },
+          { t: 'coil', k: 'OTE', a: 'IND_891A_Need52C1', l: 'HMI reason' }
+        ]
+      }
+    },
     io: [
       { tag: 'DI_PB_52C1_Close', type: 'DI', addr: 'I:12/0', role: 'Close pushbutton for breaker 52C1', initial: 0 },
       { tag: 'DI_PB_52C1_Open', type: 'DI', addr: 'I:12/1', role: 'Open pushbutton for breaker 52C1', initial: 0 },
@@ -561,7 +581,11 @@ export const RUNGS = [
       { tag: 'DI_CAP_RelayHealthy', type: 'DI', addr: 'I:12/4', role: 'Capacitor-bank relay healthy', initial: 1 },
       { tag: 'L_86Lockout', type: 'BIT', addr: 'B3:20/3', role: '86 lockout', initial: 0 },
       { tag: 'T_52C1_MinOff', type: 'TIMER', addr: 'T4:20', role: '20 s min-off wait while the breaker is proven open', initial: 0 },
-      { tag: 'SIM_891A_Closed', type: 'BIT', addr: 'B3:20/4', role: 'Switch placeholder, closed', initial: 1 },
+      { tag: 'DI_891A_Closed', type: 'DI', addr: 'I:13/0', role: '891A disconnect closed', initial: 1 },
+      { tag: 'DI_891A_Open', type: 'DI', addr: 'I:13/1', role: '891A disconnect open', initial: 0 },
+      { tag: 'DI_KeyA_At891A_LO', type: 'DI', addr: 'I:13/2', role: 'Key A in the 891A lock-open lock', initial: 1 },
+      { tag: 'P_891A_Operate', type: 'BIT', addr: 'B3:21/0', role: 'Training interlock: 52C1 proven open', initial: 0 },
+      { tag: 'IND_891A_Need52C1', type: 'BIT', addr: 'B3:21/1', role: 'HMI reason: 52C1 must be open to operate 891A', initial: 0 },
       { tag: 'SIM_891G_Open', type: 'BIT', addr: 'B3:20/5', role: 'Ground-switch placeholder, open', initial: 1 },
       { tag: 'P_52C1_Close', type: 'BIT', addr: 'B3:20/6', role: 'Close permissive', initial: 0 },
       { tag: 'T_52C1_ClosePulse', type: 'TIMER', addr: 'T4:21', role: 'Close pulse timer', initial: 0 },
@@ -575,7 +599,8 @@ export const RUNGS = [
       'T_52C1_MinOff is a plain TON. Its only input is proven open. A fresh PLC image starts .ACC at 0 (1756-RM018A Timer On Delay, p. 130).',
       'The open pushbutton writes the trip command and clears the accepted close request in that scan.',
       'The close command follows T_52C1_ClosePulse.TT. The command is on while that timer is timing.',
-      'The operations counter adds one on each 52a rising edge.'
+      'The operations counter adds one on each 52a rising edge.',
+      'The one-line moves 891A and key A. P_891A_Operate and the HMI reason are ladder bits. The close chain reads DI_891A_Closed.'
     ],
     defects: [
       'The close command follows the permissive chain, including the min-off done bit.',
