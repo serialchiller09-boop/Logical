@@ -13,6 +13,7 @@ import {
 } from '../lib/tagBus.js';
 import { IoLabDock, loadDockLayout, saveDockLayout } from './IoLabDock.jsx';
 import CapBankHmi from './CapBankHmi.jsx';
+import { apply891AField, settle891A } from '../lib/capBankField.js';
 import { isBusyDock, resolveDockLayout } from '../lib/dockLayout.js';
 
 function dockLayoutFromSearch(searchParams) {
@@ -325,6 +326,7 @@ export function RungSimulator({
   const doScan = useCallback(() => {
     const st = stRef.current;
     st.dt = dt;
+    if (entry?.id === 'rungs:rung-cap-close') settle891A(st.bits);
     const writes = [];
     const results = scanLadders(rungs.map((r) => r.ladder), st);
     results.forEach((res, index) => {
@@ -334,7 +336,7 @@ export function RungSimulator({
     setScans((n) => n + 1);
     if (writes.length) setLog((l) => [...writes.map((w) => `${new Date().toISOString().slice(11, 19)}  ${w.rung}: ${w.kind} ${w.addr} := ${w.value ? 'TRUE' : 'FALSE'}`), ...l].slice(0, 40));
     publishSimToBus(st);
-  }, [dt, rungs, publishSimToBus]);
+  }, [dt, rungs, publishSimToBus, entry?.id]);
 
   useEffect(() => {
     if (!auto) return;
@@ -401,9 +403,9 @@ export function RungSimulator({
         {entry?.id === 'rungs:rung-cap-close' && (
           <CapBankHmi
             bits={stRef.current.bits}
-            onRequest={(tag) => {
-              stRef.current.bits[tag] = 1;
-              busSetBit(tag, 1, 'ladder');
+            onAction={(action) => {
+              apply891AField(stRef.current.bits, action);
+              publishSimToBus(stRef.current);
               rerender();
             }}
           />

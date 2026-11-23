@@ -9,14 +9,14 @@ function bitOn(bits, tag) {
  * 891A is ahead of 52C1. Key A is drawn on the 891A lock when it is home,
  * and in hand when it is free. Dashed key lines reach 891A, TDKR, and 891G.
  */
-export default function CapBankHmi({ bits = {}, onRequest }) {
+export default function CapBankHmi({ bits = {}, onAction }) {
   const closed = bitOn(bits, 'DI_891A_Closed');
   const open = bitOn(bits, 'DI_891A_Open');
   const keyHome = bitOn(bits, 'DI_KeyA_At891A_LO');
   const breakerClosed = bitOn(bits, 'DI_52C1_52a');
   const reason = bitOn(bits, 'IND_891A_Need52C1');
   const position = closed ? 'Closed' : (open ? 'Open' : 'In place');
-  const ask = (tag) => onRequest?.(tag);
+  const ask = (action) => onAction?.(action);
 
   return (
     <section className="cap-hmi" aria-label="891A and 52C1 one-line">
@@ -25,7 +25,7 @@ export default function CapBankHmi({ bits = {}, onRequest }) {
           <line className="cap-power" x1="36" y1="86" x2="150" y2="86" />
           <SwitchGlyph x={188} closed={!!closed} />
           <line className="cap-power" x1="226" y1="86" x2="330" y2="86" />
-          <BreakerGlyph x={368} closed={!!breakerClosed} />
+          <BreakerGlyph x={368} closed={!!breakerClosed} label={breakerClosed ? 'Closed' : 'Open'} />
           <line className="cap-power" x1="406" y1="86" x2="520" y2="86" />
           <rect className="cap-bank" x="520" y="60" width="86" height="52" rx="6" />
           <text className="cap-label" x="563" y="90" textAnchor="middle">Bank</text>
@@ -33,7 +33,6 @@ export default function CapBankHmi({ bits = {}, onRequest }) {
           <text className="cap-name" x="188" y="28" textAnchor="middle">891A</text>
           <text className="cap-state" x="188" y="124" textAnchor="middle">{position}</text>
           <text className="cap-name" x="368" y="28" textAnchor="middle">52C1</text>
-          <text className="cap-state" x="368" y="124" textAnchor="middle">{breakerClosed ? 'Closed' : 'Open'}</text>
 
           <path className="cap-keyline" d="M188 146 V190 H620" />
           <path className="cap-keyline" d="M320 190 V170" />
@@ -56,10 +55,10 @@ export default function CapBankHmi({ bits = {}, onRequest }) {
       {reason ? <p className="cap-hmi-reason" role="status">{HMI_891A_REASON}</p> : null}
 
       <div className="cap-hmi-actions">
-        <button type="button" className="btn btn-sm" onClick={() => ask('CMD_891A_Open')}>Open 891A</button>
-        <button type="button" className="btn btn-sm" onClick={() => ask('CMD_891A_Close')}>Close 891A</button>
-        <button type="button" className="btn btn-sm" onClick={() => ask('CMD_891A_LockOpen')}>Lock open</button>
-        <button type="button" className="btn btn-sm" onClick={() => ask('CMD_KeyA_Return')}>Return key A</button>
+        <button type="button" className="btn btn-sm" onClick={() => ask('open')}>Open 891A</button>
+        <button type="button" className="btn btn-sm" onClick={() => ask('close')}>Close 891A</button>
+        <button type="button" className="btn btn-sm" onClick={() => ask('lock')}>Lock open</button>
+        <button type="button" className="btn btn-sm" onClick={() => ask('return')}>Return key A</button>
       </div>
     </section>
   );
@@ -77,11 +76,11 @@ function SwitchGlyph({ x, closed }) {
   );
 }
 
-function BreakerGlyph({ x, closed }) {
+function BreakerGlyph({ x, closed, label }) {
   return (
     <g>
-      <rect className={`cap-breaker ${closed ? 'is-closed' : 'is-open'}`} x={x - 22} y="66" width="44" height="40" rx="4" />
-      <text className="cap-label" x={x} y="90" textAnchor="middle">{closed ? '52a' : '52b'}</text>
+      <rect className={`cap-breaker ${closed ? 'is-closed' : 'is-open'}`} x={x - 36} y="66" width="72" height="40" rx="4" />
+      <text className="cap-label" x={x} y="90" textAnchor="middle">{label}</text>
     </g>
   );
 }

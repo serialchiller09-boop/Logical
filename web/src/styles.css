@@ -1658,8 +1658,8 @@ button.lab-dock-led {
 .re-rules-body li { margin-bottom: 8px; }
 .re-problems, #re-problems .callout h2 { font-size: 15px; }
 .cap-hmi { margin: 0 0 8px; min-width: 0; max-width: 100%; }
-.cap-hmi-scroll { overflow-x: auto; max-width: 100%; min-width: 0; -webkit-overflow-scrolling: touch; }
-.cap-hmi-line { width: 100%; min-width: 640px; height: auto; display: block; }
+.cap-hmi-scroll { overflow-x: hidden; max-width: 100%; min-width: 0; }
+.cap-hmi-line { width: 100%; max-width: 100%; height: auto; display: block; }
 .cap-power { stroke: var(--ink-2); stroke-width: 3; fill: none; }
 .cap-blade { stroke: var(--power); stroke-width: 3; }
 .cap-jaw { stroke: var(--power); stroke-width: 2; fill: var(--panel); }

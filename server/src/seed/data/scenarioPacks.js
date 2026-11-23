@@ -181,7 +181,7 @@ export const PROGRESSIVE_PATH_LEVELS = [
       'Leave 891A closed and press Step. Key A stays on the lock. Why: key A stays captive until 891A is locked open.',
       'With 52C1 proven open, open 891A and apply the lock-open lock. Key A comes free. Why: locking 891A open frees key A for the next step.',
       'With 52C1 closed, operate 891A. 891A stays in place and the HMI shows the reason. Why: 52C1 must be open to operate 891A.',
-      'With key A away, ask 891A to close. 891A stays open. Return key A with 52C1 still open, then close 891A. Why: 891A closes only when key A is back in its lock and 52C1 is still open.'
+      'With key A away, press Close on 891A. 891A stays open. Return key A with 52C1 still open, then close 891A. Why: 891A closes only when key A is back in its lock and 52C1 is still open.'
     ],
     scanHint: 'Press Close after the 20 s wait. The close command pulses. The wait lets residual charge decay.'
   }

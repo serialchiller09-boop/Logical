@@ -16,6 +16,7 @@ import {
   analyze, layout, frameLadder, maxWireGap, fitRung, initialState, collectElements, presetMs, resolveOperand, evalExpr, fitPinText, scanLadders,
   memberRef, GEO, EDITOR_GEO, LADDER_MIN_TAG_FONT_PX, LADDER_TAG_FONT_PX, LADDER_NARROW_PX
 } from '../web/src/lib/ladder.js';
+import { apply891AField, settle891A } from '../web/src/lib/capBankField.js';
 import { RUNGS } from '../server/src/seed/data/rungs.js';
 import { RUNGS2 } from '../server/src/seed/data/rungs2.js';
 import { INSTRUCTIONS } from '../server/src/seed/data/instructions.js';
@@ -481,6 +482,14 @@ test('52C1 close stays off when a permissive is false, and the old discharge tag
 
 test('key A stays captive while 891A is closed and comes free after lock-open', () => {
   const r = byId['rung-cap-close'];
+  const inputs = new Set(['DI_891A_Closed', 'DI_891A_Open', 'DI_KeyA_At891A_LO']);
+  for (const lad of ladsOf(r)) {
+    for (const el of collectElements(lad)) {
+      if (el.t === 'coil') assert.equal(inputs.has(el.a), false, `ladder writes input ${el.a}`);
+    }
+  }
+  assert.doesNotMatch(JSON.stringify(r), /CMD_891A_|CMD_KeyA_Return|clear891ACmdRung/);
+
   const step = (st, bits = {}) => {
     Object.assign(st.bits, bits);
     st.dt = 1000;
@@ -489,16 +498,19 @@ test('key A stays captive while 891A is closed and comes free after lock-open', 
   const captive = initialState(ioOf(r));
   captive.bits.DI_KeyA_At891A_LO = 0;
   step(captive);
+  assert.equal(captive.bits.DI_KeyA_At891A_LO, 0, 'the ladder leaves the key input alone');
+  settle891A(captive.bits);
   assert.equal(captive.bits.DI_891A_Closed, 1);
   assert.equal(captive.bits.DI_KeyA_At891A_LO, 1, 'key A stays on the lock while 891A is closed');
 
   const freed = initialState(ioOf(r));
-  step(freed, { DI_52C1_52b: 1, DI_52C1_52a: 0, CMD_891A_Open: 1 });
+  step(freed, { DI_52C1_52b: 1, DI_52C1_52a: 0 });
   assert.equal(freed.bits.P_891A_Operate, 1);
+  apply891AField(freed.bits, 'open');
   assert.equal(freed.bits.DI_891A_Open, 1);
   assert.equal(freed.bits.DI_891A_Closed, 0);
   assert.equal(freed.bits.DI_KeyA_At891A_LO, 1);
-  step(freed, { CMD_891A_LockOpen: 1 });
+  apply891AField(freed.bits, 'lock');
   assert.equal(freed.bits.DI_891A_Open, 1);
   assert.equal(freed.bits.DI_KeyA_At891A_LO, 0, 'locking 891A open frees key A');
 });
@@ -511,25 +523,29 @@ test('891A keeps its position when 52C1 is closed, and stays open while key A is
     for (const lad of ladsOf(r)) analyze(lad, st, { live: true });
   };
   const held = initialState(ioOf(r));
-  step(held, { DI_52C1_52a: 1, DI_52C1_52b: 0, CMD_891A_Open: 1 });
+  step(held, { DI_52C1_52a: 1, DI_52C1_52b: 0 });
   assert.equal(held.bits.P_52C1_ProvenOpen, 0);
   assert.equal(held.bits.P_891A_Operate, 0);
+  assert.equal(held.bits.IND_891A_Need52C1, 1);
+  apply891AField(held.bits, 'open');
+  apply891AField(held.bits, 'lock');
   assert.equal(held.bits.DI_891A_Closed, 1);
   assert.equal(held.bits.DI_891A_Open, 0);
-  assert.equal(held.bits.IND_891A_Need52C1, 1);
+  assert.equal(held.bits.DI_KeyA_At891A_LO, 1);
 
   const away = initialState(ioOf(r));
+  step(away, { DI_52C1_52b: 1, DI_52C1_52a: 0 });
   away.bits.DI_891A_Closed = 0;
   away.bits.DI_891A_Open = 1;
   away.bits.DI_KeyA_At891A_LO = 0;
-  step(away, { DI_52C1_52b: 1, DI_52C1_52a: 0, CMD_891A_Close: 1 });
+  apply891AField(away.bits, 'close');
   assert.equal(away.bits.P_891A_Operate, 1);
   assert.equal(away.bits.DI_891A_Open, 1);
   assert.equal(away.bits.DI_891A_Closed, 0);
-  step(away, { CMD_KeyA_Return: 1 });
+  apply891AField(away.bits, 'return');
   assert.equal(away.bits.DI_KeyA_At891A_LO, 1);
   assert.equal(away.bits.DI_891A_Open, 1);
-  step(away, { CMD_891A_Close: 1 });
+  apply891AField(away.bits, 'close');
   assert.equal(away.bits.DI_891A_Closed, 1);
   assert.equal(away.bits.DI_891A_Open, 0);
   assert.equal(away.bits.DI_KeyA_At891A_LO, 1);
