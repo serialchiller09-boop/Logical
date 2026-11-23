@@ -461,7 +461,7 @@ export const RUNGS = [
     level: 'Intermediate',
     oneLine: 'Close 52C1 after it has been proven open for 20 seconds.',
     purpose: 'Part 1 of a fictional substation capacitor bank. Breaker 52C1 closes after proven open has been true for 20 seconds, with the bank relay healthy and the lockout clear. The wait lets residual charge decay.',
-    boolean: 'P_52C1_ProvenOpen = 52b on and 52a off. The close button sets REQ_52C1_Close on its rising edge. T_52C1_MinOff is a TON at 20000 ms from proven open alone. P_52C1_Close is the accepted request with relay healthy, lockout clear, proven open, min-off done, and the two switch placeholders. CMD_52C1_Close follows the close-pulse timing bit. CMD_52C1_Trip follows the open button. C_52C1_Operations counts 52a rising edges.',
+    boolean: 'P_52C1_ProvenOpen = 52b on and 52a off. The close button sets REQ_52C1_Close on its rising edge. T_52C1_MinOff is a TON at 20000 ms from proven open alone. The open button writes CMD_52C1_Trip and clears REQ_52C1_Close in that scan. P_52C1_Close is the accepted request with relay healthy, lockout clear, proven open, min-off done, and the two switch placeholders. CMD_52C1_Close follows the close-pulse timing bit. C_52C1_Operations counts 52a rising edges.',
     ladder: {
       t: 'and',
       c: [
@@ -476,12 +476,12 @@ export const RUNGS = [
         t: 'and',
         c: [
           { t: 'no', a: 'DI_PB_52C1_Close', l: 'Close' },
-          { t: 'blk', k: 'ONS', a: 'OSR_52C1_CloseReq', l: 'One shot', p: [] },
+          { t: 'blk', k: 'ONS', a: 'ONS_52C1_CloseReq', l: 'One shot', p: [] },
           { t: 'coil', k: 'OTL', a: 'REQ_52C1_Close', l: 'Accept request' }
         ]
       }
     },
-    dischargeRung: {
+    minOffRung: {
       note: 'T_52C1_MinOff is a Timer On Delay with a 20000 ms preset. Its rung is proven open. The first true scan records the time. Later scans add the whole step. .DN is set when .ACC reaches .PRE (1756-RM018A p. 130 and TON Flow Chart (True), p. 135). The wait lets residual charge decay.',
       ladder: {
         t: 'and',
@@ -491,8 +491,19 @@ export const RUNGS = [
         ]
       }
     },
+    tripRung: {
+      note: 'The open pushbutton writes the trip command and clears the accepted close request in that scan. Why: a trip releases the pending close before the pulse runs.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'DI_PB_52C1_Open', l: 'Open' },
+          { t: 'coil', k: 'OTE', a: 'CMD_52C1_Trip', l: 'Trip command' },
+          { t: 'coil', k: 'OTU', a: 'REQ_52C1_Close', l: 'Clear request' }
+        ]
+      }
+    },
     closeRung: {
-      note: 'The close command is on while the pulse timer is timing. Why: the coil follows .TT for one pulse.',
+      note: 'P_52C1_Close is true when the request, the relay, proven open, and the finished wait are true together.',
       ladder: {
         t: 'and',
         c: [
@@ -503,7 +514,16 @@ export const RUNGS = [
           { t: 'no', a: 'T_52C1_MinOff.DN', l: 'Wait done' },
           { t: 'no', a: 'SIM_891A_Closed', l: 'Switch closed' },
           { t: 'no', a: 'SIM_891G_Open', l: 'Ground open' },
-          { t: 'coil', k: 'OTE', a: 'P_52C1_Close', l: 'Close permissive' },
+          { t: 'coil', k: 'OTE', a: 'P_52C1_Close', l: 'Close permissive' }
+        ]
+      }
+    },
+    pulseRung: {
+      note: 'The close command is on while the pulse timer is timing. Why: the coil follows .TT for one pulse.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'P_52C1_Close', l: 'Close permissive' },
           { t: 'blk', k: 'TON', a: 'T_52C1_ClosePulse', l: 'Close pulse', p: [{ k: 'PRE', v: '1000' }, { k: 'TT', v: 'pulsing' }] },
           { t: 'no', a: 'T_52C1_ClosePulse.TT', l: 'Pulse timing' },
           { t: 'coil', k: 'OTE', a: 'CMD_52C1_Close', l: 'Close command' }
@@ -517,16 +537,6 @@ export const RUNGS = [
         c: [
           { t: 'no', a: 'T_52C1_ClosePulse.DN', l: 'Pulse finished' },
           { t: 'coil', k: 'OTU', a: 'REQ_52C1_Close', l: 'Request done' }
-        ]
-      }
-    },
-    tripRung: {
-      note: 'The open pushbutton writes the trip command. Why: the trip coil follows the open button.',
-      ladder: {
-        t: 'and',
-        c: [
-          { t: 'no', a: 'DI_PB_52C1_Open', l: 'Open' },
-          { t: 'coil', k: 'OTE', a: 'CMD_52C1_Trip', l: 'Trip command' }
         ]
       }
     },
@@ -546,7 +556,7 @@ export const RUNGS = [
       { tag: 'DI_52C1_52a', type: 'DI', addr: 'I:12/2', role: '52a closed contact', initial: 0 },
       { tag: 'DI_52C1_52b', type: 'DI', addr: 'I:12/3', role: '52b open contact', initial: 1 },
       { tag: 'P_52C1_ProvenOpen', type: 'BIT', addr: 'B3:20/0', role: 'Proven open: 52b on and 52a off', initial: 0 },
-      { tag: 'OSR_52C1_CloseReq', type: 'BIT', addr: 'B3:20/1', role: 'One-shot storage for the close-button edge', initial: 0 },
+      { tag: 'ONS_52C1_CloseReq', type: 'BIT', addr: 'B3:20/1', role: 'One-shot storage for the close-button edge', initial: 0 },
       { tag: 'REQ_52C1_Close', type: 'BIT', addr: 'B3:20/2', role: 'Accepted close request', initial: 0 },
       { tag: 'DI_CAP_RelayHealthy', type: 'DI', addr: 'I:12/4', role: 'Capacitor-bank relay healthy', initial: 1 },
       { tag: 'L_86Lockout', type: 'BIT', addr: 'B3:20/3', role: '86 lockout', initial: 0 },
@@ -561,10 +571,10 @@ export const RUNGS = [
     ],
     readThisWay: [
       'Proven open is 52b on and 52a off.',
-      'The close pushbutton sets the request on its rising edge. The storage bit is OSR_52C1_CloseReq.',
+      'The close pushbutton sets the request on its rising edge. The storage bit is ONS_52C1_CloseReq.',
       'T_52C1_MinOff is a plain TON. Its only input is proven open. A fresh PLC image starts .ACC at 0 (1756-RM018A Timer On Delay, p. 130).',
+      'The open pushbutton writes the trip command and clears the accepted close request in that scan.',
       'The close command follows T_52C1_ClosePulse.TT. The command is on while that timer is timing.',
-      'The open pushbutton writes the trip command.',
       'The operations counter adds one on each 52a rising edge.'
     ],
     defects: [
@@ -575,6 +585,6 @@ export const RUNGS = [
     ],
     status: 'illustrative-example',
     mnemonics: ['XIC', 'XIO', 'OTE', 'OTL', 'OTU', 'ONS', 'TON', 'CTU'],
-    note: 'This is a fictional substation. The tags are invented. The 20 s wait and the 1 s close pulse are placeholders, not a bank specification. The wait lets residual charge decay.'
+    note: 'This is a fictional substation. The tags are invented. The 20 s wait is the lab time. The 1 s close pulse width is a placeholder. The wait lets residual charge decay.'
   }
 ];

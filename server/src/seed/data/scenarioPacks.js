@@ -30,10 +30,12 @@ const CAP_FULL_DOCK = [
 
 /** Level 6 — series AND slice of the close chain. */
 const CAP_SERIES_AND_DOCK = [
+  'DI_PB_52C1_Close',
   'REQ_52C1_Close',
   'DI_CAP_RelayHealthy',
   'L_86Lockout',
   'P_52C1_ProvenOpen',
+  'T_52C1_MinOff',
   'CMD_52C1_Close'
 ];
 
@@ -141,8 +143,8 @@ export const PROGRESSIVE_PATH_LEVELS = [
     dockTags: CAP_SERIES_AND_DOCK,
     goal: 'Every contact in the close chain is true together before the close command turns on.',
     tryThis: [
-      'Leave L_86Lockout on. Press Step. CMD_52C1_Close stays off. Why: the lockout contact is in series with the close command.',
-      'Turn L_86Lockout off and leave the breaker proven open. The close command turns on after the 20 s wait and a close press. Why: every series contact is true together.'
+      'Leave L_86Lockout off. Press Step. CMD_52C1_Close stays off. Why: the close command waits for an accepted request and the finished 20 s timer.',
+      'Press Close and leave the breaker proven open. After the 20 s timer finishes, the close command turns on. Why: every series contact is true together.'
     ],
     scanHint: 'The close command turns on when every series contact is true and the 20 s wait has finished.'
   },
@@ -157,7 +159,7 @@ export const PROGRESSIVE_PATH_LEVELS = [
     goal: 'Leave 52C1 proven open until the 20 s timer finishes. The wait lets residual charge decay.',
     tryThis: [
       'Leave DI_52C1_52b on and DI_52C1_52a off. Press Auto-scan until T_52C1_MinOff.DN is true. Why: the wait lets residual charge decay.',
-      'Turn DI_52C1_52a on while the timer is running, then press Step. T_52C1_MinOff.ACC returns to zero. Why: the TON rung is proven open, so the accumulated time clears when that rung is false.'
+      'Turn DI_52C1_52a on while the timer is running, then press Step. T_52C1_MinOff.ACC returns to zero. Why: a new proven-open period starts the timer at zero.'
     ],
     scanHint: 'Leave 52b on and 52a off. Auto-scan until the min-off timer finishes. The wait lets residual charge decay.'
   },
@@ -175,7 +177,7 @@ export const PROGRESSIVE_PATH_LEVELS = [
       'Leave 52b on and 52a off. Auto-scan until T_52C1_MinOff.DN is true, then turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close pulses. Why: the wait lets residual charge decay.',
       'With the breaker proven open and the wait still running, turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close stays off. Why: the close command waits for the 20 s timer to finish.',
       'Turn both DI_52C1_52a and DI_52C1_52b on and press Step. P_52C1_ProvenOpen stays false and the close command stays off. Why: proven open is 52b on together with 52a off.',
-      'Turn DI_52C1_52a from off to on and press Step. C_52C1_Operations adds one. Why: the counter counts each time the breaker closes.'
+      'Leave DI_52C1_52a off and press Step. Turn DI_52C1_52a on and press Step again. C_52C1_Operations adds one. Why: the counter counts each new close of the breaker.'
     ],
     scanHint: 'Press Close after the 20 s wait. The close command pulses. The wait lets residual charge decay.'
   }

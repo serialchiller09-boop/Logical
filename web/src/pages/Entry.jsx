@@ -304,7 +304,7 @@ export default function EntryPage() {
       {entry?.id === 'rungs:rung-cap-close' && (
         <p className="tiny muted" style={{ margin: '18px 0 0', maxWidth: '62ch' }}>
           This page is a fictional substation for practice. Flip the panel switches, then press Step.
-          The 20 s wait and the close pulse width are placeholders. The wait lets residual charge decay.
+          The 20 s wait is the lab time. The close pulse width is a placeholder. The wait lets residual charge decay.
         </p>
       )}
 

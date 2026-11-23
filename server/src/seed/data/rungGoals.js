@@ -92,7 +92,7 @@ export const RUNG_GOALS = {
       'Leave 52b on and 52a off. Auto-scan until T_52C1_MinOff.DN is true, then turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close pulses. Why: the wait lets residual charge decay.',
       'With the breaker proven open and the wait still running, turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close stays off. Why: the close command waits for the 20 s timer to finish.',
       'Turn both DI_52C1_52a and DI_52C1_52b on and press Step. P_52C1_ProvenOpen stays false and the close command stays off. Why: proven open is 52b on together with 52a off.',
-      'Turn DI_52C1_52a from off to on and press Step. C_52C1_Operations adds one. Why: the counter counts each time the breaker closes.'
+      'Leave DI_52C1_52a off and press Step. Turn DI_52C1_52a on and press Step again. C_52C1_Operations adds one. Why: the counter counts each new close of the breaker.'
     ]
   }),
   'rung-pid-level': {

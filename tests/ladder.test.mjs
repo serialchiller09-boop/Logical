@@ -407,9 +407,9 @@ test('block pin values stay short enough to fit inside the TON box', () => {
   assert.ok(fitPinText('PLACEHOLDER - manufacturer / approved procedure', 16).length <= 16);
 
   const cap = byId['rung-cap-close'];
-  const ton = collectElements(cap.dischargeRung.ladder).find((el) => el.k === 'TON');
+  const ton = collectElements(cap.minOffRung.ladder).find((el) => el.k === 'TON');
   assert.equal(ton.a, 'T_52C1_MinOff');
-  const pins = collectElements(cap.dischargeRung.ladder)
+  const pins = collectElements(cap.minOffRung.ladder)
     .filter((el) => el.t === 'blk')
     .flatMap((el) => el.p || []);
   for (const p of pins) {
@@ -428,7 +428,10 @@ test('52C1 proven open needs both contacts', () => {
 
 test('52C1 min-off is a 20000 ms TON, and close waits for it', () => {
   const cap = byId['rung-cap-close'];
-  const els = collectElements(cap.dischargeRung.ladder);
+  const els = collectElements(cap.minOffRung.ladder);
+  const pulse = collectElements(cap.pulseRung.ladder);
+  assert.equal(pulse.at(-1).a, 'CMD_52C1_Close');
+  assert.equal(collectElements(cap.closeRung.ladder).at(-1).a, 'P_52C1_Close');
   assert.equal(els[0].a, 'P_52C1_ProvenOpen');
   assert.equal(els[1].k, 'TON');
   assert.equal(els[1].a, 'T_52C1_MinOff');
@@ -496,6 +499,51 @@ test('52C1 operations counter counts 52a rising edges, and trip follows the open
   const trip = scan('rung-cap-close', { bits: { DI_PB_52C1_Open: 1 } });
   assert.equal(trip.st.bits.CMD_52C1_Trip, 1);
   assert.equal(scan('rung-cap-close').st.bits.CMD_52C1_Trip, 0);
+});
+
+test('a trip in the same scan clears a pending close request before the pulse', () => {
+  const r = byId['rung-cap-close'];
+  const ready = (open) => {
+    const st = initialState(ioOf(r));
+    st.bits.DI_52C1_52b = 1;
+    st.bits.DI_52C1_52a = 0;
+    st.bits.REQ_52C1_Close = 1;
+    st.bits.DI_PB_52C1_Open = open ? 1 : 0;
+    st.timers.T_52C1_MinOff = { acc: 20000, dn: true, running: false, en: true, pre: 20000 };
+    return st;
+  };
+  const held = ready(false);
+  scanLadders(ladsOf(r), held);
+  assert.equal(held.bits.CMD_52C1_Close, 1);
+  assert.equal(held.bits.P_52C1_Close, 1);
+  assert.equal(held.bits.REQ_52C1_Close, 1);
+
+  const tripped = ready(true);
+  scanLadders(ladsOf(r), tripped);
+  assert.equal(tripped.bits.CMD_52C1_Trip, 1);
+  assert.equal(tripped.bits.REQ_52C1_Close, 0);
+  assert.equal(tripped.bits.P_52C1_Close, 0);
+  assert.equal(tripped.bits.CMD_52C1_Close, 0);
+  assert.equal(tripped.timers.T_52C1_MinOff.dn, true);
+});
+
+test('52C1 operations count through CTU prescan needs a rising edge after the first scan', () => {
+  const r = byId['rung-cap-close'];
+  const already = initialState(ioOf(r));
+  already.bits.DI_52C1_52a = 1;
+  scanLadders(ladsOf(r), already);
+  assert.equal(already.counters.C_52C1_Operations.acc, 0, 'prescan .CU blocks an already-true 52a');
+  assert.equal(already.counters.C_52C1_Operations.cu, true);
+
+  const stepped = initialState(ioOf(r));
+  stepped.bits.DI_52C1_52a = 0;
+  scanLadders(ladsOf(r), stepped);
+  assert.equal(stepped.counters.C_52C1_Operations.acc, 0);
+  stepped.bits.DI_52C1_52a = 1;
+  scanLadders(ladsOf(r), stepped);
+  assert.equal(stepped.counters.C_52C1_Operations.acc, 1);
+  scanLadders(ladsOf(r), stepped);
+  assert.equal(stepped.counters.C_52C1_Operations.acc, 1);
 });
 
 test('notebook and substation project files are still present', () => {
