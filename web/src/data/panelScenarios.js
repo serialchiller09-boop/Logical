@@ -13,7 +13,7 @@ export const PANEL_SCENARIOS = [
   { entryId: 'rungs:rung-latch-ack', cardTitle: 'Latch and acknowledge', levelTitle: 'Latch and acknowledge', order: 3 },
   { entryId: 'rungs:rung-2oo3', cardTitle: 'Two-out-of-three voting', levelTitle: 'Two-out-of-three', order: 4 },
   { entryId: 'rungs:rung-ton-lockout', cardTitle: 'Timer lockout', levelTitle: 'Timer lockout', order: 5 },
-  { entryId: 'rungs:rung-cap-close', cardTitle: 'Cap bank close', levelTitle: 'Cap bank close', order: 8 }
+  { entryId: 'rungs:rung-cap-close', cardTitle: 'Cap bank close', levelTitle: '52C1 close', order: 8 }
 ];
 
 export function panelScenarioHref(entryId) {

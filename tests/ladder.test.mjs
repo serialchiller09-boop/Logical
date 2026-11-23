@@ -9,6 +9,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 
 import {
@@ -406,11 +407,105 @@ test('block pin values stay short enough to fit inside the TON box', () => {
   assert.ok(fitPinText('PLACEHOLDER - manufacturer / approved procedure', 16).length <= 16);
 
   const cap = byId['rung-cap-close'];
+  const ton = collectElements(cap.dischargeRung.ladder).find((el) => el.k === 'TON');
+  assert.equal(ton.a, 'T_52C1_MinOff');
   const pins = collectElements(cap.dischargeRung.ladder)
     .filter((el) => el.t === 'blk')
     .flatMap((el) => el.p || []);
   for (const p of pins) {
     assert.ok(String(p.v).length <= 18, `cap-bank pin ${p.k}=${p.v} is too long for the box`);
+  }
+});
+
+const OPEN = { DI_52C1_52b: 1, DI_52C1_52a: 0, DI_PB_52C1_Close: 1 };
+
+test('52C1 proven open needs both contacts', () => {
+  assert.equal(scan('rung-cap-close', { bits: { DI_52C1_52b: 1, DI_52C1_52a: 0 } }).st.bits.P_52C1_ProvenOpen, 1);
+  assert.equal(scan('rung-cap-close', { bits: { DI_52C1_52b: 1, DI_52C1_52a: 1 } }).st.bits.P_52C1_ProvenOpen, 0);
+  assert.equal(scan('rung-cap-close', { bits: { DI_52C1_52b: 0, DI_52C1_52a: 0 } }).st.bits.P_52C1_ProvenOpen, 0);
+  assert.equal(scan('rung-cap-close', { bits: { DI_52C1_52b: 0, DI_52C1_52a: 1 } }).st.bits.P_52C1_ProvenOpen, 0);
+});
+
+test('52C1 min-off is a 20000 ms TON, and close waits for it', () => {
+  const cap = byId['rung-cap-close'];
+  const els = collectElements(cap.dischargeRung.ladder);
+  assert.equal(els[0].a, 'P_52C1_ProvenOpen');
+  assert.equal(els[1].k, 'TON');
+  assert.equal(els[1].a, 'T_52C1_MinOff');
+  assert.equal(els[1].p.find((p) => p.k === 'PRE').v, '20000');
+  assert.ok(!els.some((el) => el.k === 'ONS' || el.k === 'OTL' || el.k === 'OTE'));
+
+  const early = scan('rung-cap-close', { scans: 5, bits: OPEN });
+  assert.equal(early.st.timers.T_52C1_MinOff.dn, false);
+  assert.equal(early.st.timers.T_52C1_MinOff.acc, 4000);
+  assert.equal(early.st.bits.CMD_52C1_Close, 0);
+  assert.equal(early.st.bits.REQ_52C1_Close, 1);
+
+  const done = scan('rung-cap-close', { scans: 21, bits: OPEN });
+  assert.equal(done.st.timers.T_52C1_MinOff.acc, 20000);
+  assert.equal(done.st.timers.T_52C1_MinOff.dn, true);
+  assert.equal(done.st.timers.T_52C1_MinOff.running, false);
+  assert.equal(done.st.bits.P_52C1_Close, 1);
+  assert.equal(done.st.bits.CMD_52C1_Close, 1);
+  assert.equal(done.st.timers.T_52C1_ClosePulse.acc, 0);
+  assert.equal(done.st.timers.T_52C1_ClosePulse.running, true);
+
+  const after = scan('rung-cap-close', { scans: 22, bits: OPEN });
+  assert.equal(after.st.timers.T_52C1_MinOff.acc, 20000);
+  assert.equal(after.st.bits.CMD_52C1_Close, 0);
+
+  const restarted = scan('rung-cap-close', { scans: 1, bits: { DI_52C1_52b: 1, DI_52C1_52a: 0 } });
+  assert.equal(restarted.st.timers.T_52C1_MinOff.acc, 0);
+  assert.equal(restarted.st.timers.T_52C1_MinOff.dn, false);
+  assert.equal(restarted.st.timers.T_52C1_MinOff.en, true);
+});
+
+test('52C1 close stays off when a permissive is false, and the old discharge tag is gone', () => {
+  for (const blocked of [
+    { SIM_891A_Closed: 0 },
+    { SIM_891G_Open: 0 },
+    { DI_CAP_RelayHealthy: 0 },
+    { L_86Lockout: 1 }
+  ]) {
+    const st = scan('rung-cap-close', { scans: 21, bits: { ...OPEN, ...blocked } }).st;
+    assert.equal(st.bits.CMD_52C1_Close, 0, JSON.stringify(blocked));
+    assert.equal(st.bits.P_52C1_Close, 0, JSON.stringify(blocked));
+  }
+  const dumped = JSON.stringify(byId['rung-cap-close']);
+  assert.doesNotMatch(dumped, /T_CAP1_Discharge|DI_K1AtBreaker|BUS101_Energized|CAP1_DisconnectOpen/);
+});
+
+test('52C1 operations counter counts 52a rising edges, and trip follows the open button', () => {
+  const r = byId['rung-cap-close'];
+  const st = initialState(ioOf(r));
+  const step = (bits) => {
+    Object.assign(st.bits, bits);
+    st.dt = 1000;
+    for (const lad of ladsOf(r)) analyze(lad, st, { live: true });
+  };
+  step({ DI_52C1_52a: 0 });
+  assert.equal(st.counters.C_52C1_Operations.acc, 0);
+  step({ DI_52C1_52a: 1 });
+  assert.equal(st.counters.C_52C1_Operations.acc, 1);
+  step({ DI_52C1_52a: 1 });
+  assert.equal(st.counters.C_52C1_Operations.acc, 1);
+  step({ DI_52C1_52a: 0 });
+  step({ DI_52C1_52a: 1 });
+  assert.equal(st.counters.C_52C1_Operations.acc, 2);
+
+  const trip = scan('rung-cap-close', { bits: { DI_PB_52C1_Open: 1 } });
+  assert.equal(trip.st.bits.CMD_52C1_Trip, 1);
+  assert.equal(scan('rung-cap-close').st.bits.CMD_52C1_Trip, 0);
+});
+
+test('notebook and substation project files are still present', () => {
+  for (const path of [
+    'web/src/data/substationProject.js',
+    'web/src/pages/ProjectNotebook.jsx',
+    'web/public/documents/controls-notebook-v1.2.pdf',
+    'docs/SUBSTATION_PLC_PROJECT_NOTEBOOK.md'
+  ]) {
+    assert.equal(existsSync(new URL(`../${path}`, import.meta.url)), true, path);
   }
 });
 

@@ -11,6 +11,7 @@ const SKIP = new Set([
   'goal', 'tryThis',
   // secondary rungs: authored under arbitrary keys, picked up by subRungs() and drawn as diagrams
   'followOn', 'outputRung', 'proveRung', 'clearRung', 'resetRung', 'fuelRung', 'encodeRung',
+  'acceptRung', 'dischargeRung', 'closeRung', 'countRung',
   'swapRung', 'validRung', 'tripRung', 'overrideRung', 'blockRung', 'solenoidRung', 'timerRung'
 ]);
 

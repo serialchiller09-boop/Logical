@@ -456,67 +456,125 @@ export const RUNGS = [
 
   {
     id: 'rung-cap-close',
-    title: 'Switched capacitor bank close: discharge wait and key interlock',
+    title: 'Capacitor bank breaker 52C1 close',
     category: 'Capacitor banks / switchgear',
     level: 'Intermediate',
-    oneLine: 'Close CAP-1 only when the bank is discharged, the key is at the breaker, and every electrical permissive is true.',
-    purpose: 'Supplemental close gate for a switched capacitor bank (repeat with independent tags, timer, ONS storage and transfer key K2 for CAP-2 - never share state between banks). The close command goes out when: bus energized and voltage proven, relay protection healthy, the transfer key is trapped at the breaker, disconnect/access is closed, no 86 lockout is latched, the breaker is proven open, and the bank discharge timer has run to .DN. The command is written to the close coil as a bounded pulse; the breaker\'s own 52a feedback is what proves the mechanism actually moved. The PLC indication is supplemental to the mechanical Kirk key system and the approved safe-work process - it never proves discharge or absence of voltage.',
-    boolean: 'CAP1_CLOSE_CMD = CAP1_CloseReq AND BUS101_Energized AND CAP1_RelayHealthy AND DI_K1AtBreaker AND NOT CAP1_DisconnectOpen AND NOT L_86Lockout AND T_CAP1_Discharge.DN AND NOT CAP1_52a',
+    oneLine: 'Close 52C1 after it has been proven open for 20 seconds.',
+    purpose: 'Part 1 of a fictional substation capacitor bank. Breaker 52C1 closes after proven open has been true for 20 seconds, with the bank relay healthy and the lockout clear. The wait lets residual charge decay.',
+    boolean: 'P_52C1_ProvenOpen = 52b on and 52a off. The close button sets REQ_52C1_Close on its rising edge. T_52C1_MinOff is a TON at 20000 ms from proven open alone. P_52C1_Close is the accepted request with relay healthy, lockout clear, proven open, min-off done, and the two switch placeholders. CMD_52C1_Close follows the close-pulse timing bit. CMD_52C1_Trip follows the open button. C_52C1_Operations counts 52a rising edges.',
     ladder: {
       t: 'and',
       c: [
-        { t: 'no', a: 'CAP1_CloseReq', l: 'Close request accepted' },
-        { t: 'no', a: 'BUS101_Energized', l: 'Bus energized, voltage in band' },
-        { t: 'no', a: 'CAP1_RelayHealthy', l: 'Relay / protection healthy' },
-        { t: 'no', a: 'DI_K1AtBreaker', l: 'K1 trapped at breaker' },
-        { t: 'nc', a: 'CAP1_DisconnectOpen', l: 'Disconnect / access closed' },
-        { t: 'nc', a: 'L_86Lockout', l: 'No lockout' },
-        { t: 'no', a: 'T_CAP1_Discharge.DN', l: 'Discharge wait complete' },
-        { t: 'nc', a: 'CAP1_52a', l: 'Breaker proven open' },
-        { t: 'coil', k: 'OTE', a: 'CAP1_CloseCmd', l: 'Close command (bounded pulse)' }
+        { t: 'no', a: 'DI_52C1_52b', l: '52b on' },
+        { t: 'nc', a: 'DI_52C1_52a', l: '52a off' },
+        { t: 'coil', k: 'OTE', a: 'P_52C1_ProvenOpen', l: 'Proven open' }
       ]
     },
-    dischargeRung: {
-      note: 'The discharge timer is the half that is easy to forget: it only runs when the breaker is proven open, current is gone, and a key release has been requested. Current returning resets it - a TON is non-retentive - so .DN is not a measurement of discharged bank, it is a waited clock:',
+    acceptRung: {
+      note: 'The close pushbutton sets the request on its rising edge. Why: one press is one accepted request.',
       ladder: {
         t: 'and',
         c: [
-          { t: 'nc', a: 'CAP1_52a', l: 'Breaker proven open' },
-          { t: 'no', a: 'CAP1_NoCurrent', l: 'No-current proof true' },
-          { t: 'no', a: 'CAP1_KeyReleaseReq', l: 'Key release requested' },
-          { t: 'blk', k: 'TON', a: 'T_CAP1_Discharge', l: 'Discharge wait timer', p: [{ k: 'PRE', v: 'site PRE' }, { k: 'DN', v: 'wait complete' }] }
+          { t: 'no', a: 'DI_PB_52C1_Close', l: 'Close' },
+          { t: 'blk', k: 'ONS', a: 'OSR_52C1_CloseReq', l: 'One shot', p: [] },
+          { t: 'coil', k: 'OTL', a: 'REQ_52C1_Close', l: 'Accept request' }
+        ]
+      }
+    },
+    dischargeRung: {
+      note: 'T_52C1_MinOff is a Timer On Delay with a 20000 ms preset. Its rung is proven open. The first true scan records the time. Later scans add the whole step. .DN is set when .ACC reaches .PRE (1756-RM018A p. 130 and TON Flow Chart (True), p. 135). The wait lets residual charge decay.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'P_52C1_ProvenOpen', l: 'Proven open' },
+          { t: 'blk', k: 'TON', a: 'T_52C1_MinOff', l: 'Min-off wait', p: [{ k: 'PRE', v: '20000' }, { k: 'DN', v: 'wait done' }] }
+        ]
+      }
+    },
+    closeRung: {
+      note: 'The close command is on while the pulse timer is timing. Why: the coil follows .TT for one pulse.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'REQ_52C1_Close', l: 'Request accepted' },
+          { t: 'no', a: 'DI_CAP_RelayHealthy', l: 'Relay healthy' },
+          { t: 'nc', a: 'L_86Lockout', l: 'Lockout clear' },
+          { t: 'no', a: 'P_52C1_ProvenOpen', l: 'Proven open' },
+          { t: 'no', a: 'T_52C1_MinOff.DN', l: 'Wait done' },
+          { t: 'no', a: 'SIM_891A_Closed', l: 'Switch closed' },
+          { t: 'no', a: 'SIM_891G_Open', l: 'Ground open' },
+          { t: 'coil', k: 'OTE', a: 'P_52C1_Close', l: 'Close permissive' },
+          { t: 'blk', k: 'TON', a: 'T_52C1_ClosePulse', l: 'Close pulse', p: [{ k: 'PRE', v: '1000' }, { k: 'TT', v: 'pulsing' }] },
+          { t: 'no', a: 'T_52C1_ClosePulse.TT', l: 'Pulse timing' },
+          { t: 'coil', k: 'OTE', a: 'CMD_52C1_Close', l: 'Close command' }
+        ]
+      }
+    },
+    clearRung: {
+      note: 'When the close pulse finishes, the accepted request clears. Why: one press produces one pulse.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'T_52C1_ClosePulse.DN', l: 'Pulse finished' },
+          { t: 'coil', k: 'OTU', a: 'REQ_52C1_Close', l: 'Request done' }
+        ]
+      }
+    },
+    tripRung: {
+      note: 'The open pushbutton writes the trip command. Why: the trip coil follows the open button.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'DI_PB_52C1_Open', l: 'Open' },
+          { t: 'coil', k: 'OTE', a: 'CMD_52C1_Trip', l: 'Trip command' }
+        ]
+      }
+    },
+    countRung: {
+      note: 'Each time 52a turns on, the operations counter adds one. Why: an operation is a close of the breaker.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'DI_52C1_52a', l: '52a on' },
+          { t: 'blk', k: 'CTU', a: 'C_52C1_Operations', l: 'Operations', p: [{ k: 'PRE', v: '10000' }, { k: 'ACC', v: 'count' }] }
         ]
       }
     },
     io: [
-      { tag: 'CAP1_CloseReq', type: 'BIT', addr: 'B3:7/0', role: 'Accepted close request, latched once by the upstream request-acceptance rung', initial: 0 },
-      { tag: 'BUS101_Energized', type: 'DI', addr: 'I:1/3', role: 'Bus energized, voltage relay proof', initial: 0 },
-      { tag: 'CAP1_RelayHealthy', type: 'DI', addr: 'I:1/4', role: 'Cap-bank relay composite healthy', initial: 0 },
-      { tag: 'DI_K1AtBreaker', type: 'DI', addr: 'I:1/11', role: 'K1 transfer key inserted / trapped at breaker', initial: 1 },
-      { tag: 'CAP1_DisconnectOpen', type: 'DI', addr: 'I:1/13', role: 'Disconnect or access door open - blocks close', initial: 0 },
-      { tag: 'L_86Lockout', type: 'BIT', addr: 'B3:10/0', role: 'Master lockout latched on any trip', initial: 0 },
-      { tag: 'T_CAP1_Discharge', type: 'TIMER', addr: 'T4:0', role: 'Bank discharge wait; the preset comes from the capacitor-bank nameplate and the approved procedure at your site - never from this page', initial: 0 },
-      { tag: 'CAP1_52a', type: 'DI', addr: 'I:1/9', role: 'CAP-1 closed indication', initial: 0 },
-      { tag: 'CAP1_NoCurrent', type: 'DI', addr: 'I:1/15', role: 'CT no-current indication on the bank', initial: 0 },
-      { tag: 'CAP1_KeyReleaseReq', type: 'BIT', addr: 'B3:7/1', role: 'Key-release request from the operator sequence', initial: 0 },
-      { tag: 'CAP1_CloseCmd', type: 'DO', addr: 'O:4/0', role: 'CAP-1 close coil command (pulsed, not sealed in)', initial: 0 }
+      { tag: 'DI_PB_52C1_Close', type: 'DI', addr: 'I:12/0', role: 'Close pushbutton for breaker 52C1', initial: 0 },
+      { tag: 'DI_PB_52C1_Open', type: 'DI', addr: 'I:12/1', role: 'Open pushbutton for breaker 52C1', initial: 0 },
+      { tag: 'DI_52C1_52a', type: 'DI', addr: 'I:12/2', role: '52a closed contact', initial: 0 },
+      { tag: 'DI_52C1_52b', type: 'DI', addr: 'I:12/3', role: '52b open contact', initial: 1 },
+      { tag: 'P_52C1_ProvenOpen', type: 'BIT', addr: 'B3:20/0', role: 'Proven open: 52b on and 52a off', initial: 0 },
+      { tag: 'OSR_52C1_CloseReq', type: 'BIT', addr: 'B3:20/1', role: 'One-shot storage for the close-button edge', initial: 0 },
+      { tag: 'REQ_52C1_Close', type: 'BIT', addr: 'B3:20/2', role: 'Accepted close request', initial: 0 },
+      { tag: 'DI_CAP_RelayHealthy', type: 'DI', addr: 'I:12/4', role: 'Capacitor-bank relay healthy', initial: 1 },
+      { tag: 'L_86Lockout', type: 'BIT', addr: 'B3:20/3', role: '86 lockout', initial: 0 },
+      { tag: 'T_52C1_MinOff', type: 'TIMER', addr: 'T4:20', role: '20 s min-off wait while the breaker is proven open', initial: 0 },
+      { tag: 'SIM_891A_Closed', type: 'BIT', addr: 'B3:20/4', role: 'Switch placeholder, closed', initial: 1 },
+      { tag: 'SIM_891G_Open', type: 'BIT', addr: 'B3:20/5', role: 'Ground-switch placeholder, open', initial: 1 },
+      { tag: 'P_52C1_Close', type: 'BIT', addr: 'B3:20/6', role: 'Close permissive', initial: 0 },
+      { tag: 'T_52C1_ClosePulse', type: 'TIMER', addr: 'T4:21', role: 'Close pulse timer', initial: 0 },
+      { tag: 'CMD_52C1_Close', type: 'DO', addr: 'O:12/0', role: '52C1 close command', initial: 0 },
+      { tag: 'CMD_52C1_Trip', type: 'DO', addr: 'O:12/1', role: '52C1 trip command', initial: 0 },
+      { tag: 'C_52C1_Operations', type: 'COUNTER', addr: 'C5:20', role: 'Counts each 52a rising edge', initial: 0 }
     ],
     readThisWay: [
-      'Every element is in series, so it is one AND chain: open any contact and the close command does not go out. That is the point - a capacitor bank close has no optional permissive.',
-      'The discharge rung runs first in the program order. .DN only sets after breaker-open plus no-current plus release request stay true for the whole preset, so the close rung above can never fire while the bank is still holding charge.',
-      'The coil is an OTE command pulse, not an OTL seal-in. If you seal the output in yourself you lose the 52a proof that the mechanism actually closed - and a welded contactor looks like a successful close to anything reading only the output bit.',
-      'CAP-2 gets its own complete copy: P_CAP2_Close, T_CAP2_Discharge, K2, its own ONS storage bits and counters. A shared timer or storage bit between banks is how the wrong bank gets released.'
+      'Proven open is 52b on and 52a off.',
+      'The close pushbutton sets the request on its rising edge. The storage bit is OSR_52C1_CloseReq.',
+      'T_52C1_MinOff is a plain TON. Its only input is proven open. A fresh PLC image starts .ACC at 0 (1756-RM018A Timer On Delay, p. 130).',
+      'The close command follows T_52C1_ClosePulse.TT. The command is on while that timer is timing.',
+      'The open pushbutton writes the trip command.',
+      'The operations counter adds one on each 52a rising edge.'
     ],
     defects: [
-      'Commanding close from the request button instead of the permissive chain: one press with the key removed, or during lockout, still fires the close coil.',
-      'Treating the timer .DN as proof the bank is discharged. It is a clock, not a measurement - the no-current proof and the approved discharge procedure do the proving.',
-      'Counting close requests or command bits in the operations counter. A rejected or failed close must not count; only the proven 52a off-to-on edge counts as an operation.',
-      'Sharing the discharge timer, one-shot storage bit or key bit between CAP-1 and CAP-2. A fault on one bank can then release the other.',
-      'Letting the PLC own the Kirk key. The PLC may indicate \"release permitted\"; the trapped-key hardware, grounding and absence-of-voltage test own the safety.',
-      'No reject path: when a close is blocked, the operator needs the exact blocked reason (key out, 86 latched, discharge running) rather than a silent no-op.'
+      'The close command follows the permissive chain, including the min-off done bit.',
+      'The 20 s timer is a wait. The wait lets residual charge decay.',
+      'The operations counter counts 52a rising edges.',
+      'A fresh PLC image starts the min-off timer at zero.'
     ],
     status: 'illustrative-example',
-    mnemonics: ['XIC', 'XIO', 'OTE', 'TON'],
-    note: 'Authored example for a cap bank project. The tags are invented and every address, timer preset and limit is a placeholder - not a design value and not a starting point for yours. The discharge preset comes from the capacitor-bank manufacturer / nameplate and the adopted electrical safe-work procedure; the mechanical Kirk system remains authoritative over any PLC indication.'
+    mnemonics: ['XIC', 'XIO', 'OTE', 'OTL', 'OTU', 'ONS', 'TON', 'CTU'],
+    note: 'This is a fictional substation. The tags are invented. The 20 s wait and the 1 s close pulse are placeholders, not a bank specification. The wait lets residual charge decay.'
   }
 ];

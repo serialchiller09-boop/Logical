@@ -88,14 +88,14 @@ test('cap bank is one entry with focus flags for levels 6–7–8 (not sibling c
   assert.equal(capLevels.length, 3);
   assert.ok(capLevels.every((l) => l.rungId === 'rung-cap-close'), 'levels 6–8 share rung-cap-close');
   const focuses = new Set(capLevels.map((l) => l.focusId));
-  assert.deepEqual([...focuses].sort(), ['discharge', 'full-close', 'series-and']);
+  assert.deepEqual([...focuses].sort(), ['full-close', 'min-off', 'series-and']);
 
   const guided = GUIDED_PANEL_SCENARIOS.find((s) => s.rungId === 'rung-cap-close');
   assert.ok(guided, 'cap bank must be a guided panel scenario');
   assert.deepEqual(guided.pathLevels, [6, 7, 8]);
   assert.ok(Array.isArray(guided.pathFocuses) && guided.pathFocuses.length === 3, 'pathFocuses for 6–7–8');
   const focusIds = guided.pathFocuses.map((f) => f.focusId).sort();
-  assert.deepEqual(focusIds, ['discharge', 'full-close', 'series-and']);
+  assert.deepEqual(focusIds, ['full-close', 'min-off', 'series-and']);
   assert.equal(GUIDED_PANEL_SCENARIOS.filter((s) => s.rungId === 'rung-cap-close').length, 1);
 });
 
@@ -146,10 +146,10 @@ test('cap-bank entry goal states the close pulse win and that the timer is only 
   const entry = byId.get('rungs:rung-cap-close');
   assert.ok(entry);
   const goal = entry.payload.goal || '';
-  assert.match(goal, /close command pulse|CAP1_CloseCmd/i);
-  assert.match(goal, /wait/i);
-  assert.match(goal, /not a safety proof|not proof/i);
-  assert.doesNotMatch(goal, /safe to touch|proves safe/i);
+  assert.match(goal, /52C1/);
+  assert.match(goal, /The wait lets residual charge decay/);
+  assert.doesNotMatch(goal, /SIM_891A_Closed|SIM_891G_Open/);
+  assert.equal(entry.payload.tryThis.length, 5);
 });
 
 test('Home unique-entry pins still match seed scenario ids', () => {
