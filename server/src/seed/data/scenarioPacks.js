@@ -10,36 +10,41 @@
  * differs by focus lives on PROGRESSIVE_PATH_LEVELS for Home/Entry to consume in later PRs.
  */
 
-/** Cap-bank boss dock set (level 8) — full close + discharge proofs. */
+/** Level 8 — full 52C1 close plate. Switch placeholders stay at their defaults. */
 const CAP_FULL_DOCK = [
-  'CAP1_CloseReq',
-  'BUS101_Energized',
-  'CAP1_RelayHealthy',
-  'DI_K1AtBreaker',
-  'CAP1_DisconnectOpen',
+  'DI_PB_52C1_Close',
+  'DI_PB_52C1_Open',
+  'DI_52C1_52a',
+  'DI_52C1_52b',
+  'P_52C1_ProvenOpen',
+  'REQ_52C1_Close',
+  'DI_CAP_RelayHealthy',
   'L_86Lockout',
-  'T_CAP1_Discharge',
-  'CAP1_52a',
-  'CAP1_NoCurrent',
-  'CAP1_KeyReleaseReq',
-  'CAP1_CloseCmd'
+  'T_52C1_MinOff',
+  'P_52C1_Close',
+  'T_52C1_ClosePulse',
+  'CMD_52C1_Close',
+  'CMD_52C1_Trip',
+  'C_52C1_Operations'
 ];
 
-/** Level 6 — series AND slice: a short close chain (not the full bank plate). */
+/** Level 6 — series AND slice of the close chain. */
 const CAP_SERIES_AND_DOCK = [
-  'CAP1_CloseReq',
-  'BUS101_Energized',
-  'CAP1_RelayHealthy',
-  'DI_K1AtBreaker',
-  'CAP1_CloseCmd'
+  'DI_PB_52C1_Close',
+  'REQ_52C1_Close',
+  'DI_CAP_RelayHealthy',
+  'L_86Lockout',
+  'P_52C1_ProvenOpen',
+  'T_52C1_MinOff',
+  'CMD_52C1_Close'
 ];
 
-/** Level 7 — discharge wait slice only. */
-const CAP_DISCHARGE_DOCK = [
-  'CAP1_52a',
-  'CAP1_NoCurrent',
-  'CAP1_KeyReleaseReq',
-  'T_CAP1_Discharge'
+/** Level 7 — 20 s min-off wait. */
+const CAP_MIN_OFF_DOCK = [
+  'DI_52C1_52a',
+  'DI_52C1_52b',
+  'P_52C1_ProvenOpen',
+  'T_52C1_MinOff'
 ];
 
 /** Level 1 — seal-in first minute: Start + Run lamp only. */
@@ -136,27 +141,27 @@ export const PROGRESSIVE_PATH_LEVELS = [
     focusId: 'series-and',
     pathLab: true,
     dockTags: CAP_SERIES_AND_DOCK,
-    goal: 'See that one false contact in series blocks the close command — every link must be true.',
+    goal: 'Every contact in the close chain is true together before the close command turns on.',
     tryThis: [
-      'Turn three of CAP1_CloseReq, BUS101_Energized, CAP1_RelayHealthy, and DI_K1AtBreaker on; leave one off. Press Step. CAP1_CloseCmd should stay off.',
-      'Turn all four on. Press Step. If the discharge wait and other bank proofs are not finished yet, close still stays off — series means every contact, not just these four.'
+      'Leave L_86Lockout off. Press Step. CMD_52C1_Close stays off. Why: the close command waits for an accepted request and the finished 20 s timer.',
+      'Press Close and leave the breaker proven open. After the 20 s timer finishes, the close command turns on. Why: every series contact is true together.'
     ],
-    scanHint: 'Any one open contact in the chain blocks CAP1_CloseCmd. These four are only part of the series — later levels add the discharge wait and the rest.'
+    scanHint: 'The close command turns on when every series contact is true and the 20 s wait has finished.'
   },
   {
     level: 7,
-    levelTitle: 'Discharge wait',
-    cardTitle: 'Discharge wait',
+    levelTitle: '20 s min-off',
+    cardTitle: '20 s min-off',
     rungId: 'rung-cap-close',
-    focusId: 'discharge',
+    focusId: 'min-off',
     pathLab: true,
-    dockTags: CAP_DISCHARGE_DOCK,
-    goal: 'Run the discharge wait until DN lights. The timer is a wait — not proof the bank is safe.',
+    dockTags: CAP_MIN_OFF_DOCK,
+    goal: 'Leave 52C1 proven open until the 20 s timer finishes. The wait lets residual charge decay.',
     tryThis: [
-      'Set CAP1_52a off (breaker open), CAP1_NoCurrent on, and CAP1_KeyReleaseReq on. Press Auto-scan until the timer DN lights.',
-      'While the timer is still running, turn CAP1_NoCurrent off. The wait should reset — DN drops.'
+      'Leave DI_52C1_52b on and DI_52C1_52a off. Press Auto-scan until T_52C1_MinOff.DN is true. Why: the wait lets residual charge decay.',
+      'Turn DI_52C1_52a on while the timer is running, then press Step. T_52C1_MinOff.ACC returns to zero. Why: a new proven-open period starts the timer at zero.'
     ],
-    scanHint: 'Keep open + no-current + release request true through Auto-scan until DN. Dropping a proof resets the wait. DN is a clock, not a safety proof.'
+    scanHint: 'Leave 52b on and 52a off. Auto-scan until the min-off timer finishes. The wait lets residual charge decay.'
   },
   {
     level: 8,
@@ -166,12 +171,15 @@ export const PROGRESSIVE_PATH_LEVELS = [
     focusId: 'full-close',
     pathLab: true,
     dockTags: CAP_FULL_DOCK,
-    goal: 'Make the close command pulse once only when every permissive is true and the wait finishes. The timer is a wait, not a safety proof.',
+    goal: 'Close 52C1 after the breaker has been proven open for 20 seconds. The wait lets residual charge decay.',
     tryThis: [
-      'Leave the discharge timer short of DN. Keep other permissives true. Press Step — CAP1_CloseCmd should stay off.',
-      'Satisfy key + electrical permissives, let the wait finish (DN), keep the breaker open, then press Step — CAP1_CloseCmd should pulse once.'
+      'Turn on DI_PB_52C1_Open and press Step. CMD_52C1_Trip turns on. Why: the open pushbutton writes the trip command.',
+      'Leave 52b on and 52a off. Auto-scan until T_52C1_MinOff.DN is true, then turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close pulses. Why: the wait lets residual charge decay.',
+      'With the breaker proven open and the wait still running, turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close stays off. Why: the close command waits for the 20 s timer to finish.',
+      'Turn both DI_52C1_52a and DI_52C1_52b on and press Step. P_52C1_ProvenOpen stays false and the close command stays off. Why: proven open is 52b on together with 52a off.',
+      'Leave DI_52C1_52a off and press Step. Turn DI_52C1_52a on and press Step again. C_52C1_Operations adds one. Why: the counter counts each new close of the breaker.'
     ],
-    scanHint: 'CAP1_CloseCmd pulses only when the full AND chain is true, including discharge DN. The timer is a wait — not proof the bank is safe to touch.'
+    scanHint: 'Press Close after the 20 s wait. The close command pulses. The wait lets residual charge decay.'
   }
 ];
 
@@ -243,9 +251,9 @@ export const GUIDED_PANEL_SCENARIOS = [
       },
       {
         level: 7,
-        focusId: 'discharge',
-        levelTitle: 'Discharge wait',
-        dockTags: CAP_DISCHARGE_DOCK
+        focusId: 'min-off',
+        levelTitle: '20 s min-off',
+        dockTags: CAP_MIN_OFF_DOCK
       },
       {
         level: 8,
@@ -256,10 +264,10 @@ export const GUIDED_PANEL_SCENARIOS = [
     ],
     focusStepTags: {
       'series-and': CAP_SERIES_AND_DOCK,
-      discharge: CAP_DISCHARGE_DOCK,
+      'min-off': CAP_MIN_OFF_DOCK,
       'full-close': CAP_FULL_DOCK
     },
-    scanHint: 'CAP1_CloseCmd pulses only when the full AND chain is true, including discharge DN. The timer is a wait — not proof the bank is safe to touch.'
+    scanHint: 'Press Close after the 20 s wait. The close command pulses. The wait lets residual charge decay.'
   }
 ];
 

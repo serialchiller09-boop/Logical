@@ -86,10 +86,13 @@ export const RUNG_GOALS = {
     ]
   },
   'rung-cap-close': withScenario('rung-cap-close', {
-    goal: 'Make the close command pulse once only when every permissive is true and the wait finishes. The timer is a wait, not a safety proof.',
+    goal: 'Close 52C1 after the breaker has been proven open for 20 seconds. The wait lets residual charge decay.',
     tryThis: [
-      'Leave the discharge timer short of DN. Keep other permissives true. Press Step — CAP1_CloseCmd should stay off.',
-      'Satisfy key + electrical permissives, let the wait finish (DN), keep the breaker open, then press Step — CAP1_CloseCmd should pulse once.'
+      'Turn on DI_PB_52C1_Open and press Step. CMD_52C1_Trip turns on. Why: the open pushbutton writes the trip command.',
+      'Leave 52b on and 52a off. Auto-scan until T_52C1_MinOff.DN is true, then turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close pulses. Why: the wait lets residual charge decay.',
+      'With the breaker proven open and the wait still running, turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close stays off. Why: the close command waits for the 20 s timer to finish.',
+      'Turn both DI_52C1_52a and DI_52C1_52b on and press Step. P_52C1_ProvenOpen stays false and the close command stays off. Why: proven open is 52b on together with 52a off.',
+      'Leave DI_52C1_52a off and press Step. Turn DI_52C1_52a on and press Step again. C_52C1_Operations adds one. Why: the counter counts each new close of the breaker.'
     ]
   }),
   'rung-pid-level': {

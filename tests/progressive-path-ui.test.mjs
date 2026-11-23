@@ -45,9 +45,9 @@ test('findPathLevel resolves level query and focus on shared rung entries', () =
   const l2 = findPathLevel({ entryId: 'rungs:rung-seal-in', levelParam: '2' });
   assert.equal(l2?.level, 2);
 
-  const l7 = findPathLevel({ entryId: 'rungs:rung-cap-close', focusParam: 'discharge' });
+  const l7 = findPathLevel({ entryId: 'rungs:rung-cap-close', focusParam: 'min-off' });
   assert.equal(l7?.level, 7);
-  assert.equal(l7?.focusId, 'discharge');
+  assert.equal(l7?.focusId, 'min-off');
 
   const defaultCap = findPathLevel({ entryId: 'rungs:rung-cap-close' });
   assert.equal(defaultCap?.level, 6);
@@ -62,12 +62,13 @@ test('nextPathLevel walks 1→8 then ends', () => {
   assert.equal(nextPathLevel(cur), null);
 });
 
-test('cap-bank path goals keep the timer honesty line on levels 7–8', () => {
+test('cap-bank path goals name the 20 s min-off wait on levels 7–8', () => {
   for (const n of [7, 8]) {
     const l = WEB_PATH.find((x) => x.level === n);
-    assert.match(l.goal, /wait/i);
-    assert.match(l.goal, /not a safety proof|not proof/i);
+    assert.match(l.goal, /The wait lets residual charge decay/);
+    assert.doesNotMatch(`${l.goal} ${l.scanHint} ${l.tryThis.join(' ')}`, /SIM_891A_Closed|SIM_891G_Open/);
   }
   const boss = WEB_PATH.find((x) => x.level === 8);
-  assert.match(boss.goal, /pulse once/i);
+  assert.equal(boss.tryThis.length, 5);
+  assert.match(boss.dockTags.join(' '), /T_52C1_MinOff/);
 });

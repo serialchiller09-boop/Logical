@@ -144,10 +144,9 @@ export default function EntryPage() {
         ) : (
           entry.subtitle && <p className="detail-sub">{entry.subtitle}</p>
         )}
-        {hasRung && guided && (
+        {hasRung && guided && entry.id !== 'rungs:rung-cap-close' && (
           <p className="tiny muted" style={{ margin: '8px 0 0', maxWidth: '62ch' }}>
             Practice only — flip the panel switches, then press Step. Not real plant I/O.
-            {pathLevel?.level >= 6 ? ' The discharge timer is a wait, not a safety proof.' : ''}
           </p>
         )}
         {!hasRung && (
@@ -300,6 +299,13 @@ export default function EntryPage() {
             </div>
           </aside>
         </div>
+      )}
+
+      {entry?.id === 'rungs:rung-cap-close' && (
+        <p className="tiny muted" style={{ margin: '18px 0 0', maxWidth: '62ch' }}>
+          This page is a fictional substation for practice. Flip the panel switches, then press Step.
+          The 20 s wait is the lab time. The close pulse width is a placeholder. The wait lets residual charge decay.
+        </p>
       )}
 
       <div className="pager">
