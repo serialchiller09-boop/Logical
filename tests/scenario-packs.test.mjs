@@ -149,7 +149,7 @@ test('cap-bank entry goal states the close pulse win and that the timer is only 
   assert.match(goal, /52C1/);
   assert.match(goal, /The wait lets residual charge decay/);
   assert.doesNotMatch(goal, /SIM_891A_Closed|SIM_891G_Open/);
-  assert.equal(entry.payload.tryThis.length, 5);
+  assert.equal(entry.payload.tryThis.length, 9);
 });
 
 test('Home unique-entry pins still match seed scenario ids', () => {

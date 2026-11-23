@@ -12,6 +12,7 @@ import {
   subscribeTagBus
 } from '../lib/tagBus.js';
 import { IoLabDock, loadDockLayout, saveDockLayout } from './IoLabDock.jsx';
+import CapBankHmi from './CapBankHmi.jsx';
 import { isBusyDock, resolveDockLayout } from '../lib/dockLayout.js';
 
 function dockLayoutFromSearch(searchParams) {
@@ -397,6 +398,16 @@ export function RungSimulator({
         Each step adds {dt >= 1000 ? `${dt / 1000} s` : `${dt} ms`} after a timer's opening scan. The default is 1 s. The rung editor adds 100 ms per step. This is simulated elapsed time, not a Logix task period.
       </p>
       <div className="card-bd stack">
+        {entry?.id === 'rungs:rung-cap-close' && (
+          <CapBankHmi
+            bits={stRef.current.bits}
+            onRequest={(tag) => {
+              stRef.current.bits[tag] = 1;
+              busSetBit(tag, 1, 'ladder');
+              rerender();
+            }}
+          />
+        )}
         {rungs.map((r, i) => (
           <div key={r.key}>
             <div className="row spread" style={{ marginBottom: 4 }}>

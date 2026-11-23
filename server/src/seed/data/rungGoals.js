@@ -92,7 +92,11 @@ export const RUNG_GOALS = {
       'Leave 52b on and 52a off. Auto-scan until T_52C1_MinOff.DN is true, then turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close pulses. Why: the wait lets residual charge decay.',
       'With the breaker proven open and the wait still running, turn on DI_PB_52C1_Close and press Step. CMD_52C1_Close stays off. Why: the close command waits for the 20 s timer to finish.',
       'Turn both DI_52C1_52a and DI_52C1_52b on and press Step. P_52C1_ProvenOpen stays false and the close command stays off. Why: proven open is 52b on together with 52a off.',
-      'Leave DI_52C1_52a off and press Step. Turn DI_52C1_52a on and press Step again. C_52C1_Operations adds one. Why: the counter counts each new close of the breaker.'
+      'Leave DI_52C1_52a off and press Step. Turn DI_52C1_52a on and press Step again. C_52C1_Operations adds one. Why: the counter counts each new close of the breaker.',
+      'Leave 891A closed and press Step. Key A stays on the lock. Why: key A stays captive until 891A is locked open.',
+      'With 52C1 proven open, open 891A and apply the lock-open lock. Key A comes free. Why: locking 891A open frees key A for the next step.',
+      'With 52C1 closed, operate 891A. 891A stays in place and the HMI shows the reason. Why: 52C1 must be open to operate 891A.',
+      'With key A away, ask 891A to close. 891A stays open. Return key A with 52C1 still open, then close 891A. Why: 891A closes only when key A is back in its lock and 52C1 is still open.'
     ]
   }),
   'rung-pid-level': {

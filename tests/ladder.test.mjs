@@ -465,7 +465,7 @@ test('52C1 min-off is a 20000 ms TON, and close waits for it', () => {
 
 test('52C1 close stays off when a permissive is false, and the old discharge tag is gone', () => {
   for (const blocked of [
-    { SIM_891A_Closed: 0 },
+    { DI_891A_Closed: 0, DI_891A_Open: 1 },
     { SIM_891G_Open: 0 },
     { DI_CAP_RelayHealthy: 0 },
     { L_86Lockout: 1 }
@@ -475,7 +475,70 @@ test('52C1 close stays off when a permissive is false, and the old discharge tag
     assert.equal(st.bits.P_52C1_Close, 0, JSON.stringify(blocked));
   }
   const dumped = JSON.stringify(byId['rung-cap-close']);
-  assert.doesNotMatch(dumped, /T_CAP1_Discharge|DI_K1AtBreaker|BUS101_Energized|CAP1_DisconnectOpen/);
+  assert.doesNotMatch(dumped, /T_CAP1_Discharge|DI_K1AtBreaker|BUS101_Energized|CAP1_DisconnectOpen|SIM_891A_Closed/);
+  assert.match(byId['rung-cap-close'].closeRung.ladder.c.map((el) => el.a).join(' '), /DI_891A_Closed/);
+});
+
+test('key A stays captive while 891A is closed and comes free after lock-open', () => {
+  const r = byId['rung-cap-close'];
+  const step = (st, bits = {}) => {
+    Object.assign(st.bits, bits);
+    st.dt = 1000;
+    for (const lad of ladsOf(r)) analyze(lad, st, { live: true });
+  };
+  const captive = initialState(ioOf(r));
+  captive.bits.DI_KeyA_At891A_LO = 0;
+  step(captive);
+  assert.equal(captive.bits.DI_891A_Closed, 1);
+  assert.equal(captive.bits.DI_KeyA_At891A_LO, 1, 'key A stays on the lock while 891A is closed');
+
+  const freed = initialState(ioOf(r));
+  step(freed, { DI_52C1_52b: 1, DI_52C1_52a: 0, CMD_891A_Open: 1 });
+  assert.equal(freed.bits.P_891A_Operate, 1);
+  assert.equal(freed.bits.DI_891A_Open, 1);
+  assert.equal(freed.bits.DI_891A_Closed, 0);
+  assert.equal(freed.bits.DI_KeyA_At891A_LO, 1);
+  step(freed, { CMD_891A_LockOpen: 1 });
+  assert.equal(freed.bits.DI_891A_Open, 1);
+  assert.equal(freed.bits.DI_KeyA_At891A_LO, 0, 'locking 891A open frees key A');
+});
+
+test('891A keeps its position when 52C1 is closed, and stays open while key A is away', () => {
+  const r = byId['rung-cap-close'];
+  const step = (st, bits = {}) => {
+    Object.assign(st.bits, bits);
+    st.dt = 1000;
+    for (const lad of ladsOf(r)) analyze(lad, st, { live: true });
+  };
+  const held = initialState(ioOf(r));
+  step(held, { DI_52C1_52a: 1, DI_52C1_52b: 0, CMD_891A_Open: 1 });
+  assert.equal(held.bits.P_52C1_ProvenOpen, 0);
+  assert.equal(held.bits.P_891A_Operate, 0);
+  assert.equal(held.bits.DI_891A_Closed, 1);
+  assert.equal(held.bits.DI_891A_Open, 0);
+  assert.equal(held.bits.IND_891A_Need52C1, 1);
+
+  const away = initialState(ioOf(r));
+  away.bits.DI_891A_Closed = 0;
+  away.bits.DI_891A_Open = 1;
+  away.bits.DI_KeyA_At891A_LO = 0;
+  step(away, { DI_52C1_52b: 1, DI_52C1_52a: 0, CMD_891A_Close: 1 });
+  assert.equal(away.bits.P_891A_Operate, 1);
+  assert.equal(away.bits.DI_891A_Open, 1);
+  assert.equal(away.bits.DI_891A_Closed, 0);
+  step(away, { CMD_KeyA_Return: 1 });
+  assert.equal(away.bits.DI_KeyA_At891A_LO, 1);
+  assert.equal(away.bits.DI_891A_Open, 1);
+  step(away, { CMD_891A_Close: 1 });
+  assert.equal(away.bits.DI_891A_Closed, 1);
+  assert.equal(away.bits.DI_891A_Open, 0);
+  assert.equal(away.bits.DI_KeyA_At891A_LO, 1);
+});
+
+test('the 891A HMI names the operate reason and one lock', () => {
+  const hmi = readFileSync(new URL('../web/src/components/CapBankHmi.jsx', import.meta.url), 'utf8');
+  assert.match(hmi, /52C1 must be open to operate 891A\./);
+  assert.doesNotMatch(hmi, /proposed|second lock|does not|cannot|T1\/A1/i);
 });
 
 test('52C1 operations counter counts 52a rising edges, and trip follows the open button', () => {

@@ -1657,6 +1657,25 @@ button.lab-dock-led {
 .re-rules-body { padding: 0 12px 12px; color: var(--ink-2); font-size: 14px; }
 .re-rules-body li { margin-bottom: 8px; }
 .re-problems, #re-problems .callout h2 { font-size: 15px; }
+.cap-hmi { margin: 0 0 8px; min-width: 0; max-width: 100%; }
+.cap-hmi-scroll { overflow-x: auto; max-width: 100%; min-width: 0; -webkit-overflow-scrolling: touch; }
+.cap-hmi-line { width: 100%; min-width: 640px; height: auto; display: block; }
+.cap-power { stroke: var(--ink-2); stroke-width: 3; fill: none; }
+.cap-blade { stroke: var(--power); stroke-width: 3; }
+.cap-jaw { stroke: var(--power); stroke-width: 2; fill: var(--panel); }
+.cap-keyline { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 5; }
+.cap-bank, .cap-box, .cap-breaker { fill: var(--panel-3); stroke: var(--line-2); stroke-width: 2; }
+.cap-breaker.is-closed { stroke: var(--power); }
+.cap-label, .cap-name, .cap-state, .cap-keyname { fill: var(--ink); font-family: var(--sans); }
+.cap-name { font-size: 15px; font-weight: 700; }
+.cap-label, .cap-state, .cap-keyname { font-size: 12px; }
+.cap-key { stroke: var(--accent); fill: none; stroke-width: 2; }
+.cap-key circle { fill: var(--panel); }
+.cap-keyletter { fill: var(--ink); font-size: 11px; font-weight: 700; font-family: var(--sans); }
+.cap-hmi-status, .cap-hmi-reason { margin: 8px 0 0; max-width: 62ch; }
+.cap-hmi-reason { color: var(--power); font-weight: 650; }
+.cap-hmi-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cap-hmi-actions .btn { min-height: 44px; }
 @media (max-width: 420px) {
   .re-instr, .re-instr:has(.re-tag + .re-tag) { grid-template-columns: minmax(0, 1fr) auto; }
   .re-kind { grid-column: 1 / -1; line-height: 1.2; }

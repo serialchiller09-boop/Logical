@@ -460,8 +460,8 @@ export const RUNGS = [
     category: 'Capacitor banks / switchgear',
     level: 'Intermediate',
     oneLine: 'Close 52C1 after it has been proven open for 20 seconds.',
-    purpose: 'Part 1 of a fictional substation capacitor bank. Breaker 52C1 closes after proven open has been true for 20 seconds, with the bank relay healthy and the lockout clear. The wait lets residual charge decay.',
-    boolean: 'P_52C1_ProvenOpen = 52b on and 52a off. The close button sets REQ_52C1_Close on its rising edge. T_52C1_MinOff is a TON at 20000 ms from proven open alone. The open button writes CMD_52C1_Trip and clears REQ_52C1_Close in that scan. P_52C1_Close is the accepted request with relay healthy, lockout clear, proven open, min-off done, and the two switch placeholders. CMD_52C1_Close follows the close-pulse timing bit. C_52C1_Operations counts 52a rising edges.',
+    purpose: 'Fictional substation capacitor bank. 891A is the disconnect ahead of breaker 52C1. Key A stays on the 891A lock while 891A is closed, and locking 891A open frees key A. 52C1 closes after proven open has been true for 20 seconds, with the bank relay healthy and the lockout clear. The wait lets residual charge decay.',
+    boolean: 'P_52C1_ProvenOpen = 52b on and 52a off. P_891A_Operate follows that proven-open bit. 891A opens, closes, and gives up key A while that bit is true. The close button sets REQ_52C1_Close on its rising edge. T_52C1_MinOff is a TON at 20000 ms from proven open alone. The open button writes CMD_52C1_Trip and clears REQ_52C1_Close in that scan. P_52C1_Close is the accepted request with relay healthy, lockout clear, proven open, min-off done, 891A closed, and the ground-switch placeholder. CMD_52C1_Close follows the close-pulse timing bit. C_52C1_Operations counts 52a rising edges.',
     ladder: {
       t: 'and',
       c: [
@@ -512,7 +512,7 @@ export const RUNGS = [
           { t: 'nc', a: 'L_86Lockout', l: 'Lockout clear' },
           { t: 'no', a: 'P_52C1_ProvenOpen', l: 'Proven open' },
           { t: 'no', a: 'T_52C1_MinOff.DN', l: 'Wait done' },
-          { t: 'no', a: 'SIM_891A_Closed', l: 'Switch closed' },
+          { t: 'no', a: 'DI_891A_Closed', l: '891A closed' },
           { t: 'no', a: 'SIM_891G_Open', l: 'Ground open' },
           { t: 'coil', k: 'OTE', a: 'P_52C1_Close', l: 'Close permissive' }
         ]
@@ -550,6 +550,123 @@ export const RUNGS = [
         ]
       }
     },
+    operateRung: {
+      note: 'P_891A_Operate follows proven open. Why: 52C1 is open before 891A moves.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'P_52C1_ProvenOpen', l: '52C1 proven open' },
+          { t: 'coil', k: 'OTE', a: 'P_891A_Operate', l: 'Operate 891A' }
+        ]
+      }
+    },
+    open891ARung: {
+      note: 'An open request with operate permission moves 891A from closed to open. Key A stays on the lock.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'CMD_891A_Open', l: 'Open request' },
+          { t: 'no', a: 'P_891A_Operate', l: 'Operate' },
+          { t: 'no', a: 'DI_891A_Closed', l: '891A closed' },
+          { t: 'coil', k: 'OTU', a: 'DI_891A_Closed', l: 'Leave closed' },
+          { t: 'coil', k: 'OTL', a: 'DI_891A_Open', l: 'Show open' }
+        ]
+      }
+    },
+    close891ARung: {
+      note: 'A close request with operate permission and key A on the lock moves 891A from open to closed.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'CMD_891A_Close', l: 'Close request' },
+          { t: 'no', a: 'P_891A_Operate', l: 'Operate' },
+          { t: 'no', a: 'DI_891A_Open', l: '891A open' },
+          { t: 'no', a: 'DI_KeyA_At891A_LO', l: 'Key A on lock' },
+          { t: 'coil', k: 'OTL', a: 'DI_891A_Closed', l: 'Show closed' },
+          { t: 'coil', k: 'OTU', a: 'DI_891A_Open', l: 'Leave open' }
+        ]
+      }
+    },
+    lockOpenRung: {
+      note: 'With 891A open and operate permission, the lock-open lock lets key A leave. Why: locking 891A open frees key A.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'CMD_891A_LockOpen', l: 'Lock open' },
+          { t: 'no', a: 'P_891A_Operate', l: 'Operate' },
+          { t: 'no', a: 'DI_891A_Open', l: '891A open' },
+          { t: 'no', a: 'DI_KeyA_At891A_LO', l: 'Key A on lock' },
+          { t: 'coil', k: 'OTU', a: 'DI_KeyA_At891A_LO', l: 'Key A free' }
+        ]
+      }
+    },
+    captiveRung: {
+      note: 'While 891A is closed, key A stays on the lock-open lock. Why: key A stays captive until 891A is locked open.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'DI_891A_Closed', l: '891A closed' },
+          { t: 'coil', k: 'OTL', a: 'DI_KeyA_At891A_LO', l: 'Key A captive' }
+        ]
+      }
+    },
+    returnKeyRung: {
+      note: 'Returning key A puts it back on the open 891A lock. The next close still waits for operate permission.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'CMD_KeyA_Return', l: 'Return key A' },
+          { t: 'no', a: 'DI_891A_Open', l: '891A open' },
+          { t: 'nc', a: 'DI_KeyA_At891A_LO', l: 'Key A in hand' },
+          { t: 'coil', k: 'OTL', a: 'DI_KeyA_At891A_LO', l: 'Key A home' }
+        ]
+      }
+    },
+    reason891ARung: {
+      note: 'An open, close, or lock request while 52C1 is closed raises the HMI reason.',
+      ladder: {
+        t: 'or',
+        c: [
+          { t: 'and', c: [
+            { t: 'no', a: 'CMD_891A_Open', l: 'Open request' },
+            { t: 'nc', a: 'P_891A_Operate', l: 'Operate clear' },
+            { t: 'coil', k: 'OTL', a: 'IND_891A_Need52C1', l: 'Show reason' }
+          ] },
+          { t: 'and', c: [
+            { t: 'no', a: 'CMD_891A_Close', l: 'Close request' },
+            { t: 'nc', a: 'P_891A_Operate', l: 'Operate clear' },
+            { t: 'coil', k: 'OTL', a: 'IND_891A_Need52C1', l: 'Show reason' }
+          ] },
+          { t: 'and', c: [
+            { t: 'no', a: 'CMD_891A_LockOpen', l: 'Lock request' },
+            { t: 'nc', a: 'P_891A_Operate', l: 'Operate clear' },
+            { t: 'coil', k: 'OTL', a: 'IND_891A_Need52C1', l: 'Show reason' }
+          ] }
+        ]
+      }
+    },
+    reasonClearRung: {
+      note: 'While 52C1 is proven open, the HMI reason clears.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'no', a: 'P_891A_Operate', l: 'Operate' },
+          { t: 'coil', k: 'OTU', a: 'IND_891A_Need52C1', l: 'Clear reason' }
+        ]
+      }
+    },
+    clear891ACmdRung: {
+      note: 'Each 891A request is for one scan.',
+      ladder: {
+        t: 'and',
+        c: [
+          { t: 'coil', k: 'OTU', a: 'CMD_891A_Open', l: 'Open request done' },
+          { t: 'coil', k: 'OTU', a: 'CMD_891A_Close', l: 'Close request done' },
+          { t: 'coil', k: 'OTU', a: 'CMD_891A_LockOpen', l: 'Lock request done' },
+          { t: 'coil', k: 'OTU', a: 'CMD_KeyA_Return', l: 'Return request done' }
+        ]
+      }
+    },
     io: [
       { tag: 'DI_PB_52C1_Close', type: 'DI', addr: 'I:12/0', role: 'Close pushbutton for breaker 52C1', initial: 0 },
       { tag: 'DI_PB_52C1_Open', type: 'DI', addr: 'I:12/1', role: 'Open pushbutton for breaker 52C1', initial: 0 },
@@ -561,7 +678,15 @@ export const RUNGS = [
       { tag: 'DI_CAP_RelayHealthy', type: 'DI', addr: 'I:12/4', role: 'Capacitor-bank relay healthy', initial: 1 },
       { tag: 'L_86Lockout', type: 'BIT', addr: 'B3:20/3', role: '86 lockout', initial: 0 },
       { tag: 'T_52C1_MinOff', type: 'TIMER', addr: 'T4:20', role: '20 s min-off wait while the breaker is proven open', initial: 0 },
-      { tag: 'SIM_891A_Closed', type: 'BIT', addr: 'B3:20/4', role: 'Switch placeholder, closed', initial: 1 },
+      { tag: 'DI_891A_Closed', type: 'DI', addr: 'I:13/0', role: '891A disconnect closed', initial: 1 },
+      { tag: 'DI_891A_Open', type: 'DI', addr: 'I:13/1', role: '891A disconnect open', initial: 0 },
+      { tag: 'DI_KeyA_At891A_LO', type: 'DI', addr: 'I:13/2', role: 'Key A in the 891A lock-open lock', initial: 1 },
+      { tag: 'P_891A_Operate', type: 'BIT', addr: 'B3:21/0', role: 'Training interlock: 52C1 proven open', initial: 0 },
+      { tag: 'CMD_891A_Open', type: 'BIT', addr: 'B3:21/1', role: 'Request to open 891A', initial: 0 },
+      { tag: 'CMD_891A_Close', type: 'BIT', addr: 'B3:21/2', role: 'Request to close 891A', initial: 0 },
+      { tag: 'CMD_891A_LockOpen', type: 'BIT', addr: 'B3:21/3', role: 'Apply the 891A lock-open lock', initial: 0 },
+      { tag: 'CMD_KeyA_Return', type: 'BIT', addr: 'B3:21/4', role: 'Return key A to the 891A lock', initial: 0 },
+      { tag: 'IND_891A_Need52C1', type: 'BIT', addr: 'B3:21/5', role: 'HMI reason: 52C1 must be open to operate 891A', initial: 0 },
       { tag: 'SIM_891G_Open', type: 'BIT', addr: 'B3:20/5', role: 'Ground-switch placeholder, open', initial: 1 },
       { tag: 'P_52C1_Close', type: 'BIT', addr: 'B3:20/6', role: 'Close permissive', initial: 0 },
       { tag: 'T_52C1_ClosePulse', type: 'TIMER', addr: 'T4:21', role: 'Close pulse timer', initial: 0 },

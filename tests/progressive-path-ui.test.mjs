@@ -69,6 +69,6 @@ test('cap-bank path goals name the 20 s min-off wait on levels 7–8', () => {
     assert.doesNotMatch(`${l.goal} ${l.scanHint} ${l.tryThis.join(' ')}`, /SIM_891A_Closed|SIM_891G_Open/);
   }
   const boss = WEB_PATH.find((x) => x.level === 8);
-  assert.equal(boss.tryThis.length, 5);
+  assert.equal(boss.tryThis.length, 9);
   assert.match(boss.dockTags.join(' '), /T_52C1_MinOff/);
 });
